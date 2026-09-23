@@ -11,6 +11,7 @@ import { SimpleModal } from "@/shared/components/ui/simple-modal";
 import { Table, Td, Th } from "@/shared/components/ui/table";
 
 // utils
+import { esLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { formatDate, formatNumber } from "@/shared/utils/format";
 
 interface StockTableProps {
@@ -86,7 +87,14 @@ export function StockTable({ stocks, sort, direction, centroId, bodegaId, busque
                                             <tr key={lote.id}>
                                                 <Td>{lote.lote}</Td>
                                                 <Td>{formatNumber(lote.cantidadDisponible)}</Td>
-                                                <Td>{formatDate(lote.fechaCaducidad)}</Td>
+                                                <Td>
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{formatDate(lote.fechaCaducidad)}</span>
+                                                        {esLoteCaducado(lote.fechaCaducidad) ? (
+                                                            <Badge tone="danger">Vencido</Badge>
+                                                        ) : null}
+                                                    </div>
+                                                </Td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -134,7 +142,7 @@ function crearSortHref(input: {
 }
 
 function alertaTone(alerta: string): "success" | "warning" | "danger" | "muted" {
-    if (alerta === "sin_stock") {
+    if (alerta === "sin_stock" || alerta === "caducado") {
         return "danger";
     }
     if (alerta === "stock_minimo" || alerta === "caducidad_proxima") {
@@ -146,6 +154,7 @@ function alertaTone(alerta: string): "success" | "warning" | "danger" | "muted" 
 function alertaLabel(alerta: string): string {
     const labels: Record<string, string> = {
         sin_stock: "Sin stock",
+        caducado: "Caducado (Merma)",
         stock_minimo: "Stock minimo",
         caducidad_proxima: "Caducidad proxima",
         ok: "OK"

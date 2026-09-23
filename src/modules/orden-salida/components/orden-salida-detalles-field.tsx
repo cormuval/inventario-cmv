@@ -10,6 +10,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 
 // utils
+import { esLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { formatDate, toDateInputValue } from "@/shared/utils/format";
 
 interface StockDisponible extends Stock {
@@ -32,14 +33,29 @@ interface DetalleSalidaRow {
 
 export function OrdenSalidaDetallesField({
     bodegaId,
-    stocks
+    stocks,
+    tipoSalida = "Consumo Interno"
 }: {
     bodegaId: string;
     stocks: StockDisponible[];
+    tipoSalida?: string;
 }): React.ReactElement {
     const [nextId, setNextId] = useState(2);
     const [detalles, setDetalles] = useState<DetalleSalidaRow[]>([crearDetalleInicial(1)]);
-    const stocksFiltrados = useMemo(() => stocks.filter((stock) => stock.bodegaId === bodegaId), [bodegaId, stocks]);
+    const esMerma = tipoSalida.trim().toLowerCase() === "merma";
+
+    const stocksFiltrados = useMemo(() => {
+        return stocks.filter((stock) => {
+            if (stock.bodegaId !== bodegaId) {
+                return false;
+            }
+            if (!esMerma && esLoteCaducado(stock.fechaCaducidad)) {
+                return false;
+            }
+            return true;
+        });
+    }, [bodegaId, stocks, esMerma]);
+
     const opciones = useMemo(() => stocksFiltrados.map((stock) => ({
         label: crearStockLabel(stock),
         productoId: String(stock.productoId),
@@ -53,7 +69,7 @@ export function OrdenSalidaDetallesField({
     useEffect(() => {
         setNextId(2);
         setDetalles([crearDetalleInicial(1)]);
-    }, [bodegaId]);
+    }, [bodegaId, esMerma]);
 
     function agregarDetalle(): void {
         setDetalles((actuales) => [...actuales, crearDetalleInicial(nextId)]);
@@ -165,5 +181,7 @@ function crearDetalleInicial(id: number): DetalleSalidaRow {
 }
 
 function crearStockLabel(stock: StockDisponible): string {
-    return `${stock.producto.descripcion} · lote ${stock.lote} · vence ${formatDate(stock.fechaCaducidad)} · ${stock.cantidadDisponible} disp.`;
+    const caducado = esLoteCaducado(stock.fechaCaducidad);
+    const prefijo = caducado ? "[CADUCADO] " : "";
+    return `${prefijo}${stock.producto.descripcion} · lote ${stock.lote} · vence ${formatDate(stock.fechaCaducidad)} · ${stock.cantidadDisponible} disp.`;
 }

@@ -165,6 +165,12 @@ async function main(): Promise<void> {
             nombre: "Daniel",
             apPaterno: "Santibanez",
             email: "dsantibanez@cmvalparaiso.cl"
+        },
+        {
+            id: "usuario-admin-practicasdas",
+            nombre: "Practicas",
+            apPaterno: "DAS",
+            email: "practicasdas@cmvalparaiso.cl"
         }
     ];
 

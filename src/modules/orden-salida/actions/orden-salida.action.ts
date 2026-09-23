@@ -14,6 +14,9 @@ import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema } from "@/modules/orde
 // types
 import type { ActionState } from "@/shared/types/action-state";
 
+// utils
+import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
+
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
 interface DetalleSalidaForm {
@@ -75,7 +78,8 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                     bodegaId: parsed.bodegaId,
                     cantidad: detalle.cantidad,
                     lote: detalle.lote,
-                    fechaCaducidad: detalle.fechaCaducidad
+                    fechaCaducidad: detalle.fechaCaducidad,
+                    tipoSalida: parsed.tipoSalida
                 });
                 await tx.ordenSalidaDetalle.create({
                     data: {
@@ -93,7 +97,11 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             accion: "crear",
             entidad: "OrdenSalida",
             entidadId: orden.id,
-            detalle: { detalles: parsed.detalles.length }
+            detalle: {
+                tipoSalida: parsed.tipoSalida,
+                destino: parsed.destino,
+                detalles: parsed.detalles.length
+            }
         });
 
         revalidatePath("/");
@@ -137,7 +145,8 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
                 bodegaId: previo.ordenSalida.bodegaId,
                 cantidad: parsed.cantidad,
                 lote: parsed.lote,
-                fechaCaducidad: parsed.fechaCaducidad
+                fechaCaducidad: parsed.fechaCaducidad,
+                tipoSalida: previo.ordenSalida.tipoSalida
             });
             await tx.ordenSalidaDetalle.update({ where: { id: detalleId }, data: parsed });
         });
@@ -200,7 +209,7 @@ function leerDetallesSalida(formData: FormData): DetalleSalidaForm[] {
 
 async function descontarStock(
     tx: Tx,
-    input: { productoId: number; bodegaId: string; cantidad: number; lote: string; fechaCaducidad: Date }
+    input: { productoId: number; bodegaId: string; cantidad: number; lote: string; fechaCaducidad: Date; tipoSalida: string }
 ): Promise<void> {
     const stock = await tx.stock.findUnique({
         where: {
@@ -215,6 +224,11 @@ async function descontarStock(
 
     if (!stock || stock.cantidadDisponible < input.cantidad) {
         throw new Error("Stock insuficiente para el producto, lote y bodega seleccionados.");
+    }
+
+    const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);
+    if (!validacion.valido) {
+        throw new Error(validacion.motivo);
     }
 
     await tx.stock.update({

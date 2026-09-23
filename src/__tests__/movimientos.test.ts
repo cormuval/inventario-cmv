@@ -10,7 +10,9 @@ import {
     obtenerTramoCaducidad,
     sumarEntrada,
     validarFechaOrdenEntrada,
-    validarFechaSalida
+    validarFechaSalida,
+    esLoteCaducado,
+    validarSalidaLoteCaducado
 } from "@/modules/stock/utils/movimientos";
 
 describe("movimientos de stock", () => {
@@ -100,5 +102,33 @@ describe("movimientos de stock", () => {
         ])).toEqual([
             { productoId: 1, bodegaId: "b1", cantidadDisponible: 0, lote: "A" }
         ]);
+    });
+
+    it("clasifica como 'caducado' un lote con fecha pasada y existencia disponible", () => {
+        const hoy = new Date("2026-07-20T00:00:00.000Z");
+        expect(evaluarAlertaStock({
+            cantidadDisponible: 10,
+            stockMinimo: 5,
+            fechaCaducidad: new Date("2026-07-19T00:00:00.000Z"),
+            hoy
+        })).toBe("caducado");
+    });
+
+    it("detecta si un lote esta caducado con esLoteCaducado", () => {
+        const hoy = new Date(2026, 6, 20, 12);
+        expect(esLoteCaducado(new Date(2026, 6, 19), hoy)).toBe(true);
+        expect(esLoteCaducado(new Date(2026, 6, 20), hoy)).toBe(true);
+        expect(esLoteCaducado(new Date(2026, 6, 21), hoy)).toBe(false);
+    });
+
+    it("valida salidas permitiendo solo Merma en lotes caducados", () => {
+        const hoy = new Date(2026, 6, 20, 12);
+        const fechaCaducada = new Date(2026, 6, 19);
+        const fechaVigente = new Date(2026, 8, 20);
+
+        expect(validarSalidaLoteCaducado("Consumo Interno", fechaCaducada, hoy).valido).toBe(false);
+        expect(validarSalidaLoteCaducado("A Otros Centros", fechaCaducada, hoy).valido).toBe(false);
+        expect(validarSalidaLoteCaducado("Merma", fechaCaducada, hoy).valido).toBe(true);
+        expect(validarSalidaLoteCaducado("Consumo Interno", fechaVigente, hoy).valido).toBe(true);
     });
 });
