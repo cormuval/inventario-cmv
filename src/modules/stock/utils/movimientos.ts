@@ -10,7 +10,7 @@ export interface StockAlertaInput {
     hoy?: Date;
 }
 
-export type StockAlerta = "sin_stock" | "stock_minimo" | "caducidad_proxima" | "ok";
+export type StockAlerta = "sin_stock" | "caducado" | "stock_minimo" | "caducidad_proxima" | "ok";
 export const DIAS_ALERTA_CADUCIDAD = [90, 60, 30, 15, 10, 5, 4, 3, 2, 1] as const;
 
 export function sumarEntrada(input: StockMovimiento): number {
@@ -41,18 +41,43 @@ export function validarFechaOrdenEntrada(fecha: Date, hoy: Date = new Date()): b
     return validarFechaSalida(fecha, hoy);
 }
 
+export function esLoteCaducado(fechaCaducidad: Date, hoy: Date = new Date()): boolean {
+    const hoyNormalizado = soloFecha(hoy).getTime();
+    const caducidadNormalizada = soloFecha(fechaCaducidad).getTime();
+    return caducidadNormalizada <= hoyNormalizado;
+}
+
+export function validarSalidaLoteCaducado(
+    tipoSalida: string,
+    fechaCaducidad: Date,
+    hoy: Date = new Date()
+): { valido: boolean; motivo?: string } {
+    const caducado = esLoteCaducado(fechaCaducidad, hoy);
+    if (caducado && tipoSalida.trim().toLowerCase() !== "merma") {
+        return {
+            valido: false,
+            motivo: "El lote seleccionado se encuentra caducado. Solo puede egresar mediante el tipo de salida 'Merma'."
+        };
+    }
+    return { valido: true };
+}
+
 export function evaluarAlertaStock(input: StockAlertaInput): StockAlerta {
     if (input.cantidadDisponible <= 0) {
         return "sin_stock";
     }
 
-    if (input.cantidadDisponible <= input.stockMinimo) {
-        return "stock_minimo";
-    }
-
     const hoy = soloFecha(input.hoy ?? new Date()).getTime();
     const caducidad = soloFecha(input.fechaCaducidad).getTime();
     const diasRestantes = Math.ceil((caducidad - hoy) / (24 * 60 * 60 * 1000));
+
+    if (diasRestantes <= 0) {
+        return "caducado";
+    }
+
+    if (input.cantidadDisponible <= input.stockMinimo) {
+        return "stock_minimo";
+    }
 
     if (diasRestantes >= 1 && diasRestantes <= DIAS_ALERTA_CADUCIDAD[0]) {
         return "caducidad_proxima";

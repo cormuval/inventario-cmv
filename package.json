@@ -12,6 +12,7 @@
         "db:generate": "prisma generate",
         "db:push": "prisma db push",
         "db:seed": "tsx prisma/seed.ts",
+        "db:seed:test-caducado": "tsx prisma/seed-test-caducado.ts",
         "db:studio": "prisma studio",
         "services:up": "docker compose up -d",
         "services:down": "docker compose down"

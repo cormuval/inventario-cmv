@@ -41,6 +41,8 @@ export function OrdenSalidaForm({
     const [state, formAction] = useActionState(crearOrdenSalida, initialActionState);
     const primerStock = stocks[0];
     const [bodegaId, setBodegaId] = useState(primerStock?.bodegaId ?? bodegas[0]?.id ?? "");
+    const [tipoSalida, setTipoSalida] = useState("Consumo Interno");
+    const esMerma = tipoSalida.trim().toLowerCase() === "merma";
 
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-3">
@@ -75,15 +77,24 @@ export function OrdenSalidaForm({
             </label>
             <label className="space-y-1 text-sm">
                 <span>Tipo salida</span>
-                <Select name="tipoSalida" required defaultValue="Consumo Interno">
+                <Select
+                    name="tipoSalida"
+                    required
+                    value={tipoSalida}
+                    onChange={(event) => setTipoSalida(event.currentTarget.value)}
+                >
                     <option value="Consumo Interno">Consumo Interno</option>
                     <option value="A Otros Centros">A Otros Centros</option>
                     <option value="Merma">Merma</option>
                 </Select>
             </label>
             <label className="space-y-1 text-sm">
-                <span>Destino</span>
-                <Input name="destino" required placeholder="Unidad o centro destino" />
+                <span>{esMerma ? "Destino / Justificación Sanitaria (Obligatorio) *" : "Destino"}</span>
+                <Input
+                    name="destino"
+                    required
+                    placeholder={esMerma ? "Ej: Baja por vencimiento en estantería según protocolo" : "Unidad o centro destino"}
+                />
             </label>
             <label className="space-y-1 text-sm">
                 <span>Correo destino</span>
@@ -91,7 +102,7 @@ export function OrdenSalidaForm({
             </label>
             <div className="border-t pt-3 md:col-span-3">
                 <p className="mb-3 text-sm font-medium">Detalle</p>
-                <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={stocks} />
+                <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={stocks} tipoSalida={tipoSalida} />
             </div>
             <div className="flex items-center gap-3 md:col-span-3">
                 <FormSubmit label="Registrar salida" />

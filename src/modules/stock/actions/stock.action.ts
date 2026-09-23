@@ -212,9 +212,10 @@ function ordenarStockConsolidado(stocks: StockConsolidadoVista[], sort: StockSor
     const multiplier = direction === "asc" ? 1 : -1;
     const alertaPeso: Record<StockAlerta, number> = {
         sin_stock: 0,
-        stock_minimo: 1,
-        caducidad_proxima: 2,
-        ok: 3
+        caducado: 1,
+        stock_minimo: 2,
+        caducidad_proxima: 3,
+        ok: 4
     };
 
     return [...stocks].sort((a, b) => {
