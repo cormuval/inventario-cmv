@@ -49,6 +49,9 @@ export function OrdenSalidaDetallesField({
             if (stock.bodegaId !== bodegaId) {
                 return false;
             }
+            if (stock.cantidadDisponible <= 0) {
+                return false;
+            }
             if (!esMerma && esLoteCaducado(stock.fechaCaducidad)) {
                 return false;
             }

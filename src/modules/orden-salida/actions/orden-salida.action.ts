@@ -222,8 +222,12 @@ async function descontarStock(
         }
     });
 
-    if (!stock || stock.cantidadDisponible < input.cantidad) {
-        throw new Error("Stock insuficiente para el producto, lote y bodega seleccionados.");
+    if (!stock || stock.cantidadDisponible <= 0) {
+        throw new Error(`El lote "${input.lote}" no tiene stock disponible (saldo: 0).`);
+    }
+
+    if (stock.cantidadDisponible < input.cantidad) {
+        throw new Error(`Stock insuficiente para el lote "${input.lote}". Solicitado: ${input.cantidad}, disponible: ${stock.cantidadDisponible}.`);
     }
 
     const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);

@@ -12,7 +12,8 @@ import {
     validarFechaOrdenEntrada,
     validarFechaSalida,
     esLoteCaducado,
-    validarSalidaLoteCaducado
+    validarSalidaLoteCaducado,
+    filtrarLotesConStockDisponible
 } from "@/modules/stock/utils/movimientos";
 
 describe("movimientos de stock", () => {
@@ -130,5 +131,18 @@ describe("movimientos de stock", () => {
         expect(validarSalidaLoteCaducado("A Otros Centros", fechaCaducada, hoy).valido).toBe(false);
         expect(validarSalidaLoteCaducado("Merma", fechaCaducada, hoy).valido).toBe(true);
         expect(validarSalidaLoteCaducado("Consumo Interno", fechaVigente, hoy).valido).toBe(true);
+    });
+
+    it("excluye lotes con saldo 0 o negativo y conserva los de saldo mayor a 0", () => {
+        const lotes = [
+            { id: "1", lote: "L1", cantidadDisponible: 10 },
+            { id: "2", lote: "L2", cantidadDisponible: 0 },
+            { id: "3", lote: "L3", cantidadDisponible: -2 },
+            { id: "4", lote: "L4", cantidadDisponible: 5 }
+        ];
+
+        const resultado = filtrarLotesConStockDisponible(lotes);
+        expect(resultado).toHaveLength(2);
+        expect(resultado.map((l) => l.lote)).toEqual(["L1", "L4"]);
     });
 });
