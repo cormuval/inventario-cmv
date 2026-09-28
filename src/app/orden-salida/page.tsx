@@ -11,6 +11,7 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
+import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 
 // utils
 import { formatDate, formatNumber } from "@/shared/utils/format";
@@ -18,18 +19,22 @@ import { formatDate, formatNumber } from "@/shared/utils/format";
 export const dynamic = "force-dynamic";
 
 export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
-    const [ordenes, centros, bodegas, stocks] = await Promise.all([
+    const alcance = await obtenerAlcanceInventario();
+    const [ordenes, stocks] = await Promise.all([
         listarOrdenesSalida(),
-        prisma.centro.findMany({ where: { estado: true }, orderBy: { nombre: "asc" } }),
-        prisma.bodega.findMany({ where: { estado: true }, orderBy: { nombre: "asc" } }),
-        prisma.stock.findMany({
-            where: { cantidadDisponible: { gt: 0 } },
-            include: {
-                producto: { select: { descripcion: true } },
-                bodega: { select: { nombre: true } }
-            },
-            orderBy: [{ producto: { descripcion: "asc" } }, { fechaCaducidad: "asc" }]
-        })
+        alcance.bodegaIds.length > 0
+            ? prisma.stock.findMany({
+                  where: {
+                      cantidadDisponible: { gt: 0 },
+                      bodegaId: { in: alcance.bodegaIds }
+                  },
+                  include: {
+                      producto: { select: { descripcion: true } },
+                      bodega: { select: { nombre: true } }
+                  },
+                  orderBy: [{ producto: { descripcion: "asc" } }, { fechaCaducidad: "asc" }]
+              })
+            : Promise.resolve([])
     ]);
 
     return (
@@ -44,7 +49,14 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                         <CardTitle>Nueva salida</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <OrdenSalidaForm centros={centros} bodegas={bodegas} stocks={stocks} />
+                        <OrdenSalidaForm
+                            centros={alcance.centros}
+                            bodegas={alcance.bodegas}
+                            stocks={stocks}
+                            centroId={alcance.centroId}
+                            bodegaId={alcance.bodegaId}
+                            puedeFiltrarCentro={alcance.puedeFiltrarCentro}
+                        />
                     </CardContent>
                 </Card>
                 <Card>
