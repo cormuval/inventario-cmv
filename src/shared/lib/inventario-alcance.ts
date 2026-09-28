@@ -110,7 +110,7 @@ async function obtenerAlcanceCentro(usuario: SessionUser, filtros: InventarioFil
 }
 
 async function obtenerAlcanceBodegasAsociadas(usuario: SessionUser, filtros: InventarioFiltrosInput): Promise<InventarioAlcance> {
-    const [centro, encargos] = await Promise.all([
+    const [centro, encargos, bodegaDirecta] = await Promise.all([
         prisma.centro.findFirst({ where: { id: usuario.centroId, estado: true } }),
         prisma.encargadosBodega.findMany({
             where: {
@@ -120,10 +120,22 @@ async function obtenerAlcanceBodegasAsociadas(usuario: SessionUser, filtros: Inv
             },
             include: { bodega: true },
             orderBy: { bodega: { nombre: "asc" } }
-        })
+        }),
+        usuario.bodegaId
+            ? prisma.bodega.findFirst({
+                  where: { id: usuario.bodegaId, centroId: usuario.centroId, estado: true }
+              })
+            : null
     ]);
     const centros = centro ? [centro] : [];
-    const bodegas = encargos.map((encargo) => encargo.bodega);
+    const mapaBodegas = new Map<string, Bodega>();
+    for (const encargo of encargos) {
+        mapaBodegas.set(encargo.bodega.id, encargo.bodega);
+    }
+    if (bodegaDirecta) {
+        mapaBodegas.set(bodegaDirecta.id, bodegaDirecta);
+    }
+    const bodegas = [...mapaBodegas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
     const bodegaId = normalizarSeleccion(filtros.bodegaId, bodegas.map((bodega) => bodega.id));
 
     return crearAlcance({
