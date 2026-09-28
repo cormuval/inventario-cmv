@@ -85,12 +85,40 @@ async function main(): Promise<void> {
         }
     });
 
+    // Lote Fantasma / Sin Stock: Saldo 0 unidades, vigencia futura
+    await prisma.stock.upsert({
+        where: {
+            stock_lote_unico: {
+                productoId: productoTest.id,
+                bodegaId: bodega.id,
+                lote: "TEST-ZERO-00",
+                fechaCaducidad: fechaFutura
+            }
+        },
+        update: {
+            cantidadDisponible: 0,
+            stockMinimo: 5,
+            fechaCaducidad: fechaFutura,
+            fechaUltimaActualizacion: new Date()
+        },
+        create: {
+            productoId: productoTest.id,
+            bodegaId: bodega.id,
+            lote: "TEST-ZERO-00",
+            fechaCaducidad: fechaFutura,
+            cantidadDisponible: 0,
+            stockMinimo: 5,
+            fechaUltimaActualizacion: new Date()
+        }
+    });
+
     console.log("==========================================================");
     console.log("PRODUCTO DE PRUEBA SANITARIO CREADO EXITOSAMENTE:");
     console.log(`- Producto: #${productoTest.id} ${productoTest.descripcion}`);
     console.log(`- Bodega: ${bodega.nombre} (${bodega.id})`);
     console.log(`- Lote Caducado: TEST-CAD-01 (Venció: ${fechaAyer.toISOString().split("T")[0]}, Saldo: 50)`);
     console.log(`- Lote Vigente:  TEST-VIG-02 (Vence:   ${fechaFutura.toISOString().split("T")[0]}, Saldo: 50)`);
+    console.log(`- Lote Sin Stock: TEST-ZERO-00 (Vence:  ${fechaFutura.toISOString().split("T")[0]}, Saldo: 0)`);
     console.log("==========================================================");
 }
 

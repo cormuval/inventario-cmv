@@ -150,6 +150,10 @@ export function filtrarExistenciasVisibles<T extends StockLoteFiltrable>(stocks:
     });
 }
 
+export function filtrarLotesConStockDisponible<T extends { cantidadDisponible: number }>(lotes: T[]): T[] {
+    return lotes.filter((lote) => lote.cantidadDisponible > 0);
+}
+
 export function consolidarStockPorProductoBodega<T extends StockLoteConsolidable>(stocks: T[]): StockConsolidadoBasico[] {
     const acumulados = new Map<string, StockConsolidadoBasico>();
 
