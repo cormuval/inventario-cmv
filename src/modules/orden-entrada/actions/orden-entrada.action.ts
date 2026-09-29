@@ -5,7 +5,8 @@ import type { PrismaClient } from "@prisma/client";
 
 // lib
 import { requireSessionUser, puedeOperarEntrada } from "@/shared/lib/auth";
-import { validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -28,14 +29,19 @@ interface DetalleEntradaForm {
 }
 
 export async function listarOrdenesEntrada() {
-    const user = await requireSessionUser();
+    const filtroAlcance = crearFiltroMovimientosAlcance(await obtenerAlcanceInventario());
+
+    if (!filtroAlcance) {
+        return [];
+    }
+
     const desde = new Date();
     desde.setHours(0, 0, 0, 0);
     desde.setDate(desde.getDate() - 90);
 
     return prisma.ordenEntrada.findMany({
         where: {
-            usuarioId: user.id,
+            ...filtroAlcance,
             fecha: { gte: desde }
         },
         include: {
@@ -147,6 +153,7 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
                 where: { id: detalleId },
                 include: { ordenEntrada: true }
             });
+            await validarCentroBodegaEnAlcance(previo.ordenEntrada.centroId, previo.ordenEntrada.bodegaId);
             await revertirEntradaStock(tx, {
                 productoId: previo.productoId,
                 bodegaId: previo.ordenEntrada.bodegaId,
@@ -185,6 +192,7 @@ export async function eliminarDetalleEntrada(detalleId: string): Promise<ActionS
                 where: { id: detalleId },
                 include: { ordenEntrada: true }
             });
+            await validarCentroBodegaEnAlcance(detalle.ordenEntrada.centroId, detalle.ordenEntrada.bodegaId);
             await revertirEntradaStock(tx, {
                 productoId: detalle.productoId,
                 bodegaId: detalle.ordenEntrada.bodegaId,

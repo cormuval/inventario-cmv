@@ -6,6 +6,9 @@ export const DOMINIO_INSTITUCIONAL = "cmvalparaiso.cl";
 /** Rol con privilegios completos sobre el sistema. */
 export const ROL_ADMINISTRADOR = "R01";
 
+/** Rol de supervision acotado a un centro de salud (todas sus bodegas). */
+export const ROL_ENCARGADO_CENTRO = "R02";
+
 /** Ruta del formulario de inicio de sesion. */
 export const RUTA_LOGIN = "/auth/login";
 

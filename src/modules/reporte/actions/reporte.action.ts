@@ -2,6 +2,8 @@
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
+import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
+import { crearFiltroMovimientosAlcance, crearFiltroStockAlcance } from "@/shared/lib/inventario-alcance-filtros";
 
 export interface ReporteConsumoMensual {
     centro: string;
@@ -30,10 +32,19 @@ const meses = [
 ] as const;
 
 export async function listarReporteConsumoMensual(anio = new Date().getFullYear()): Promise<ReporteConsumoMensual[]> {
+    const alcance = await obtenerAlcanceInventario();
+    const filtroMovimientos = crearFiltroMovimientosAlcance(alcance);
+    const filtroStock = crearFiltroStockAlcance(alcance);
+
+    if (!filtroMovimientos || !filtroStock) {
+        return [];
+    }
+
     const [salidas, stocks] = await Promise.all([
         prisma.ordenSalidaDetalle.findMany({
             where: {
                 ordenSalida: {
+                    ...filtroMovimientos,
                     fecha: {
                         gte: new Date(`${anio}-01-01T00:00:00.000Z`),
                         lt: new Date(`${anio + 1}-01-01T00:00:00.000Z`)
@@ -52,6 +63,7 @@ export async function listarReporteConsumoMensual(anio = new Date().getFullYear(
             }
         }),
         prisma.stock.findMany({
+            where: filtroStock,
             include: {
                 producto: true,
                 bodega: {

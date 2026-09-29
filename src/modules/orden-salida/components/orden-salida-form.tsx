@@ -32,17 +32,31 @@ interface StockDisponible extends Stock {
 export function OrdenSalidaForm({
     centros,
     bodegas,
-    stocks
+    stocks,
+    centroId = null,
+    bodegaId: bodegaIdProp = null,
+    puedeFiltrarCentro = false
 }: {
     centros: Centro[];
     bodegas: Bodega[];
     stocks: StockDisponible[];
+    centroId?: string | null;
+    bodegaId?: string | null;
+    puedeFiltrarCentro?: boolean;
 }): React.ReactElement {
     const [state, formAction] = useActionState(crearOrdenSalida, initialActionState);
-    const primerStock = stocks[0];
-    const [bodegaId, setBodegaId] = useState(primerStock?.bodegaId ?? bodegas[0]?.id ?? "");
+    const [centroSeleccionado, setCentroSeleccionado] = useState(centroId ?? centros[0]?.id ?? "");
+    const bodegasFiltradas = bodegas.filter((bodega) => bodega.centroId === centroSeleccionado);
+    const primerStock = stocks.find((s) => s.bodegaId === (bodegaIdProp ?? bodegasFiltradas[0]?.id));
+    const [bodegaId, setBodegaId] = useState(bodegaIdProp ?? primerStock?.bodegaId ?? bodegasFiltradas[0]?.id ?? "");
     const [tipoSalida, setTipoSalida] = useState("Consumo Interno");
     const esMerma = tipoSalida.trim().toLowerCase() === "merma";
+
+    function cambiarCentro(nuevoCentroId: string): void {
+        setCentroSeleccionado(nuevoCentroId);
+        const disponibles = bodegas.filter((b) => b.centroId === nuevoCentroId);
+        setBodegaId(disponibles[0]?.id ?? "");
+    }
 
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-3">
@@ -52,13 +66,27 @@ export function OrdenSalidaForm({
             </label>
             <label className="space-y-1 text-sm">
                 <span>Centro</span>
-                <Select name="centroId" required>
-                    {centros.map((centro) => (
-                        <option key={centro.id} value={centro.id}>
-                            {centro.nombre}
-                        </option>
-                    ))}
-                </Select>
+                {puedeFiltrarCentro ? (
+                    <Select
+                        name="centroId"
+                        value={centroSeleccionado}
+                        onChange={(event) => cambiarCentro(event.currentTarget.value)}
+                        required
+                    >
+                        {centros.map((centro) => (
+                            <option key={centro.id} value={centro.id}>
+                                {centro.nombre}
+                            </option>
+                        ))}
+                    </Select>
+                ) : (
+                    <>
+                        <input type="hidden" name="centroId" value={centroSeleccionado} readOnly />
+                        <div className="flex h-10 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
+                            {centros.find((centro) => centro.id === centroSeleccionado)?.nombre ?? "Centro asignado"}
+                        </div>
+                    </>
+                )}
             </label>
             <label className="space-y-1 text-sm">
                 <span>Bodega</span>
@@ -68,7 +96,8 @@ export function OrdenSalidaForm({
                     value={bodegaId}
                     onChange={(event) => setBodegaId(event.currentTarget.value)}
                 >
-                    {bodegas.map((bodega) => (
+                    {bodegasFiltradas.length === 0 && <option value="">Sin bodegas disponibles</option>}
+                    {bodegasFiltradas.map((bodega) => (
                         <option key={bodega.id} value={bodega.id}>
                             {bodega.nombre}
                         </option>

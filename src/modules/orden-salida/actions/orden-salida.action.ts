@@ -5,6 +5,8 @@ import type { PrismaClient } from "@prisma/client";
 
 // lib
 import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
+import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -27,7 +29,14 @@ interface DetalleSalidaForm {
 }
 
 export async function listarOrdenesSalida() {
+    const filtroAlcance = crearFiltroMovimientosAlcance(await obtenerAlcanceInventario());
+
+    if (!filtroAlcance) {
+        return [];
+    }
+
     return prisma.ordenSalida.findMany({
+        where: filtroAlcance,
         include: {
             usuario: true,
             centro: true,
@@ -57,6 +66,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             correoDestino: formData.get("correoDestino")?.toString() || undefined,
             detalles: leerDetallesSalida(formData)
         });
+        await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
 
         const orden = await prisma.$transaction(async (tx) => {
             const nuevaOrden = await tx.ordenSalida.create({
@@ -133,6 +143,7 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
                 where: { id: detalleId },
                 include: { ordenSalida: true }
             });
+            await validarCentroBodegaEnAlcance(previo.ordenSalida.centroId, previo.ordenSalida.bodegaId);
             await devolverStock(tx, {
                 productoId: previo.productoId,
                 bodegaId: previo.ordenSalida.bodegaId,
@@ -173,6 +184,7 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
                 where: { id: detalleId },
                 include: { ordenSalida: true }
             });
+            await validarCentroBodegaEnAlcance(detalle.ordenSalida.centroId, detalle.ordenSalida.bodegaId);
             await devolverStock(tx, {
                 productoId: detalle.productoId,
                 bodegaId: detalle.ordenSalida.bodegaId,
