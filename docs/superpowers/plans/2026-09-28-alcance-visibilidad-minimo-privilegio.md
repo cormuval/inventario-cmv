@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 15 (App Router), React 19, TypeScript strict, Prisma ORM, MySQL 8.4, Vitest.
 
-**Spec:** [`docs/specs/procedimiento-alcance-visibilidad-minimo-privilegio.md`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/docs/specs/procedimiento-alcance-visibilidad-minimo-privilegio.md)
+**Spec:** [`docs/specs/procedimiento-alcance-visibilidad-minimo-privilegio.md`](../../specs/procedimiento-alcance-visibilidad-minimo-privilegio.md)
 
 ---
 

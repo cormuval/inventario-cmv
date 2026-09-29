@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Inventario APS — Corporación Municipal de Valparaíso (CMV)  
 **Documento:** Especificación de Seguridad Operativa y Control de Acceso por Alcance  
-**Versión:** 1.0 (Borrador para Aprobación)  
+**Versión:** 1.1 (Aprobada)  
 **Fecha:** 25 de Septiembre de 2026  
 **Clasificación:** Seguridad Operativa y Segregación de Datos Crítica (Prioridad Alta)  
 
@@ -71,6 +71,11 @@
 ### Regla R-03: Continuidad de Turno en Historial de Entradas y Salidas
 - `listarOrdenesSalida` y `listarOrdenesEntrada` deben filtrar por `bodegaId: { in: alcance.bodegaIds }` y `centroId: { in: alcance.centroIds }`.
 - De esta manera, los funcionarios que comparten turno en la misma bodega ven el historial completo de su bodega (garantizando continuidad operativa), pero tienen ceguera total frente a otras bodegas y otros centros.
+- El historial **no** se acota a centros/bodegas activos (una bodega desactivada conserva sus movimientos):
+  - `R01` no recibe filtro de centro ni bodega (vista panorámica completa, incluidas bodegas desactivadas).
+  - `R02` se filtra solo por `centroId: { in: alcance.centroIds }` (todas las bodegas de su centro, activas o no).
+  - `R03`, `R06`, `R07` se filtran por `bodegaId` y `centroId` de su alcance.
+- La construcción de estos filtros se centraliza en `src/shared/lib/inventario-alcance-filtros.ts` (`crearFiltroMovimientosAlcance`, `crearFiltroStockAlcance`), y aplica igual al reporte (R-04).
 
 ### Regla R-04: Reportes Acorde al Mínimo Privilegio (`/reporte`)
 - `listarReporteConsumoMensual` debe resolver el `obtenerAlcanceInventario()`.
@@ -87,29 +92,31 @@
 
 ## 4. Plan de Archivos Afectados
 
-1. [`src/shared/lib/inventario-alcance.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/shared/lib/inventario-alcance.ts):
+1. [`src/shared/lib/inventario-alcance.ts`](../../src/shared/lib/inventario-alcance.ts):
    - Mejorar `obtenerAlcanceBodegasAsociadas` para incluir unión con `usuario.bodegaId`.
-2. [`src/modules/orden-salida/actions/orden-salida.action.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/orden-salida/actions/orden-salida.action.ts):
+2. [`src/modules/orden-salida/actions/orden-salida.action.ts`](../../src/modules/orden-salida/actions/orden-salida.action.ts):
    - En `listarOrdenesSalida()`: incorporar filtro por alcance (`bodegaId in alcance.bodegaIds`).
    - En `crearOrdenSalida()`: agregar validación `validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId)`.
    - En `actualizarDetalleSalida()` y `eliminarDetalleSalida()`: validar que la orden pertenezca al alcance antes de modificar o eliminar.
-3. [`src/app/orden-salida/page.tsx`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/app/orden-salida/page.tsx):
+3. [`src/app/orden-salida/page.tsx`](../../src/app/orden-salida/page.tsx):
    - Usar `obtenerAlcanceInventario()` para alimentar `centros`, `bodegas` y `stocks` restringidos.
-4. [`src/modules/orden-salida/components/orden-salida-form.tsx`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/orden-salida/components/orden-salida-form.tsx):
+4. [`src/modules/orden-salida/components/orden-salida-form.tsx`](../../src/modules/orden-salida/components/orden-salida-form.tsx):
    - Aceptar `centroId`, `bodegaId` y `puedeFiltrarCentro` (igual que `OrdenEntradaForm`) para bloquear selección al usuario local.
-5. [`src/modules/orden-entrada/actions/orden-entrada.action.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/orden-entrada/actions/orden-entrada.action.ts):
+5. [`src/modules/orden-entrada/actions/orden-entrada.action.ts`](../../src/modules/orden-entrada/actions/orden-entrada.action.ts):
    - En `listarOrdenesEntrada()`: filtrar por `bodegaId in alcance.bodegaIds` en lugar de únicamente `usuarioId: user.id`.
    - En `actualizarDetalleEntrada()` y `eliminarDetalleEntrada()`: validar alcance antes de operar.
-6. [`src/modules/reporte/actions/reporte.action.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/reporte/actions/reporte.action.ts):
+6. [`src/modules/reporte/actions/reporte.action.ts`](../../src/modules/reporte/actions/reporte.action.ts):
    - En `listarReporteConsumoMensual()`: aplicar `obtenerAlcanceInventario()` en las consultas de salidas y stocks.
+7. [`src/shared/lib/inventario-alcance-filtros.ts`](../../src/shared/lib/inventario-alcance-filtros.ts):
+   - Filtros Prisma por rol para historiales y stock (ver R-03).
 
 ---
 
 ## 5. Criterios de Aceptación (Definición de Terminado)
 
-- [ ] **CA-1 (Salidas UI):** Un funcionario asignado a "Bodega Farmacia" de "CESFAM Barón" no ve en el selector de salidas ninguna bodega que no sea la suya, ni otros centros.
-- [ ] **CA-2 (Historial Salidas):** La tabla de salidas solo muestra despachos realizados en las bodegas que el funcionario tiene asignadas.
-- [ ] **CA-3 (Historial Entradas):** La tabla de entradas muestra recepciones de la bodega asignada (continuidad de turno) sin revelar entradas de otros CESFAMs o bodegas.
-- [ ] **CA-4 (Backend Defense):** Si se envía por API/Action un `bodegaId` o `centroId` no autorizado, el backend rechaza la transacción con error de permisos.
-- [ ] **CA-5 (Reportes):** El reporte mensual se ciñe automáticamente al alcance del usuario.
-- [ ] **CA-6 (Vista Panorámica DAS):** El usuario `R01` (Administrador) mantiene visibilidad completa y capacidad de filtrar por cualquier centro y bodega.
+- [x] **CA-1 (Salidas UI):** Un funcionario asignado a "Bodega Farmacia" de "CESFAM Barón" no ve en el selector de salidas ninguna bodega que no sea la suya, ni otros centros.
+- [x] **CA-2 (Historial Salidas):** La tabla de salidas solo muestra despachos realizados en las bodegas que el funcionario tiene asignadas.
+- [x] **CA-3 (Historial Entradas):** La tabla de entradas muestra recepciones de la bodega asignada (continuidad de turno) sin revelar entradas de otros CESFAMs o bodegas.
+- [x] **CA-4 (Backend Defense):** Si se envía por API/Action un `bodegaId` o `centroId` no autorizado, el backend rechaza la transacción con error de permisos.
+- [x] **CA-5 (Reportes):** El reporte mensual se ciñe automáticamente al alcance del usuario.
+- [x] **CA-6 (Vista Panorámica DAS):** El usuario `R01` (Administrador) mantiene visibilidad completa y capacidad de filtrar por cualquier centro y bodega.
