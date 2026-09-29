@@ -3,7 +3,7 @@
 import type { Bodega, Centro } from "@prisma/client";
 
 // config
-import { ROL_ADMINISTRADOR } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO } from "@/config/auth";
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
@@ -34,7 +34,7 @@ export async function obtenerAlcanceInventario(filtros: InventarioFiltrosInput =
         return obtenerAlcanceAdministrador(usuario, filtros);
     }
 
-    if (usuario.rol === "R02") {
+    if (usuario.rol === ROL_ENCARGADO_CENTRO) {
         return obtenerAlcanceCentro(usuario, filtros);
     }
 

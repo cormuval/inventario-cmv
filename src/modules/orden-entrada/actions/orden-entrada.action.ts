@@ -6,6 +6,7 @@ import type { PrismaClient } from "@prisma/client";
 // lib
 import { requireSessionUser, puedeOperarEntrada } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -28,9 +29,9 @@ interface DetalleEntradaForm {
 }
 
 export async function listarOrdenesEntrada() {
-    const alcance = await obtenerAlcanceInventario();
+    const filtroAlcance = crearFiltroMovimientosAlcance(await obtenerAlcanceInventario());
 
-    if (alcance.bodegaIds.length === 0 || alcance.centroIds.length === 0) {
+    if (!filtroAlcance) {
         return [];
     }
 
@@ -40,8 +41,7 @@ export async function listarOrdenesEntrada() {
 
     return prisma.ordenEntrada.findMany({
         where: {
-            bodegaId: { in: alcance.bodegaIds },
-            centroId: { in: alcance.centroIds },
+            ...filtroAlcance,
             fecha: { gte: desde }
         },
         include: {
