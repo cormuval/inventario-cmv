@@ -54,10 +54,16 @@
 - Se habilita `"A otra bodega"` como opción seleccionable en el desplegable de `tipoSalida`.
 - La opción queda sujeta a las mismas validaciones de vigencia sanitaria: **no se permite traspasar lotes caducados** ni lotes sin stock disponible (`cantidadDisponible > 0`).
 
-### Regla R-02: Selección Asistida de Bodega Receptora
-- Cuando `tipoSalida === "A otra bodega"`, el campo "Destino" deja de ser texto libre y se transforma en un selector desplegable (`<Select>`) que lista las bodegas activas pertenecientes al mismo `centroId`.
-- El selector filtra y excluye automáticamente la bodega origen seleccionada (`bodega.id !== bodegaOrigenId`).
-- Si el centro cuenta con una sola bodega, el sistema advierte que no existen otras bodegas en el centro para realizar traspasos.
+### Regla R-02: Destinos Controlados (Eliminación Total de Texto Libre en Destino)
+Para evitar que se ingresen bodegas inexistentes, nombres duplicados o datos con errores tipográficos, el campo "Destino" deja de ser texto libre en todos los tipos de salida y pasa a ser estrictamente controlado por selectores:
+1. **"A otra bodega" (Traspaso interno):**
+   - Selector desplegable (`<Select>`) que lista las bodegas activas del **mismo centro de salud**, excluyendo la bodega origen (`bodega.id !== bodegaOrigenId`).
+2. **"A Otros Centros" (Traspaso inter-centro):**
+   - Selector desplegable (`<Select>`) que lista los demás **centros de salud** comunales activos (excluyendo el centro actual).
+3. **"Consumo Interno" (Uso clínico en CESFAM):**
+   - Selector desplegable (`<Select>`) con el catálogo de unidades clínicas estándar de APS (Urgencia/SAPU, Box Médico, Vacunatorio, Dental, Toma de Muestras, Curaciones, etc.).
+4. **"Merma" (Baja sanitaria):**
+   - Selector desplegable (`<Select>`) con causales sanitarias estándar (Baja por caducidad en estantería, Rotura o deterioro de envase, Falla de cadena de frío, Alerta ISP, etc.).
 
 ### Regla R-03: Traspaso Atómico Completo en Servidor
 - En `crearOrdenSalida`, dentro de `prisma.$transaction`:

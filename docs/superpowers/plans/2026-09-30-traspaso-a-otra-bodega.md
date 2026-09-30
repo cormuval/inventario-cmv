@@ -29,26 +29,18 @@
 - Modificar: `src/modules/orden-salida/components/orden-salida-form.tsx`
 
 - [ ] **Paso 1: Agregar opción "A otra bodega" en el selector de tipo de salida**
-  En `src/modules/orden-salida/components/orden-salida-form.tsx`, agregar:
-  ```tsx
-  <option value="A otra bodega">A otra bodega</option>
-  ```
-- [ ] **Paso 2: Calcular bodegas destino disponibles del mismo centro**
-  Derivar la lista `bodegasDestinoDisponibles`:
-  ```tsx
-  const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
-  const bodegasDestinoDisponibles = bodegasFiltradas.filter((b) => b.id !== bodegaId);
-  const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
-  ```
-- [ ] **Paso 3: Renderizar selector desplegable asistido cuando sea traspaso**
-  Cuando `esTraspasoBodega` sea verdadero:
-  - Renderizar un `<Select name="bodegaDestinoId">` con las `bodegasDestinoDisponibles`.
-  - Renderizar un input oculto `<input type="hidden" name="destino" value={nombreDeBodegaDestino} />` para mantener la compatibilidad con el esquema y la tabla.
-  - Si no existen otras bodegas en el centro (`bodegasDestinoDisponibles.length === 0`), mostrar mensaje informativo deshabilitando el envío.
+  En `src/modules/orden-salida/components/orden-salida-form.tsx`, agregar la opción `"A otra bodega"`.
+- [ ] **Paso 2: Definir catálogos estándar para Destino según el tipo de salida**
+  - Para `"A otra bodega"`: Filtrar las bodegas hermanas del mismo centro (`bodegasFiltradas.filter(b => b.id !== bodegaId)`).
+  - Para `"A Otros Centros"`: Filtrar los demás centros de salud comunales (`centros.filter(c => c.id !== centroSeleccionado)`).
+  - Para `"Consumo Interno"`: Lista estandarizada de unidades de atención APS (SAPU/Urgencia, Box Médico, Vacunatorio, Dental, Toma de Muestras, Curaciones, etc.).
+  - Para `"Merma"`: Lista estandarizada de causales de baja técnica (Baja por caducidad en estantería, Deterioro de envase, Pérdida de cadena de frío, Alerta sanitaria ISP, etc.).
+- [ ] **Paso 3: Renderizar selector desplegable asistido para cada modo**
+  El campo "Destino" pasa a ser un `<Select name="destino">` adaptado a la categoría elegida, eliminando totalmente la posibilidad de escribir destinos arbitrarios o bodegas inexistentes.
 - [ ] **Paso 4: Probar visualmente y verificar compilación**
   Verificar que `npx tsc --noEmit` pase sin errores.
 - [ ] **Paso 5: Commit del cambio**
-  `git add src/modules/orden-salida/components/orden-salida-form.tsx; git commit -m "feat(salidas): habilitar opcion y selector asistido para traspaso a otra bodega"`
+  `git add src/modules/orden-salida/components/orden-salida-form.tsx; git commit -m "feat(salidas): eliminar texto libre y exigir destinos controlados en todos los tipos de salida"`
 
 ---
 
