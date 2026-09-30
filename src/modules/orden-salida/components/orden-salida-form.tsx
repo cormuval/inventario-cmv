@@ -1,7 +1,7 @@
 "use client";
 
 import type * as React from "react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import type { Bodega, Centro, Stock } from "@prisma/client";
 
 // actions
@@ -51,6 +51,19 @@ export function OrdenSalidaForm({
     const [bodegaId, setBodegaId] = useState(bodegaIdProp ?? primerStock?.bodegaId ?? bodegasFiltradas[0]?.id ?? "");
     const [tipoSalida, setTipoSalida] = useState("Consumo Interno");
     const esMerma = tipoSalida.trim().toLowerCase() === "merma";
+    const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
+
+    const bodegasDestinoDisponibles = useMemo(
+        () => bodegasFiltradas.filter((b) => b.id !== bodegaId),
+        [bodegasFiltradas, bodegaId]
+    );
+    const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
+
+    useEffect(() => {
+        if (!bodegasDestinoDisponibles.some((b) => b.id === bodegaDestinoId)) {
+            setBodegaDestinoId(bodegasDestinoDisponibles[0]?.id ?? "");
+        }
+    }, [bodegasDestinoDisponibles, bodegaDestinoId]);
 
     function cambiarCentro(nuevoCentroId: string): void {
         setCentroSeleccionado(nuevoCentroId);
@@ -113,18 +126,45 @@ export function OrdenSalidaForm({
                     onChange={(event) => setTipoSalida(event.currentTarget.value)}
                 >
                     <option value="Consumo Interno">Consumo Interno</option>
+                    <option value="A otra bodega">A otra bodega</option>
                     <option value="A Otros Centros">A Otros Centros</option>
                     <option value="Merma">Merma</option>
                 </Select>
             </label>
-            <label className="space-y-1 text-sm">
-                <span>{esMerma ? "Destino / Justificación Sanitaria (Obligatorio) *" : "Destino"}</span>
-                <Input
-                    name="destino"
-                    required
-                    placeholder={esMerma ? "Ej: Baja por vencimiento en estantería según protocolo" : "Unidad o centro destino"}
-                />
-            </label>
+            {esTraspasoBodega ? (
+                <label className="space-y-1 text-sm">
+                    <span>Bodega destino (Mismo centro) *</span>
+                    <Select
+                        name="bodegaDestinoId"
+                        required
+                        value={bodegaDestinoId}
+                        onChange={(event) => setBodegaDestinoId(event.currentTarget.value)}
+                    >
+                        {bodegasDestinoDisponibles.length === 0 && (
+                            <option value="">No hay otras bodegas en este centro</option>
+                        )}
+                        {bodegasDestinoDisponibles.map((bodega) => (
+                            <option key={bodega.id} value={bodega.id}>
+                                {bodega.nombre}
+                            </option>
+                        ))}
+                    </Select>
+                    <input
+                        type="hidden"
+                        name="destino"
+                        value={bodegasDestinoDisponibles.find((b) => b.id === bodegaDestinoId)?.nombre ?? ""}
+                    />
+                </label>
+            ) : (
+                <label className="space-y-1 text-sm">
+                    <span>{esMerma ? "Destino / Justificación Sanitaria (Obligatorio) *" : "Destino"}</span>
+                    <Input
+                        name="destino"
+                        required
+                        placeholder={esMerma ? "Ej: Baja por vencimiento en estantería según protocolo" : "Unidad o centro destino"}
+                    />
+                </label>
+            )}
             <label className="space-y-1 text-sm">
                 <span>Correo destino</span>
                 <Input type="email" name="correoDestino" placeholder="Opcional" />
