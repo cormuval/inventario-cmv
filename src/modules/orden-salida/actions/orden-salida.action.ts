@@ -138,12 +138,13 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
             fechaCaducidad: formData.get("fechaCaducidad")
         });
 
+        const previo = await prisma.ordenSalidaDetalle.findUniqueOrThrow({
+            where: { id: detalleId },
+            include: { ordenSalida: true }
+        });
+        await validarCentroBodegaEnAlcance(previo.ordenSalida.centroId, previo.ordenSalida.bodegaId);
+
         await prisma.$transaction(async (tx) => {
-            const previo = await tx.ordenSalidaDetalle.findUniqueOrThrow({
-                where: { id: detalleId },
-                include: { ordenSalida: true }
-            });
-            await validarCentroBodegaEnAlcance(previo.ordenSalida.centroId, previo.ordenSalida.bodegaId);
             await devolverStock(tx, {
                 productoId: previo.productoId,
                 bodegaId: previo.ordenSalida.bodegaId,
@@ -179,12 +180,13 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
             return { ok: false, message: "No tienes permiso para eliminar salidas." };
         }
 
+        const detalle = await prisma.ordenSalidaDetalle.findUniqueOrThrow({
+            where: { id: detalleId },
+            include: { ordenSalida: true }
+        });
+        await validarCentroBodegaEnAlcance(detalle.ordenSalida.centroId, detalle.ordenSalida.bodegaId);
+
         await prisma.$transaction(async (tx) => {
-            const detalle = await tx.ordenSalidaDetalle.findUniqueOrThrow({
-                where: { id: detalleId },
-                include: { ordenSalida: true }
-            });
-            await validarCentroBodegaEnAlcance(detalle.ordenSalida.centroId, detalle.ordenSalida.bodegaId);
             await devolverStock(tx, {
                 productoId: detalle.productoId,
                 bodegaId: detalle.ordenSalida.bodegaId,
