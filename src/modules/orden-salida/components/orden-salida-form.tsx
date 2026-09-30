@@ -14,6 +14,13 @@ import { FormSubmit } from "@/shared/components/ui/form-submit";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 
+// constants
+import {
+    TIPOS_SALIDA,
+    DESTINOS_CONSUMO_INTERNO,
+    DESTINOS_MERMA
+} from "@/modules/orden-salida/constants/destinos";
+
 // types
 import { initialActionState } from "@/shared/types/action-state";
 
@@ -52,12 +59,18 @@ export function OrdenSalidaForm({
     const [tipoSalida, setTipoSalida] = useState("Consumo Interno");
     const esMerma = tipoSalida.trim().toLowerCase() === "merma";
     const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
+    const esOtrosCentros = tipoSalida.trim().toLowerCase() === "a otros centros";
 
     const bodegasDestinoDisponibles = useMemo(
         () => bodegasFiltradas.filter((b) => b.id !== bodegaId),
         [bodegasFiltradas, bodegaId]
     );
     const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
+
+    const otrosCentrosDisponibles = useMemo(
+        () => centros.filter((c) => c.id !== centroSeleccionado && c.estado !== false),
+        [centros, centroSeleccionado]
+    );
 
     useEffect(() => {
         if (!bodegasDestinoDisponibles.some((b) => b.id === bodegaDestinoId)) {
@@ -155,14 +168,41 @@ export function OrdenSalidaForm({
                         value={bodegasDestinoDisponibles.find((b) => b.id === bodegaDestinoId)?.nombre ?? ""}
                     />
                 </label>
+            ) : esOtrosCentros ? (
+                <label className="space-y-1 text-sm">
+                    <span>Centro de salud destino *</span>
+                    <Select key="a-otros-centros" name="destino" required defaultValue={otrosCentrosDisponibles[0]?.nombre ?? ""}>
+                        {otrosCentrosDisponibles.length === 0 && (
+                            <option value="">No hay otros centros disponibles</option>
+                        )}
+                        {otrosCentrosDisponibles.map((centro) => (
+                            <option key={centro.id} value={centro.nombre}>
+                                {centro.nombre}
+                            </option>
+                        ))}
+                    </Select>
+                </label>
+            ) : esMerma ? (
+                <label className="space-y-1 text-sm">
+                    <span>Causal / Justificación sanitaria *</span>
+                    <Select key="merma" name="destino" required defaultValue={DESTINOS_MERMA[0]}>
+                        {DESTINOS_MERMA.map((causal) => (
+                            <option key={causal} value={causal}>
+                                {causal}
+                            </option>
+                        ))}
+                    </Select>
+                </label>
             ) : (
                 <label className="space-y-1 text-sm">
-                    <span>{esMerma ? "Destino / Justificación Sanitaria (Obligatorio) *" : "Destino"}</span>
-                    <Input
-                        name="destino"
-                        required
-                        placeholder={esMerma ? "Ej: Baja por vencimiento en estantería según protocolo" : "Unidad o centro destino"}
-                    />
+                    <span>Servicio / Unidad clínica destino *</span>
+                    <Select key="consumo-interno" name="destino" required defaultValue={DESTINOS_CONSUMO_INTERNO[0]}>
+                        {DESTINOS_CONSUMO_INTERNO.map((unidad) => (
+                            <option key={unidad} value={unidad}>
+                                {unidad}
+                            </option>
+                        ))}
+                    </Select>
                 </label>
             )}
             <label className="space-y-1 text-sm">
