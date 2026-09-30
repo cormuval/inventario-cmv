@@ -5,7 +5,7 @@ import * as authLib from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
 // actions
-import { eliminarDetalleEntrada, listarOrdenesEntrada } from "@/modules/orden-entrada/actions/orden-entrada.action";
+import { actualizarDetalleEntrada, eliminarDetalleEntrada, listarOrdenesEntrada } from "@/modules/orden-entrada/actions/orden-entrada.action";
 import {
     actualizarDetalleSalida,
     crearOrdenSalida,
@@ -36,8 +36,10 @@ vi.mock("@/shared/lib/prisma", () => ({
         bodega: { findMany: vi.fn(), findFirst: vi.fn() },
         encargadosBodega: { findMany: vi.fn() },
         ordenEntrada: { findMany: vi.fn() },
+        ordenEntradaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
         ordenSalida: { findMany: vi.fn() },
-        ordenSalidaDetalle: { findMany: vi.fn() },
+        ordenSalidaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
+        producto: { findMany: vi.fn() },
         stock: { findMany: vi.fn() }
     }
 }));
@@ -120,23 +122,16 @@ describe("alcance en acciones de inventario", () => {
             expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
-        it("actualizarDetalleSalida rechaza un detalle de una bodega ajena sin devolver stock", async () => {
+        it("actualizarDetalleSalida rechaza un detalle de una bodega ajena sin abrir transaccion", async () => {
             sesionOperadorFarmacia();
-            const tx = {
-                ordenSalidaDetalle: {
-                    findUniqueOrThrow: vi.fn().mockResolvedValue({
-                        id: "det-1",
-                        productoId: 1,
-                        cantidad: 5,
-                        lote: "LOTE-01",
-                        fechaCaducidad: new Date(),
-                        ordenSalida: { centroId: "centro-2", bodegaId: "b3" }
-                    }),
-                    update: vi.fn()
-                },
-                stock: { findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() }
-            };
-            simularTransaccion(tx);
+            vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue({
+                id: "det-1",
+                productoId: 1,
+                cantidad: 5,
+                lote: "LOTE-01",
+                fechaCaducidad: new Date(),
+                ordenSalida: { centroId: "centro-2", bodegaId: "b3" }
+            } as never);
 
             const formData = new FormData();
             formData.set("productoId", "1");
@@ -147,36 +142,27 @@ describe("alcance en acciones de inventario", () => {
             const resultado = await actualizarDetalleSalida("det-1", formData);
 
             expect(resultado).toEqual({ ok: false, message: MENSAJE_SIN_PERMISO });
-            expect(tx.stock.update).not.toHaveBeenCalled();
-            expect(tx.stock.upsert).not.toHaveBeenCalled();
-            expect(tx.ordenSalidaDetalle.update).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
-        it("eliminarDetalleSalida rechaza un detalle de una bodega ajena", async () => {
+        it("eliminarDetalleSalida rechaza un detalle de una bodega ajena sin abrir transaccion", async () => {
             sesionOperadorFarmacia();
-            const tx = {
-                ordenSalidaDetalle: {
-                    findUniqueOrThrow: vi.fn().mockResolvedValue({
-                        id: "det-1",
-                        productoId: 1,
-                        cantidad: 5,
-                        lote: "LOTE-01",
-                        fechaCaducidad: new Date(),
-                        ordenSalida: { centroId: "centro-2", bodegaId: "b3" }
-                    }),
-                    delete: vi.fn()
-                },
-                stock: { update: vi.fn(), upsert: vi.fn() }
-            };
-            simularTransaccion(tx);
+            vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue({
+                id: "det-1",
+                productoId: 1,
+                cantidad: 5,
+                lote: "LOTE-01",
+                fechaCaducidad: new Date(),
+                ordenSalida: { centroId: "centro-2", bodegaId: "b3" }
+            } as never);
 
             const resultado = await eliminarDetalleSalida("det-1");
 
             expect(resultado).toEqual({ ok: false, message: MENSAJE_SIN_PERMISO });
-            expect(tx.ordenSalidaDetalle.delete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
-        it("eliminarDetalleEntrada rechaza un detalle de una bodega ajena", async () => {
+        it("actualizarDetalleEntrada rechaza un detalle de una bodega ajena sin abrir transaccion", async () => {
             vi.mocked(authLib.requireSessionUser).mockResolvedValue({
                 id: "user-operador",
                 nombre: "Operador",
@@ -189,27 +175,53 @@ describe("alcance en acciones de inventario", () => {
             vi.mocked(prisma.centro.findFirst).mockResolvedValue(centroBaron as never);
             vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
             vi.mocked(prisma.bodega.findFirst).mockResolvedValue(bodegaFarmacia as never);
-            const tx = {
-                ordenEntradaDetalle: {
-                    findUniqueOrThrow: vi.fn().mockResolvedValue({
-                        id: "det-1",
-                        productoId: 1,
-                        cantidad: 5,
-                        lote: "LOTE-01",
-                        fechaCaducidad: new Date(),
-                        ordenEntrada: { centroId: "centro-1", bodegaId: "b-vacunatorio" }
-                    }),
-                    delete: vi.fn()
-                },
-                stock: { findUnique: vi.fn(), update: vi.fn() }
-            };
-            simularTransaccion(tx);
+            vi.mocked(prisma.ordenEntradaDetalle.findUniqueOrThrow).mockResolvedValue({
+                id: "det-1",
+                productoId: 1,
+                cantidad: 5,
+                lote: "LOTE-01",
+                fechaCaducidad: new Date(),
+                ordenEntrada: { centroId: "centro-1", bodegaId: "b-vacunatorio" }
+            } as never);
+
+            const formData = new FormData();
+            formData.set("productoId", "1");
+            formData.set("cantidad", "3");
+            formData.set("lote", "LOTE-01");
+            formData.set("fechaCaducidad", new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString());
+
+            const resultado = await actualizarDetalleEntrada("det-1", formData);
+
+            expect(resultado).toEqual({ ok: false, message: MENSAJE_SIN_PERMISO });
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+
+        it("eliminarDetalleEntrada rechaza un detalle de una bodega ajena sin abrir transaccion", async () => {
+            vi.mocked(authLib.requireSessionUser).mockResolvedValue({
+                id: "user-operador",
+                nombre: "Operador",
+                apPaterno: "Entrada",
+                email: "operador@cmvalparaiso.cl",
+                rol: "R06",
+                centroId: "centro-1",
+                bodegaId: "b1"
+            });
+            vi.mocked(prisma.centro.findFirst).mockResolvedValue(centroBaron as never);
+            vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
+            vi.mocked(prisma.bodega.findFirst).mockResolvedValue(bodegaFarmacia as never);
+            vi.mocked(prisma.ordenEntradaDetalle.findUniqueOrThrow).mockResolvedValue({
+                id: "det-1",
+                productoId: 1,
+                cantidad: 5,
+                lote: "LOTE-01",
+                fechaCaducidad: new Date(),
+                ordenEntrada: { centroId: "centro-1", bodegaId: "b-vacunatorio" }
+            } as never);
 
             const resultado = await eliminarDetalleEntrada("det-1");
 
             expect(resultado).toEqual({ ok: false, message: MENSAJE_SIN_PERMISO });
-            expect(tx.stock.update).not.toHaveBeenCalled();
-            expect(tx.ordenEntradaDetalle.delete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
     });
 
