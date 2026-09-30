@@ -89,4 +89,48 @@ describe("crearOrdenSalidaSchema - validaciones sanitarias", () => {
         const result = crearOrdenSalidaSchema.safeParse(payload);
         expect(result.success).toBe(true);
     });
+
+    it("todos los destinos de CONSUMO_INTERNO y MERMA cumplen con los requisitos del schema", async () => {
+        const { DESTINOS_CONSUMO_INTERNO, DESTINOS_MERMA } = await import(
+            "@/modules/orden-salida/constants/destinos"
+        );
+
+        expect(DESTINOS_CONSUMO_INTERNO.length).toBeGreaterThan(0);
+        for (const destino of DESTINOS_CONSUMO_INTERNO) {
+            const result = crearOrdenSalidaSchema.safeParse({
+                fecha: hoy,
+                bodegaId: "bodega-1",
+                centroId: "centro-1",
+                tipoSalida: "Consumo Interno",
+                destino,
+                detalles: [{
+                    productoId: 1,
+                    cantidad: 1,
+                    lote: "LOT-OK",
+                    fechaCaducidad: manana
+                }]
+            });
+            expect(result.success).toBe(true);
+        }
+
+        expect(DESTINOS_MERMA.length).toBeGreaterThan(0);
+        for (const merma of DESTINOS_MERMA) {
+            expect(merma.trim().length).toBeGreaterThanOrEqual(5);
+            const result = crearOrdenSalidaSchema.safeParse({
+                fecha: hoy,
+                bodegaId: "bodega-1",
+                centroId: "centro-1",
+                tipoSalida: "Merma",
+                destino: merma,
+                detalles: [{
+                    productoId: 1,
+                    cantidad: 1,
+                    lote: "LOT-CAD",
+                    fechaCaducidad: ayer
+                }]
+            });
+            expect(result.success).toBe(true);
+        }
+    });
 });
+
