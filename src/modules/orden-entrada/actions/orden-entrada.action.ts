@@ -142,6 +142,12 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
             cantidad: formData.get("cantidad"),
             lote: formData.get("lote")
         });
+        const previo = await prisma.ordenEntradaDetalle.findUniqueOrThrow({
+            where: { id: detalleId },
+            include: { ordenEntrada: true }
+        });
+        await validarCentroBodegaEnAlcance(previo.ordenEntrada.centroId, previo.ordenEntrada.bodegaId);
+
         const categoriasPorProducto = await obtenerCategoriasProductos([parsed.productoId]);
         const categoria = categoriasPorProducto.get(parsed.productoId);
         if (!categoria) {
@@ -149,11 +155,6 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
         }
 
         await prisma.$transaction(async (tx) => {
-            const previo = await tx.ordenEntradaDetalle.findUniqueOrThrow({
-                where: { id: detalleId },
-                include: { ordenEntrada: true }
-            });
-            await validarCentroBodegaEnAlcance(previo.ordenEntrada.centroId, previo.ordenEntrada.bodegaId);
             await revertirEntradaStock(tx, {
                 productoId: previo.productoId,
                 bodegaId: previo.ordenEntrada.bodegaId,
@@ -187,12 +188,13 @@ export async function eliminarDetalleEntrada(detalleId: string): Promise<ActionS
             return { ok: false, message: "No tienes permiso para eliminar entradas." };
         }
 
+        const detalle = await prisma.ordenEntradaDetalle.findUniqueOrThrow({
+            where: { id: detalleId },
+            include: { ordenEntrada: true }
+        });
+        await validarCentroBodegaEnAlcance(detalle.ordenEntrada.centroId, detalle.ordenEntrada.bodegaId);
+
         await prisma.$transaction(async (tx) => {
-            const detalle = await tx.ordenEntradaDetalle.findUniqueOrThrow({
-                where: { id: detalleId },
-                include: { ordenEntrada: true }
-            });
-            await validarCentroBodegaEnAlcance(detalle.ordenEntrada.centroId, detalle.ordenEntrada.bodegaId);
             await revertirEntradaStock(tx, {
                 productoId: detalle.productoId,
                 bodegaId: detalle.ordenEntrada.bodegaId,
