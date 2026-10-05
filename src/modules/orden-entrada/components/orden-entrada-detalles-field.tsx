@@ -7,8 +7,8 @@ import { Plus, Trash2 } from "lucide-react";
 
 // components
 import { Button } from "@/shared/components/ui/button";
+import { Combobox } from "@/shared/components/ui/combobox";
 import { Input } from "@/shared/components/ui/input";
-import { Select } from "@/shared/components/ui/select";
 
 // utils
 import { toDateInputValue } from "@/shared/utils/format";
@@ -24,6 +24,12 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
     const [detalles, setDetalles] = useState<DetalleEntradaRow[]>([crearDetalleInicial(1)]);
     const productosPorId = useMemo(() => new Map(productos.map((producto) => [String(producto.id), producto])), [productos]);
     const fechaMinima = toDateInputValue();
+
+    const opciones = useMemo(() => productos.map((producto) => ({
+        value: String(producto.id),
+        label: crearProductoLabel(producto),
+        keywords: [producto.descripcion, producto.linea, String(producto.id)]
+    })), [productos]);
 
     function agregarDetalle(): void {
         setDetalles((actuales) => [...actuales, crearDetalleInicial(nextId)]);
@@ -55,18 +61,14 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
                 <div key={detalle.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-6">
                     <label className="space-y-1 text-sm md:col-span-2">
                         <span>Producto</span>
-                        <Select
+                        <Combobox
                             value={detalle.productoId}
-                            onChange={(event) => seleccionarProducto(detalle.id, event.currentTarget.value)}
-                            required
-                        >
-                            <option value="">Seleccione producto del catálogo...</option>
-                            {productos.map((producto) => (
-                                <option key={producto.id} value={String(producto.id)}>
-                                    {crearProductoLabel(producto)}
-                                </option>
-                            ))}
-                        </Select>
+                            onChange={(value) => seleccionarProducto(detalle.id, value)}
+                            options={opciones}
+                            placeholder="Seleccione producto del catálogo..."
+                            searchPlaceholder="Buscar por nombre, línea o código..."
+                            emptyText="No se encontraron productos"
+                        />
                         <input type="hidden" name="productoId" value={detalle.productoId} readOnly />
                     </label>
                     <div className="space-y-1 text-sm">

@@ -1,53 +1,67 @@
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { Stock } from "@prisma/client";
 
 // components
 import { OrdenSalidaDetallesField } from "@/modules/orden-salida/components/orden-salida-detalles-field";
 import { OrdenEntradaDetallesField } from "@/modules/orden-entrada/components/orden-entrada-detalles-field";
 
+interface StockMock extends Stock {
+    producto: {
+        descripcion: string;
+    };
+    bodega: {
+        nombre: string;
+    };
+}
+
+function crearStockMock(overrides: Partial<StockMock> = {}): StockMock {
+    return {
+        id: "stock-1",
+        productoId: 101,
+        bodegaId: "bodega-1",
+        cantidadDisponible: 50,
+        fechaUltimaActualizacion: new Date(),
+        stockMinimo: 10,
+        lote: "LOT-A1",
+        fechaCaducidad: new Date("2028-12-31T00:00:00.000Z"),
+        producto: { descripcion: "PARACETAMOL 500 MG" },
+        bodega: { nombre: "Bodega Principal" },
+        ...overrides
+    };
+}
+
 describe("Estandarización de Selectores y Erradicación de Datalist / Caché", () => {
-    describe("OrdenSalidaDetallesField", () => {
-        const mockStocks = [
-            {
-                id: 1,
+    describe("OrdenSalidaDetallesField con Combobox", () => {
+        const mockStocks: StockMock[] = [
+            crearStockMock({
+                id: "stock-1",
                 bodegaId: "bodega-1",
                 productoId: 101,
                 lote: "LOT-A1",
                 cantidadDisponible: 50,
-                cantidadReservada: 0,
                 fechaCaducidad: new Date("2028-12-31T00:00:00.000Z"),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                producto: { descripcion: "PARACETAMOL 500 MG" },
-                bodega: { nombre: "Bodega Principal" }
-            },
-            {
-                id: 2,
+                producto: { descripcion: "PARACETAMOL 500 MG" }
+            }),
+            crearStockMock({
+                id: "stock-2",
                 bodegaId: "bodega-1",
                 productoId: 102,
                 lote: "LOT-EXP",
                 cantidadDisponible: 20,
-                cantidadReservada: 0,
                 fechaCaducidad: new Date("2020-01-01T00:00:00.000Z"), // Vencido
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                producto: { descripcion: "AMOXICILINA 500 MG" },
-                bodega: { nombre: "Bodega Principal" }
-            },
-            {
-                id: 3,
+                producto: { descripcion: "AMOXICILINA 500 MG" }
+            }),
+            crearStockMock({
+                id: "stock-3",
                 bodegaId: "bodega-2", // Otra bodega
                 productoId: 103,
                 lote: "LOT-B1",
                 cantidadDisponible: 15,
-                cantidadReservada: 0,
                 fechaCaducidad: new Date("2028-05-15T00:00:00.000Z"),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                producto: { descripcion: "IBUPROFENO 400 MG" },
-                bodega: { nombre: "Otra Bodega" }
-            }
+                producto: { descripcion: "IBUPROFENO 400 MG" }
+            })
         ];
 
         it("no renderiza ningún elemento <datalist> ni atributos list en inputs", () => {
@@ -72,14 +86,17 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
                 />
             );
 
-            const select = screen.getByRole("combobox");
-            expect(select).toBeInTheDocument();
+            const trigger = screen.getByRole("combobox");
+            expect(trigger).toBeInTheDocument();
+            expect(trigger).toHaveTextContent("Seleccione stock disponible...");
 
-            const options = within(select).getAllByRole("option");
-            // Placeholder + 1 stock válido (bodega-1 y no vencido)
-            expect(options).toHaveLength(2);
-            expect(options[0]).toHaveTextContent("Seleccione stock disponible...");
-            expect(options[1]).toHaveTextContent("[Disp: 50 un.] PARACETAMOL 500 MG | Lote: LOT-A1");
+            // Abrir el combobox
+            fireEvent.click(trigger);
+
+            // Solo debe mostrar stock-1 (PARACETAMOL)
+            expect(screen.getByText(/PARACETAMOL 500 MG/i)).toBeInTheDocument();
+            expect(screen.queryByText(/AMOXICILINA/i)).toBeNull();
+            expect(screen.queryByText(/IBUPROFENO/i)).toBeNull();
         });
 
         it("muestra lotes caducados con prefijo [CADUCADO] cuando el tipo de salida es Merma", () => {
@@ -91,12 +108,43 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
                 />
             );
 
-            const select = screen.getByRole("combobox");
-            const options = within(select).getAllByRole("option");
-            // Placeholder + 2 stocks de bodega-1 (incluyendo el vencido)
-            expect(options).toHaveLength(3);
-            expect(within(select).getByRole("option", { name: /\[CADUCADO\]/i })).toBeInTheDocument();
-            expect(within(select).getByRole("option", { name: /AMOXICILINA 500 MG/i })).toBeInTheDocument();
+            const trigger = screen.getByRole("combobox");
+            fireEvent.click(trigger);
+
+            expect(screen.getByText(/\[CADUCADO\]/i)).toBeInTheDocument();
+            expect(screen.getByText(/AMOXICILINA 500 MG/i)).toBeInTheDocument();
+        });
+
+        it("permite filtrar en la búsqueda por descripción del producto y por lote", () => {
+            render(
+                <OrdenSalidaDetallesField
+                    bodegaId="bodega-1"
+                    stocks={[
+                        ...mockStocks,
+                        crearStockMock({
+                            id: "stock-4",
+                            bodegaId: "bodega-1",
+                            productoId: 104,
+                            lote: "LOT-CLAV-99",
+                            cantidadDisponible: 30,
+                            fechaCaducidad: new Date("2029-01-01T00:00:00.000Z"),
+                            producto: { descripcion: "CLAVULANICO 125 MG" }
+                        })
+                    ]}
+                    tipoSalida="Consumo Interno"
+                />
+            );
+
+            const trigger = screen.getByRole("combobox");
+            fireEvent.click(trigger);
+
+            const searchInput = screen.getByPlaceholderText(/Buscar por producto o lote/i);
+            expect(searchInput).toBeInTheDocument();
+
+            // Filtrar por lote
+            fireEvent.change(searchInput, { target: { value: "CLAV-99" } });
+            expect(screen.getByText(/CLAVULANICO 125 MG/i)).toBeInTheDocument();
+            expect(screen.queryByText(/PARACETAMOL/i)).toBeNull();
         });
 
         it("al seleccionar un stock, actualiza los campos ocultos y los indicadores de disponible y max", () => {
@@ -108,10 +156,11 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
                 />
             );
 
-            const select = screen.getByRole("combobox");
-            // Seleccionar el stock disponible de PARACETAMOL
-            const optionVal = (within(select).getAllByRole("option")[1] as HTMLOptionElement).value;
-            fireEvent.change(select, { target: { value: optionVal } });
+            const trigger = screen.getByRole("combobox");
+            fireEvent.click(trigger);
+
+            const optionItem = screen.getByText(/PARACETAMOL 500 MG/i);
+            fireEvent.click(optionItem);
 
             // Verificar inputs ocultos
             const inputProductoId = container.querySelector("input[name='productoId']") as HTMLInputElement;
@@ -126,10 +175,11 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
 
             // Indicador de disponible visible en pantalla
             expect(screen.getByText("50")).toBeInTheDocument();
+            expect(trigger).toHaveTextContent(/PARACETAMOL 500 MG/i);
         });
     });
 
-    describe("OrdenEntradaDetallesField", () => {
+    describe("OrdenEntradaDetallesField con Combobox", () => {
         const mockProductos = [
             {
                 id: 104,
@@ -172,17 +222,21 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
             expect(container.querySelector("input[list]")).toBeNull();
         });
 
-        it("renderiza el selector estándar con las opciones formateadas con descripción, línea e id", () => {
+        it("permite buscar y filtrar por nombre, línea o ID en el catálogo", () => {
             render(<OrdenEntradaDetallesField productos={mockProductos} />);
 
-            const select = screen.getByRole("combobox");
-            expect(select).toBeInTheDocument();
+            const trigger = screen.getByRole("combobox");
+            expect(trigger).toHaveTextContent("Seleccione producto del catálogo...");
 
-            const options = within(select).getAllByRole("option");
-            expect(options).toHaveLength(3); // placeholder + 2 productos
-            expect(options[0]).toHaveTextContent("Seleccione producto del catálogo...");
-            expect(options[1]).toHaveTextContent("PARACETAMOL 500 MG COMPRIMIDO — Medicamentos (#104)");
-            expect(options[2]).toHaveTextContent("JERINGA 5 ML CON AGUJA — Insumos Médicos (#205)");
+            fireEvent.click(trigger);
+
+            const searchInput = screen.getByPlaceholderText(/Buscar por nombre, línea o código/i);
+            expect(searchInput).toBeInTheDocument();
+
+            // Filtrar por ID "205"
+            fireEvent.change(searchInput, { target: { value: "205" } });
+            expect(screen.getByText(/JERINGA 5 ML/i)).toBeInTheDocument();
+            expect(screen.queryByText(/PARACETAMOL/i)).toBeNull();
         });
 
         it("al seleccionar un producto, actualiza el input oculto productoId y el indicador de categoría", () => {
@@ -190,14 +244,18 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
                 <OrdenEntradaDetallesField productos={mockProductos} />
             );
 
-            const select = screen.getByRole("combobox");
-            fireEvent.change(select, { target: { value: "104" } });
+            const trigger = screen.getByRole("combobox");
+            fireEvent.click(trigger);
+
+            const optionItem = screen.getByText(/PARACETAMOL 500 MG COMPRIMIDO/i);
+            fireEvent.click(optionItem);
 
             const inputProductoId = container.querySelector("input[name='productoId']") as HTMLInputElement;
             expect(inputProductoId.value).toBe("104");
 
             // Verifica que la categoría se refleja en pantalla
             expect(screen.getByText("Medicamentos")).toBeInTheDocument();
+            expect(trigger).toHaveTextContent(/PARACETAMOL 500 MG COMPRIMIDO/i);
         });
     });
 });

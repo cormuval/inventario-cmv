@@ -6,8 +6,8 @@ import { Plus, Trash2 } from "lucide-react";
 
 // components
 import { Button } from "@/shared/components/ui/button";
+import { Combobox } from "@/shared/components/ui/combobox";
 import { Input } from "@/shared/components/ui/input";
-import { Select } from "@/shared/components/ui/select";
 
 // utils
 import { esLoteCaducado } from "@/modules/stock/utils/movimientos";
@@ -24,7 +24,7 @@ interface StockDisponible extends Stock {
 
 interface DetalleSalidaRow {
     id: number;
-    stockKey: string;
+    stockId: string;
     productoId: string;
     lote: string;
     fechaCaducidad: string;
@@ -61,17 +61,17 @@ export function OrdenSalidaDetallesField({
 
     const opciones = useMemo(() => stocksFiltrados.map((stock) => {
         const fechaFormat = toDateInputValue(stock.fechaCaducidad);
-        const key = `${stock.productoId}-${stock.lote}-${fechaFormat}`;
         return {
-            key,
+            value: String(stock.id),
             label: crearStockLabel(stock),
+            keywords: [stock.lote, stock.producto.descripcion, String(stock.productoId)],
             productoId: String(stock.productoId),
             lote: stock.lote,
             fechaCaducidad: fechaFormat,
             disponible: stock.cantidadDisponible
         };
     }), [stocksFiltrados]);
-    const opcionesPorKey = useMemo(() => new Map(opciones.map((opcion) => [opcion.key, opcion])), [opciones]);
+    const opcionesPorId = useMemo(() => new Map(opciones.map((opcion) => [opcion.value, opcion])), [opciones]);
 
     useEffect(() => {
         setNextId(2);
@@ -87,8 +87,8 @@ export function OrdenSalidaDetallesField({
         setDetalles((actuales) => actuales.length === 1 ? actuales : actuales.filter((detalle) => detalle.id !== id));
     }
 
-    function seleccionarStock(id: number, stockKey: string): void {
-        const opcion = opcionesPorKey.get(stockKey);
+    function seleccionarStock(id: number, stockId: string): void {
+        const opcion = opcionesPorId.get(stockId);
         setDetalles((actuales) => actuales.map((detalle) => {
             if (detalle.id !== id) {
                 return detalle;
@@ -96,7 +96,7 @@ export function OrdenSalidaDetallesField({
 
             return {
                 ...detalle,
-                stockKey,
+                stockId,
                 productoId: opcion?.productoId ?? "",
                 lote: opcion?.lote ?? "",
                 fechaCaducidad: opcion?.fechaCaducidad ?? "",
@@ -111,18 +111,14 @@ export function OrdenSalidaDetallesField({
                 <div key={detalle.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-5">
                     <label className="space-y-1 text-sm md:col-span-2">
                         <span>Producto / lote disponible</span>
-                        <Select
-                            value={detalle.stockKey}
-                            onChange={(event) => seleccionarStock(detalle.id, event.currentTarget.value)}
-                            required
-                        >
-                            <option value="">Seleccione stock disponible...</option>
-                            {opciones.map((opcion) => (
-                                <option key={opcion.key} value={opcion.key}>
-                                    {opcion.label}
-                                </option>
-                            ))}
-                        </Select>
+                        <Combobox
+                            value={detalle.stockId}
+                            onChange={(value) => seleccionarStock(detalle.id, value)}
+                            options={opciones}
+                            placeholder="Seleccione stock disponible..."
+                            searchPlaceholder="Buscar por producto o lote..."
+                            emptyText="No se encontraron productos o lotes"
+                        />
                         <input type="hidden" name="productoId" value={detalle.productoId} readOnly />
                         <input type="hidden" name="lote" value={detalle.lote} readOnly />
                         <input type="hidden" name="fechaCaducidad" value={detalle.fechaCaducidad} readOnly />
@@ -179,7 +175,7 @@ export function OrdenSalidaDetallesField({
 function crearDetalleInicial(id: number): DetalleSalidaRow {
     return {
         id,
-        stockKey: "",
+        stockId: "",
         productoId: "",
         lote: "",
         fechaCaducidad: "",
