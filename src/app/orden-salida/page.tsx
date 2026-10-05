@@ -20,7 +20,8 @@ export const dynamic = "force-dynamic";
 
 export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
-    const [ordenes, stocks] = await Promise.all([
+    const centrosDisponiblesIds = alcance.centros.map((c) => c.id);
+    const [ordenes, stocks, bodegasDestino] = await Promise.all([
         listarOrdenesSalida(),
         alcance.bodegaIds.length > 0
             ? prisma.stock.findMany({
@@ -33,6 +34,15 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                       bodega: { select: { nombre: true } }
                   },
                   orderBy: [{ producto: { descripcion: "asc" } }, { fechaCaducidad: "asc" }]
+              })
+            : Promise.resolve([]),
+        centrosDisponiblesIds.length > 0
+            ? prisma.bodega.findMany({
+                  where: {
+                      centroId: { in: centrosDisponiblesIds },
+                      estado: true
+                  },
+                  orderBy: { nombre: "asc" }
               })
             : Promise.resolve([])
     ]);
@@ -52,6 +62,7 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                         <OrdenSalidaForm
                             centros={alcance.centros}
                             bodegas={alcance.bodegas}
+                            bodegasDestino={bodegasDestino}
                             stocks={stocks}
                             centroId={alcance.centroId}
                             bodegaId={alcance.bodegaId}

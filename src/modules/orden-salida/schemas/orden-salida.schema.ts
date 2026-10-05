@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// constants
+import { TIPOS_SALIDA } from "@/modules/orden-salida/constants/destinos";
+
 // utils
 import { validarFechaSalida, esLoteCaducado } from "@/modules/stock/utils/movimientos";
 
@@ -15,14 +18,32 @@ export const crearOrdenSalidaSchema = z.object({
         message: "La fecha debe estar entre hoy y los ultimos 7 dias."
     }),
     bodegaId: z.string().min(1),
+    bodegaDestinoId: z.string().optional(),
     centroId: z.string().min(1),
-    tipoSalida: z.string().min(1),
+    tipoSalida: z.enum(TIPOS_SALIDA),
     destino: z.string().min(1),
     codigoSalida: z.string().optional(),
     correoDestino: z.string().email().optional().or(z.literal("")),
     detalles: z.array(ordenSalidaDetalleSchema).min(1, "Debe ingresar al menos un detalle.")
 }).superRefine((data, ctx) => {
     const esMerma = data.tipoSalida.trim().toLowerCase() === "merma";
+    const esTraspaso = data.tipoSalida.trim().toLowerCase() === "a otra bodega";
+
+    if (esTraspaso) {
+        if (!data.bodegaDestinoId || data.bodegaDestinoId.trim() === "") {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Debe seleccionar la bodega destino para el traspaso.",
+                path: ["bodegaDestinoId"]
+            });
+        } else if (data.bodegaDestinoId === data.bodegaId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "La bodega destino no puede ser la misma bodega de origen.",
+                path: ["bodegaDestinoId"]
+            });
+        }
+    }
 
     if (esMerma) {
         if (data.destino.trim().length < 5) {

@@ -59,6 +59,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         const parsed = crearOrdenSalidaSchema.parse({
             fecha: formData.get("fecha"),
             bodegaId: formData.get("bodegaId"),
+            bodegaDestinoId: formData.get("bodegaDestinoId")?.toString()?.trim() || undefined,
             centroId: formData.get("centroId"),
             tipoSalida: formData.get("tipoSalida"),
             destino: formData.get("destino"),
@@ -68,16 +69,37 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         });
         await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
 
+        const esTraspasoBodega = parsed.tipoSalida.trim().toLowerCase() === "a otra bodega";
+        let bodegaDestinoId: string | null = null;
+
+        if (esTraspasoBodega) {
+            bodegaDestinoId = parsed.bodegaDestinoId ?? null;
+            if (!bodegaDestinoId) {
+                return { ok: false, message: "Debe seleccionar la bodega destino para el traspaso." };
+            }
+            if (bodegaDestinoId === parsed.bodegaId) {
+                return { ok: false, message: "La bodega destino no puede ser la misma bodega de origen." };
+            }
+            const bodegaDestino = await prisma.bodega.findUnique({
+                where: { id: bodegaDestinoId }
+            });
+            if (!bodegaDestino || !bodegaDestino.estado || bodegaDestino.centroId !== parsed.centroId) {
+                return { ok: false, message: "La bodega destino seleccionada no existe o no pertenece al mismo centro de salud." };
+            }
+            parsed.destino = bodegaDestino.nombre;
+        }
+
         const orden = await prisma.$transaction(async (tx) => {
             const nuevaOrden = await tx.ordenSalida.create({
                 data: {
                     fecha: parsed.fecha,
                     usuarioId: user.id,
                     bodegaId: parsed.bodegaId,
+                    bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : null,
                     tipoSalida: parsed.tipoSalida,
                     centroId: parsed.centroId,
                     destino: parsed.destino,
-                    codigoSalida: parsed.codigoSalida,
+                    codigoSalida: parsed.codigoSalida || null,
                     correoDestino: parsed.correoDestino || null
                 }
             });
@@ -91,6 +113,17 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                     fechaCaducidad: detalle.fechaCaducidad,
                     tipoSalida: parsed.tipoSalida
                 });
+
+                if (esTraspasoBodega && bodegaDestinoId) {
+                    await devolverStock(tx, {
+                        productoId: detalle.productoId,
+                        bodegaId: bodegaDestinoId,
+                        cantidad: detalle.cantidad,
+                        lote: detalle.lote,
+                        fechaCaducidad: detalle.fechaCaducidad
+                    });
+                }
+
                 await tx.ordenSalidaDetalle.create({
                     data: {
                         ...detalle,
@@ -110,6 +143,8 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             detalle: {
                 tipoSalida: parsed.tipoSalida,
                 destino: parsed.destino,
+                bodegaOrigenId: parsed.bodegaId,
+                ...(esTraspasoBodega && bodegaDestinoId ? { bodegaDestinoId } : {}),
                 detalles: parsed.detalles.length
             }
         });
@@ -144,6 +179,18 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
         });
         await validarCentroBodegaEnAlcance(previo.ordenSalida.centroId, previo.ordenSalida.bodegaId);
 
+        const esTraspaso = previo.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
+        let bodegaDestinoId: string | null = null;
+        if (esTraspaso) {
+            bodegaDestinoId = previo.ordenSalida.bodegaDestinoId;
+            if (!bodegaDestinoId) {
+                return {
+                    ok: false,
+                    message: "La orden de traspaso no tiene bodega destino registrada; no es posible revertirla."
+                };
+            }
+        }
+
         await prisma.$transaction(async (tx) => {
             await devolverStock(tx, {
                 productoId: previo.productoId,
@@ -152,6 +199,18 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
                 lote: previo.lote,
                 fechaCaducidad: previo.fechaCaducidad
             });
+            if (esTraspaso && bodegaDestinoId) {
+                await descontarStock(tx, {
+                    productoId: previo.productoId,
+                    bodegaId: bodegaDestinoId,
+                    cantidad: previo.cantidad,
+                    lote: previo.lote,
+                    fechaCaducidad: previo.fechaCaducidad,
+                    tipoSalida: "A otra bodega",
+                    esCompensacion: true
+                });
+            }
+
             await descontarStock(tx, {
                 productoId: parsed.productoId,
                 bodegaId: previo.ordenSalida.bodegaId,
@@ -160,10 +219,29 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
                 fechaCaducidad: parsed.fechaCaducidad,
                 tipoSalida: previo.ordenSalida.tipoSalida
             });
+            if (esTraspaso && bodegaDestinoId) {
+                await devolverStock(tx, {
+                    productoId: parsed.productoId,
+                    bodegaId: bodegaDestinoId,
+                    cantidad: parsed.cantidad,
+                    lote: parsed.lote,
+                    fechaCaducidad: parsed.fechaCaducidad
+                });
+            }
+
             await tx.ordenSalidaDetalle.update({ where: { id: detalleId }, data: parsed });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "actualizar", entidad: "OrdenSalidaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "actualizar",
+            entidad: "OrdenSalidaDetalle",
+            entidadId: detalleId,
+            detalle: {
+                bodegaOrigenId: previo.ordenSalida.bodegaId,
+                ...(esTraspaso && bodegaDestinoId ? { bodegaDestinoId } : {})
+            }
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
@@ -186,6 +264,18 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
         });
         await validarCentroBodegaEnAlcance(detalle.ordenSalida.centroId, detalle.ordenSalida.bodegaId);
 
+        const esTraspaso = detalle.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
+        let bodegaDestinoId: string | null = null;
+        if (esTraspaso) {
+            bodegaDestinoId = detalle.ordenSalida.bodegaDestinoId;
+            if (!bodegaDestinoId) {
+                return {
+                    ok: false,
+                    message: "La orden de traspaso no tiene bodega destino registrada; no es posible revertirla."
+                };
+            }
+        }
+
         await prisma.$transaction(async (tx) => {
             await devolverStock(tx, {
                 productoId: detalle.productoId,
@@ -194,10 +284,31 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
                 lote: detalle.lote,
                 fechaCaducidad: detalle.fechaCaducidad
             });
+            if (esTraspaso && bodegaDestinoId) {
+                await descontarStock(tx, {
+                    productoId: detalle.productoId,
+                    bodegaId: bodegaDestinoId,
+                    cantidad: detalle.cantidad,
+                    lote: detalle.lote,
+                    fechaCaducidad: detalle.fechaCaducidad,
+                    tipoSalida: "A otra bodega",
+                    esCompensacion: true
+                });
+            }
+
             await tx.ordenSalidaDetalle.delete({ where: { id: detalleId } });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "eliminar", entidad: "OrdenSalidaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "eliminar",
+            entidad: "OrdenSalidaDetalle",
+            entidadId: detalleId,
+            detalle: {
+                bodegaOrigenId: detalle.ordenSalida.bodegaId,
+                ...(esTraspaso && bodegaDestinoId ? { bodegaDestinoId } : {})
+            }
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
@@ -223,7 +334,15 @@ function leerDetallesSalida(formData: FormData): DetalleSalidaForm[] {
 
 async function descontarStock(
     tx: Tx,
-    input: { productoId: number; bodegaId: string; cantidad: number; lote: string; fechaCaducidad: Date; tipoSalida: string }
+    input: {
+        productoId: number;
+        bodegaId: string;
+        cantidad: number;
+        lote: string;
+        fechaCaducidad: Date;
+        tipoSalida: string;
+        esCompensacion?: boolean;
+    }
 ): Promise<void> {
     const stock = await tx.stock.findUnique({
         where: {
@@ -244,9 +363,11 @@ async function descontarStock(
         throw new Error(`Stock insuficiente para el lote "${input.lote}". Solicitado: ${input.cantidad}, disponible: ${stock.cantidadDisponible}.`);
     }
 
-    const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);
-    if (!validacion.valido) {
-        throw new Error(validacion.motivo);
+    if (!input.esCompensacion) {
+        const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);
+        if (!validacion.valido) {
+            throw new Error(validacion.motivo);
+        }
     }
 
     await tx.stock.update({

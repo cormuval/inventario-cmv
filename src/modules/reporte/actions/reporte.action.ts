@@ -45,6 +45,7 @@ export async function listarReporteConsumoMensual(anio = new Date().getFullYear(
             where: {
                 ordenSalida: {
                     ...filtroMovimientos,
+                    tipoSalida: { not: "A otra bodega" },
                     fecha: {
                         gte: new Date(`${anio}-01-01T00:00:00.000Z`),
                         lt: new Date(`${anio + 1}-01-01T00:00:00.000Z`)

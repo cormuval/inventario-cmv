@@ -1,7 +1,6 @@
 "use client";
 
-import type * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Stock } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 
