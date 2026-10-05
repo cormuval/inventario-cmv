@@ -8,13 +8,13 @@ import { Plus, Trash2 } from "lucide-react";
 // components
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
+import { Select } from "@/shared/components/ui/select";
 
 // utils
 import { toDateInputValue } from "@/shared/utils/format";
 
 interface DetalleEntradaRow {
     id: number;
-    productoTexto: string;
     productoId: string;
     linea: string;
 }
@@ -22,13 +22,7 @@ interface DetalleEntradaRow {
 export function OrdenEntradaDetallesField({ productos }: { productos: Producto[] }): React.ReactElement {
     const [nextId, setNextId] = useState(2);
     const [detalles, setDetalles] = useState<DetalleEntradaRow[]>([crearDetalleInicial(1)]);
-    const opciones = useMemo(() => productos.map((producto) => ({
-        id: String(producto.id),
-        label: crearProductoLabel(producto),
-        linea: producto.linea
-    })), [productos]);
-    const opcionesPorLabel = useMemo(() => new Map(opciones.map((opcion) => [opcion.label, opcion])), [opciones]);
-    const datalistId = "productos-entrada-list";
+    const productosPorId = useMemo(() => new Map(productos.map((producto) => [String(producto.id), producto])), [productos]);
     const fechaMinima = toDateInputValue();
 
     function agregarDetalle(): void {
@@ -40,8 +34,8 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
         setDetalles((actuales) => actuales.length === 1 ? actuales : actuales.filter((detalle) => detalle.id !== id));
     }
 
-    function seleccionarProducto(id: number, productoTexto: string): void {
-        const opcion = opcionesPorLabel.get(productoTexto);
+    function seleccionarProducto(id: number, productoId: string): void {
+        const producto = productosPorId.get(productoId);
         setDetalles((actuales) => actuales.map((detalle) => {
             if (detalle.id !== id) {
                 return detalle;
@@ -49,31 +43,30 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
 
             return {
                 ...detalle,
-                productoTexto,
-                productoId: opcion?.id ?? "",
-                linea: opcion?.linea ?? ""
+                productoId,
+                linea: producto?.linea ?? ""
             };
         }));
     }
 
     return (
         <div className="space-y-3">
-            <datalist id={datalistId}>
-                {opciones.map((opcion) => (
-                    <option key={opcion.id} value={opcion.label} />
-                ))}
-            </datalist>
             {detalles.map((detalle, index) => (
                 <div key={detalle.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-6">
                     <label className="space-y-1 text-sm md:col-span-2">
                         <span>Producto</span>
-                        <Input
-                            list={datalistId}
-                            value={detalle.productoTexto}
+                        <Select
+                            value={detalle.productoId}
                             onChange={(event) => seleccionarProducto(detalle.id, event.currentTarget.value)}
                             required
-                            placeholder="Escribe para buscar"
-                        />
+                        >
+                            <option value="">Seleccione producto del catálogo...</option>
+                            {productos.map((producto) => (
+                                <option key={producto.id} value={String(producto.id)}>
+                                    {crearProductoLabel(producto)}
+                                </option>
+                            ))}
+                        </Select>
                         <input type="hidden" name="productoId" value={detalle.productoId} readOnly />
                     </label>
                     <div className="space-y-1 text-sm">
@@ -120,12 +113,11 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
 function crearDetalleInicial(id: number): DetalleEntradaRow {
     return {
         id,
-        productoTexto: "",
         productoId: "",
         linea: ""
     };
 }
 
 function crearProductoLabel(producto: Producto): string {
-    return `${producto.descripcion} (${producto.linea}) #${producto.id}`;
+    return `${producto.descripcion} — ${producto.linea} (#${producto.id})`;
 }
