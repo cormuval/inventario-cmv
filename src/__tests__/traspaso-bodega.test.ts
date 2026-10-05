@@ -5,7 +5,11 @@ import * as authLib from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
 // actions
-import { crearOrdenSalida } from "@/modules/orden-salida/actions/orden-salida.action";
+import {
+    crearOrdenSalida,
+    actualizarDetalleSalida,
+    eliminarDetalleSalida
+} from "@/modules/orden-salida/actions/orden-salida.action";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
@@ -27,7 +31,7 @@ vi.mock("@/shared/lib/prisma", () => ({
         bodega: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
         encargadosBodega: { findMany: vi.fn() },
         ordenSalida: { findMany: vi.fn(), create: vi.fn() },
-        ordenSalidaDetalle: { findMany: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn() },
+        ordenSalidaDetalle: { findMany: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn(), delete: vi.fn() },
         stock: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() }
     }
 }));
@@ -139,6 +143,16 @@ describe("traspaso a otra bodega en el mismo centro", () => {
                 })
             })
         );
+
+        // Verifica que se guarda bodegaDestinoId en data
+        expect(tx.ordenSalida.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    bodegaDestinoId: "b2",
+                    destino: "Bodega Vacunatorio"
+                })
+            })
+        );
     });
 
     it("rechaza si no se selecciona bodega destino", async () => {
@@ -212,4 +226,180 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         expect(resultado.ok).toBe(false);
         expect(resultado.message).toContain("se encuentra caducado");
     });
+
+    it("rechaza el traspaso de un lote con cantidadDisponible: 0 (saldo 0)", async () => {
+        sesionOperador();
+        vi.mocked(prisma.bodega.findUnique).mockResolvedValue(bodegaVacunatorio as never);
+
+        const tx = {
+            ordenSalida: { create: vi.fn().mockResolvedValue({ id: "orden-1" }) },
+            stock: {
+                findUnique: vi.fn().mockResolvedValue({
+                    id: "stock-1",
+                    productoId: 1,
+                    bodegaId: "b1",
+                    cantidadDisponible: 0,
+                    lote: "LOTE-SIN-STOCK",
+                    fechaCaducidad: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                })
+            }
+        };
+        vi.mocked(prisma.$transaction).mockImplementation((async (fn: (client: unknown) => Promise<unknown>) => fn(tx)) as never);
+
+        const formData = crearFormDataTraspaso({ bodegaDestinoId: "b2" });
+        const resultado = await crearOrdenSalida({ ok: false, message: "" }, formData);
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("saldo: 0");
+    });
+
+    it("elimina detalle de traspaso revirtiendo en origen y descontando en destino", async () => {
+        sesionOperador();
+
+        const detalleExistente = {
+            id: "det-traspaso-1",
+            productoId: 1,
+            cantidad: 5,
+            lote: "LOTE-01",
+            fechaCaducidad: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000),
+            ordenSalida: {
+                id: "ord-1",
+                centroId: "centro-1",
+                bodegaId: "b1",
+                bodegaDestinoId: "b2",
+                tipoSalida: "A otra bodega"
+            }
+        };
+
+        vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue(detalleExistente as never);
+
+        const tx = {
+            stock: {
+                upsert: vi.fn().mockResolvedValue({}),
+                findUnique: vi.fn().mockResolvedValue({
+                    id: "stock-destino-1",
+                    cantidadDisponible: 10,
+                    fechaCaducidad: detalleExistente.fechaCaducidad
+                }),
+                update: vi.fn().mockResolvedValue({})
+            },
+            ordenSalidaDetalle: {
+                delete: vi.fn().mockResolvedValue({})
+            }
+        };
+
+        vi.mocked(prisma.$transaction).mockImplementation((async (fn: (client: unknown) => Promise<unknown>) => fn(tx)) as never);
+
+        const resultado = await eliminarDetalleSalida("det-traspaso-1");
+
+        expect(resultado.ok).toBe(true);
+        expect(resultado.message).toBe("Detalle de salida eliminado.");
+
+        // Repone en origen (upsert +5)
+        expect(tx.stock.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    stock_lote_unico: expect.objectContaining({
+                        bodegaId: "b1",
+                        productoId: 1
+                    })
+                },
+                update: expect.objectContaining({
+                    cantidadDisponible: { increment: 5 }
+                })
+            })
+        );
+
+        // Descuenta en destino (-5)
+        expect(tx.stock.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "stock-destino-1" },
+                data: expect.objectContaining({
+                    cantidadDisponible: { decrement: 5 }
+                })
+            })
+        );
+
+        expect(tx.ordenSalidaDetalle.delete).toHaveBeenCalledWith({ where: { id: "det-traspaso-1" } });
+    });
+
+    it("actualiza detalle de traspaso ajustando cantidades en origen y destino bilateralmente", async () => {
+        sesionOperador();
+
+        const fechaLote = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000);
+        const detallePrevio = {
+            id: "det-traspaso-2",
+            productoId: 1,
+            cantidad: 5,
+            lote: "LOTE-01",
+            fechaCaducidad: fechaLote,
+            ordenSalida: {
+                id: "ord-2",
+                centroId: "centro-1",
+                bodegaId: "b1",
+                bodegaDestinoId: "b2",
+                tipoSalida: "A otra bodega"
+            }
+        };
+
+        vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue(detallePrevio as never);
+
+        const tx = {
+            stock: {
+                upsert: vi.fn().mockResolvedValue({}),
+                findUnique: vi.fn().mockResolvedValue({
+                    id: "stock-valido",
+                    cantidadDisponible: 20,
+                    fechaCaducidad: fechaLote
+                }),
+                update: vi.fn().mockResolvedValue({})
+            },
+            ordenSalidaDetalle: {
+                update: vi.fn().mockResolvedValue({})
+            }
+        };
+
+        vi.mocked(prisma.$transaction).mockImplementation((async (fn: (client: unknown) => Promise<unknown>) => fn(tx)) as never);
+
+        const formData = new FormData();
+        formData.set("productoId", "1");
+        formData.set("cantidad", "8"); // Modifica cantidad de 5 a 8
+        formData.set("lote", "LOTE-01");
+        formData.set("fechaCaducidad", fechaLote.toISOString());
+
+        const resultado = await actualizarDetalleSalida("det-traspaso-2", formData);
+
+        expect(resultado.ok).toBe(true);
+        expect(resultado.message).toBe("Detalle de salida actualizado.");
+        expect(tx.stock.upsert).toHaveBeenCalledTimes(2); // Devolver previo en origen y nuevo en destino
+        expect(tx.stock.update).toHaveBeenCalledTimes(2); // Descontar previo en destino y nuevo en origen
+    });
+
+    it("falla si la orden de traspaso carece de bodegaDestinoId registrada al intentar revertir", async () => {
+        sesionOperador();
+
+        const detalleInvalido = {
+            id: "det-invalido",
+            productoId: 1,
+            cantidad: 3,
+            lote: "LOTE-01",
+            fechaCaducidad: new Date(),
+            ordenSalida: {
+                id: "ord-invalida",
+                centroId: "centro-1",
+                bodegaId: "b1",
+                bodegaDestinoId: null, // No tiene destino registrado
+                tipoSalida: "A otra bodega"
+            }
+        };
+
+        vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue(detalleInvalido as never);
+
+        const resultado = await eliminarDetalleSalida("det-invalido");
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("no tiene bodega destino registrada");
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
 });
+

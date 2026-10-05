@@ -1,7 +1,6 @@
 "use client";
 
-import type * as React from "react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import React, { useActionState, useEffect, useMemo, useState } from "react";
 import type { Bodega, Centro, Stock } from "@prisma/client";
 
 // actions
@@ -39,6 +38,7 @@ interface StockDisponible extends Stock {
 export function OrdenSalidaForm({
     centros,
     bodegas,
+    bodegasDestino = [],
     stocks,
     centroId = null,
     bodegaId: bodegaIdProp = null,
@@ -46,6 +46,7 @@ export function OrdenSalidaForm({
 }: {
     centros: Centro[];
     bodegas: Bodega[];
+    bodegasDestino?: Bodega[];
     stocks: StockDisponible[];
     centroId?: string | null;
     bodegaId?: string | null;
@@ -61,10 +62,10 @@ export function OrdenSalidaForm({
     const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
     const esOtrosCentros = tipoSalida.trim().toLowerCase() === "a otros centros";
 
-    const bodegasDestinoDisponibles = useMemo(
-        () => bodegasFiltradas.filter((b) => b.id !== bodegaId),
-        [bodegasFiltradas, bodegaId]
-    );
+    const bodegasDestinoDisponibles = useMemo(() => {
+        const pool = bodegasDestino && bodegasDestino.length > 0 ? bodegasDestino : bodegas;
+        return pool.filter((b) => b.centroId === centroSeleccionado && b.id !== bodegaId && b.estado);
+    }, [bodegasDestino, bodegas, centroSeleccionado, bodegaId]);
     const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
 
     const otrosCentrosDisponibles = useMemo(
@@ -138,10 +139,11 @@ export function OrdenSalidaForm({
                     value={tipoSalida}
                     onChange={(event) => setTipoSalida(event.currentTarget.value)}
                 >
-                    <option value="Consumo Interno">Consumo Interno</option>
-                    <option value="A otra bodega">A otra bodega</option>
-                    <option value="A Otros Centros">A Otros Centros</option>
-                    <option value="Merma">Merma</option>
+                    {TIPOS_SALIDA.map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                            {tipo}
+                        </option>
+                    ))}
                 </Select>
             </label>
             {esTraspasoBodega ? (

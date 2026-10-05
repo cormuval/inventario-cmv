@@ -59,6 +59,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         const parsed = crearOrdenSalidaSchema.parse({
             fecha: formData.get("fecha"),
             bodegaId: formData.get("bodegaId"),
+            bodegaDestinoId: formData.get("bodegaDestinoId")?.toString()?.trim() || undefined,
             centroId: formData.get("centroId"),
             tipoSalida: formData.get("tipoSalida"),
             destino: formData.get("destino"),
@@ -72,7 +73,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         let bodegaDestinoId: string | null = null;
 
         if (esTraspasoBodega) {
-            bodegaDestinoId = formData.get("bodegaDestinoId")?.toString()?.trim() || null;
+            bodegaDestinoId = parsed.bodegaDestinoId ?? null;
             if (!bodegaDestinoId) {
                 return { ok: false, message: "Debe seleccionar la bodega destino para el traspaso." };
             }
@@ -86,7 +87,6 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                 return { ok: false, message: "La bodega destino seleccionada no existe o no pertenece al mismo centro de salud." };
             }
             parsed.destino = bodegaDestino.nombre;
-            parsed.codigoSalida = parsed.codigoSalida || `TR-${bodegaDestino.id}`;
         }
 
         const orden = await prisma.$transaction(async (tx) => {
@@ -95,10 +95,11 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                     fecha: parsed.fecha,
                     usuarioId: user.id,
                     bodegaId: parsed.bodegaId,
+                    bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : null,
                     tipoSalida: parsed.tipoSalida,
                     centroId: parsed.centroId,
                     destino: parsed.destino,
-                    codigoSalida: parsed.codigoSalida,
+                    codigoSalida: parsed.codigoSalida || null,
                     correoDestino: parsed.correoDestino || null
                 }
             });
@@ -142,6 +143,8 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             detalle: {
                 tipoSalida: parsed.tipoSalida,
                 destino: parsed.destino,
+                bodegaOrigenId: parsed.bodegaId,
+                ...(esTraspasoBodega && bodegaDestinoId ? { bodegaDestinoId } : {}),
                 detalles: parsed.detalles.length
             }
         });
@@ -179,11 +182,13 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
         const esTraspaso = previo.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
         let bodegaDestinoId: string | null = null;
         if (esTraspaso) {
-            bodegaDestinoId = previo.ordenSalida.codigoSalida?.startsWith("TR-")
-                ? previo.ordenSalida.codigoSalida.replace(/^TR-/, "")
-                : (await prisma.bodega.findFirst({
-                      where: { centroId: previo.ordenSalida.centroId, nombre: previo.ordenSalida.destino, estado: true }
-                  }))?.id ?? null;
+            bodegaDestinoId = previo.ordenSalida.bodegaDestinoId;
+            if (!bodegaDestinoId) {
+                return {
+                    ok: false,
+                    message: "La orden de traspaso no tiene bodega destino registrada; no es posible revertirla."
+                };
+            }
         }
 
         await prisma.$transaction(async (tx) => {
@@ -201,7 +206,8 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
                     cantidad: previo.cantidad,
                     lote: previo.lote,
                     fechaCaducidad: previo.fechaCaducidad,
-                    tipoSalida: "A otra bodega"
+                    tipoSalida: "A otra bodega",
+                    esCompensacion: true
                 });
             }
 
@@ -226,7 +232,16 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
             await tx.ordenSalidaDetalle.update({ where: { id: detalleId }, data: parsed });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "actualizar", entidad: "OrdenSalidaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "actualizar",
+            entidad: "OrdenSalidaDetalle",
+            entidadId: detalleId,
+            detalle: {
+                bodegaOrigenId: previo.ordenSalida.bodegaId,
+                ...(esTraspaso && bodegaDestinoId ? { bodegaDestinoId } : {})
+            }
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
@@ -252,11 +267,13 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
         const esTraspaso = detalle.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
         let bodegaDestinoId: string | null = null;
         if (esTraspaso) {
-            bodegaDestinoId = detalle.ordenSalida.codigoSalida?.startsWith("TR-")
-                ? detalle.ordenSalida.codigoSalida.replace(/^TR-/, "")
-                : (await prisma.bodega.findFirst({
-                      where: { centroId: detalle.ordenSalida.centroId, nombre: detalle.ordenSalida.destino, estado: true }
-                  }))?.id ?? null;
+            bodegaDestinoId = detalle.ordenSalida.bodegaDestinoId;
+            if (!bodegaDestinoId) {
+                return {
+                    ok: false,
+                    message: "La orden de traspaso no tiene bodega destino registrada; no es posible revertirla."
+                };
+            }
         }
 
         await prisma.$transaction(async (tx) => {
@@ -274,14 +291,24 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
                     cantidad: detalle.cantidad,
                     lote: detalle.lote,
                     fechaCaducidad: detalle.fechaCaducidad,
-                    tipoSalida: "A otra bodega"
+                    tipoSalida: "A otra bodega",
+                    esCompensacion: true
                 });
             }
 
             await tx.ordenSalidaDetalle.delete({ where: { id: detalleId } });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "eliminar", entidad: "OrdenSalidaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "eliminar",
+            entidad: "OrdenSalidaDetalle",
+            entidadId: detalleId,
+            detalle: {
+                bodegaOrigenId: detalle.ordenSalida.bodegaId,
+                ...(esTraspaso && bodegaDestinoId ? { bodegaDestinoId } : {})
+            }
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
@@ -307,7 +334,15 @@ function leerDetallesSalida(formData: FormData): DetalleSalidaForm[] {
 
 async function descontarStock(
     tx: Tx,
-    input: { productoId: number; bodegaId: string; cantidad: number; lote: string; fechaCaducidad: Date; tipoSalida: string }
+    input: {
+        productoId: number;
+        bodegaId: string;
+        cantidad: number;
+        lote: string;
+        fechaCaducidad: Date;
+        tipoSalida: string;
+        esCompensacion?: boolean;
+    }
 ): Promise<void> {
     const stock = await tx.stock.findUnique({
         where: {
@@ -328,9 +363,11 @@ async function descontarStock(
         throw new Error(`Stock insuficiente para el lote "${input.lote}". Solicitado: ${input.cantidad}, disponible: ${stock.cantidadDisponible}.`);
     }
 
-    const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);
-    if (!validacion.valido) {
-        throw new Error(validacion.motivo);
+    if (!input.esCompensacion) {
+        const validacion = validarSalidaLoteCaducado(input.tipoSalida, stock.fechaCaducidad);
+        if (!validacion.valido) {
+            throw new Error(validacion.motivo);
+        }
     }
 
     await tx.stock.update({

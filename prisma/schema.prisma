@@ -27,10 +27,11 @@ model Bodega {
     estado     Boolean            @default(true) @map("Estado")
     centro     Centro             @relation(fields: [centroId], references: [id])
     usuarios   Usuario[]
-    entradas   OrdenEntrada[]
-    salidas    OrdenSalida[]
-    stocks     Stock[]
-    encargados EncargadosBodega[]
+    entradas       OrdenEntrada[]
+    salidas        OrdenSalida[]      @relation("OrdenSalidaBodegaOrigen")
+    salidasDestino OrdenSalida[]      @relation("OrdenSalidaBodegaDestino")
+    stocks         Stock[]
+    encargados     EncargadosBodega[]
 
     @@index([centroId])
     @@map("Bodega")
@@ -126,23 +127,26 @@ model OrdenEntradaDetalle {
 }
 
 model OrdenSalida {
-    id            String               @id @default(cuid()) @map("ID_OrdenSalida") @db.VarChar(255)
-    fecha         DateTime             @map("Fecha") @db.Date
-    usuarioId     String               @map("ID_User") @db.VarChar(255)
-    bodegaId      String               @map("ID_Bodega") @db.VarChar(255)
-    tipoSalida    String               @map("Tipo_Salida") @db.VarChar(255)
-    centroId      String               @map("ID_Centro") @db.VarChar(255)
-    destino       String               @map("Destino") @db.VarChar(255)
-    codigoSalida  String?              @map("Codigo_Salida") @db.VarChar(255)
-    enviarCorreo  Boolean              @default(false) @map("Enviar_Correo")
-    correoDestino String?              @map("Correo_Destino") @db.VarChar(255)
-    usuario       Usuario              @relation(fields: [usuarioId], references: [id])
-    bodega        Bodega               @relation(fields: [bodegaId], references: [id])
-    centro        Centro               @relation(fields: [centroId], references: [id])
-    detalles      OrdenSalidaDetalle[]
+    id              String               @id @default(cuid()) @map("ID_OrdenSalida") @db.VarChar(255)
+    fecha           DateTime             @map("Fecha") @db.Date
+    usuarioId       String               @map("ID_User") @db.VarChar(255)
+    bodegaId        String               @map("ID_Bodega") @db.VarChar(255)
+    bodegaDestinoId String?              @map("ID_Bodega_Destino") @db.VarChar(255)
+    tipoSalida      String               @map("Tipo_Salida") @db.VarChar(255)
+    centroId        String               @map("ID_Centro") @db.VarChar(255)
+    destino         String               @map("Destino") @db.VarChar(255)
+    codigoSalida    String?              @map("Codigo_Salida") @db.VarChar(255)
+    enviarCorreo    Boolean              @default(false) @map("Enviar_Correo")
+    correoDestino   String?              @map("Correo_Destino") @db.VarChar(255)
+    usuario         Usuario              @relation(fields: [usuarioId], references: [id])
+    bodega          Bodega               @relation("OrdenSalidaBodegaOrigen", fields: [bodegaId], references: [id])
+    bodegaDestino   Bodega?              @relation("OrdenSalidaBodegaDestino", fields: [bodegaDestinoId], references: [id])
+    centro          Centro               @relation(fields: [centroId], references: [id])
+    detalles        OrdenSalidaDetalle[]
 
     @@index([usuarioId])
     @@index([bodegaId])
+    @@index([bodegaDestinoId])
     @@index([centroId])
     @@map("OrdenSalida")
 }
