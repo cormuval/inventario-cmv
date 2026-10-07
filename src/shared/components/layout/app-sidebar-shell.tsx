@@ -12,8 +12,8 @@ import {
     Package,
     PanelLeftClose,
     PanelLeftOpen,
-    Settings,
     ShieldCheck,
+    SlidersHorizontal,
     Warehouse
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -52,7 +52,7 @@ const navItems = [
     { href: "/orden-entrada", label: "Orden entrada", icon: ClipboardList },
     { href: "/orden-salida", label: "Orden salida", icon: ClipboardList },
     { href: "/reporte", label: "Reporte", icon: FileBarChart },
-    { href: "/configuraciones", label: "Configuraciones", icon: Settings }
+    { href: "/configuraciones", label: "Mantenedores", icon: SlidersHorizontal }
 ] as const;
 
 export function AppSidebarShell({ children, profile }: AppSidebarShellProps): React.ReactElement {
