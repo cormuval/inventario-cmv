@@ -35,6 +35,10 @@ export interface ComboboxProps {
     searchPlaceholder?: string;
     emptyText?: string;
     disabled?: boolean;
+    /** Impide enviar el formulario sin una opción seleccionada (validación nativa del navegador). */
+    required?: boolean;
+    /** Mensaje mostrado por el navegador cuando `required` no se cumple. */
+    requiredMessage?: string;
     className?: string;
     id?: string;
 }
@@ -47,10 +51,18 @@ export function Combobox({
     searchPlaceholder = "Buscar por nombre, lote o código...",
     emptyText = "Sin resultados",
     disabled = false,
+    required = false,
+    requiredMessage = "Seleccione una opción de la lista.",
     className,
     id
 }: ComboboxProps): React.ReactElement {
     const [open, setOpen] = React.useState(false);
+    const validacionRef = React.useRef<HTMLInputElement>(null);
+
+    // Limpia el mensaje personalizado al cambiar la seleccion; si no, el campo sigue invalido.
+    React.useEffect(() => {
+        validacionRef.current?.setCustomValidity("");
+    }, [value]);
 
     const selectedOption = React.useMemo(
         () => options.find((opt) => opt.value === value),
@@ -58,71 +70,86 @@ export function Combobox({
     );
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    id={id}
-                    type="button"
-                    role="combobox"
-                    aria-expanded={open}
-                    aria-haspopup="listbox"
-                    disabled={disabled}
-                    title={selectedOption ? selectedOption.label : undefined}
-                    className={cn(
-                        "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                        !selectedOption && "text-muted-foreground",
-                        className
-                    )}
+        <div className="relative">
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                    <button
+                        id={id}
+                        type="button"
+                        role="combobox"
+                        aria-expanded={open}
+                        aria-haspopup="listbox"
+                        disabled={disabled}
+                        title={selectedOption ? selectedOption.label : undefined}
+                        className={cn(
+                            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                            !selectedOption && "text-muted-foreground",
+                            className
+                        )}
+                    >
+                        <span className="truncate text-left">
+                            {selectedOption ? selectedOption.label : placeholder}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent
+                    className="w-[--radix-popover-trigger-width] min-w-[300px] p-0"
+                    align="start"
                 >
-                    <span className="truncate text-left">
-                        {selectedOption ? selectedOption.label : placeholder}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[--radix-popover-trigger-width] min-w-[300px] p-0"
-                align="start"
-            >
-                <Command
-                    filter={(itemValue, search, keywords = []) => {
-                        const target = `${itemValue} ${keywords.join(" ")}`.toLowerCase();
-                        return target.includes(search.trim().toLowerCase()) ? 1 : 0;
-                    }}
-                >
-                    <CommandInput
-                        placeholder={searchPlaceholder}
-                        autoComplete="off"
-                    />
-                    <CommandList>
-                        <CommandEmpty>{emptyText}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    keywords={option.keywords}
-                                    onSelect={() => {
-                                        onChange(option.value);
-                                        setOpen(false);
-                                    }}
-                                    className="flex items-start gap-2 py-2"
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mt-0.5 h-4 w-4 shrink-0",
-                                            value === option.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    <span className="break-words leading-tight">
-                                        {option.label}
-                                    </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
+                    <Command
+                        filter={(itemValue, search, keywords = []) => {
+                            const target = `${itemValue} ${keywords.join(" ")}`.toLowerCase();
+                            return target.includes(search.trim().toLowerCase()) ? 1 : 0;
+                        }}
+                    >
+                        <CommandInput
+                            placeholder={searchPlaceholder}
+                            autoComplete="off"
+                        />
+                        <CommandList>
+                            <CommandEmpty>{emptyText}</CommandEmpty>
+                            <CommandGroup>
+                                {options.map((option) => (
+                                    <CommandItem
+                                        key={option.value}
+                                        value={option.label}
+                                        keywords={option.keywords}
+                                        onSelect={() => {
+                                            onChange(option.value);
+                                            setOpen(false);
+                                        }}
+                                        className="flex items-start gap-2 py-2"
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mt-0.5 h-4 w-4 shrink-0",
+                                                value === option.value ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="break-words leading-tight">
+                                            {option.label}
+                                        </span>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+            {required && (
+                // Input invisible (no `display: none`) para que el navegador lo valide y ubique su aviso bajo el selector.
+                <input
+                    ref={validacionRef}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    required
+                    value={value}
+                    onChange={() => undefined}
+                    onInvalid={(event) => event.currentTarget.setCustomValidity(requiredMessage)}
+                    className="pointer-events-none absolute bottom-0 left-4 h-px w-px opacity-0"
+                />
+            )}
+        </div>
     );
 }

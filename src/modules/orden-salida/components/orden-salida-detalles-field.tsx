@@ -115,6 +115,8 @@ export function OrdenSalidaDetallesField({
                             value={detalle.stockId}
                             onChange={(value) => seleccionarStock(detalle.id, value)}
                             options={opciones}
+                            required
+                            requiredMessage="Seleccione un producto y lote disponible."
                             placeholder="Seleccione stock disponible..."
                             searchPlaceholder="Buscar por producto o lote..."
                             emptyText="No se encontraron productos o lotes"

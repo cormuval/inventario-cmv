@@ -65,6 +65,8 @@ export function OrdenEntradaDetallesField({ productos }: { productos: Producto[]
                             value={detalle.productoId}
                             onChange={(value) => seleccionarProducto(detalle.id, value)}
                             options={opciones}
+                            required
+                            requiredMessage="Seleccione un producto del catálogo."
                             placeholder="Seleccione producto del catálogo..."
                             searchPlaceholder="Buscar por nombre, línea o código..."
                             emptyText="No se encontraron productos"
