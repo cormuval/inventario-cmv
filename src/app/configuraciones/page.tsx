@@ -19,8 +19,8 @@ export default async function ConfiguracionesPage(): Promise<React.ReactElement>
         <AppLayout>
             <div className="space-y-6">
                 <div>
-                    <p className="text-sm text-muted-foreground">Mantenedores iniciales</p>
-                    <h2 className="text-2xl font-semibold">Configuraciones</h2>
+                    <p className="text-sm text-muted-foreground">Gestión de centros de salud, bodegas, unidades y usuarios del sistema</p>
+                    <h2 className="text-2xl font-semibold">Mantenedores</h2>
                 </div>
                 <section className="grid gap-4 lg:grid-cols-3">
                     <Card>
