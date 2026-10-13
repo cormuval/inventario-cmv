@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import type { Bodega, Centro, Rol } from "@prisma/client";
 
 // actions
-import { crearBodega, crearCentro, crearUnidad, crearUsuario } from "@/modules/configuraciones/actions/configuraciones.action";
+import { crearBodega, crearCentro, crearUnidad, crearUsuario } from "@/modules/mantenedores/actions/mantenedores.action";
 
 // components
 import { ActionMessage } from "@/shared/components/ui/action-message";

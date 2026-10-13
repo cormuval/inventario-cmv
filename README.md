@@ -1,6 +1,6 @@
 # Inventario APS
 
-MVP local para gestionar stock, productos, ordenes de entrada, ordenes de salida, reportes y configuraciones.
+MVP local para gestionar stock, productos, ordenes de entrada, ordenes de salida, reportes y mantenedores.
 
 ## Inicio local
 

@@ -1,6 +1,6 @@
 # AGENTS.md — Inventario
 
-App web para gestionar la demanda de atencion en salud primaria (Valparaiso): Stock, vista de productos, reporte, orden de entrada, orden de salida y configuraciones. App unica Next.js (front + back).
+App web para gestionar la demanda de atencion en salud primaria (Valparaiso): Stock, vista de productos, reporte, orden de entrada, orden de salida y mantenedores. App unica Next.js (front + back).
 
 ## Stack
 
@@ -22,7 +22,7 @@ src/
   auth.ts · auth.config.ts · middleware.ts
 ```
 
-Modulos: `stock`, `vista de productos`, `reporte`, `orden de entrada`, `orden de salida`,`configuraciones` .
+Modulos: `stock`, `vista de productos`, `reporte`, `orden de entrada`, `orden de salida`, `mantenedores`.
 
 ## Comandos
 
