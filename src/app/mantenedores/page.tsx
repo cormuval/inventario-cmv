@@ -1,10 +1,10 @@
 import type * as React from "react";
 
 // actions
-import { listarConfiguraciones } from "@/modules/configuraciones/actions/configuraciones.action";
+import { listarMantenedores } from "@/modules/mantenedores/actions/mantenedores.action";
 
 // components
-import { BodegaForm, CentroForm, UnidadForm, UsuarioForm } from "@/modules/configuraciones/components/configuracion-forms";
+import { BodegaForm, CentroForm, UnidadForm, UsuarioForm } from "@/modules/mantenedores/components/mantenedores-forms";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Td, Th, Table } from "@/shared/components/ui/table";
@@ -12,8 +12,8 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConfiguracionesPage(): Promise<React.ReactElement> {
-    const data = await listarConfiguraciones();
+export default async function MantenedoresPage(): Promise<React.ReactElement> {
+    const data = await listarMantenedores();
 
     return (
         <AppLayout>

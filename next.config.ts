@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
         serverActions: {
             bodySizeLimit: "2mb"
         }
+    },
+    async redirects() {
+        return [
+            // Ruta historica del modulo, renombrado a "Mantenedores": conserva marcadores y enlaces antiguos.
+            {
+                source: "/configuraciones",
+                destination: "/mantenedores",
+                permanent: true
+            }
+        ];
     }
 };
 

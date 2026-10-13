@@ -52,7 +52,7 @@ const navItems = [
     { href: "/orden-entrada", label: "Orden entrada", icon: ClipboardList },
     { href: "/orden-salida", label: "Orden salida", icon: ClipboardList },
     { href: "/reporte", label: "Reporte", icon: FileBarChart },
-    { href: "/configuraciones", label: "Mantenedores", icon: SlidersHorizontal }
+    { href: "/mantenedores", label: "Mantenedores", icon: SlidersHorizontal }
 ] as const;
 
 export function AppSidebarShell({ children, profile }: AppSidebarShellProps): React.ReactElement {
