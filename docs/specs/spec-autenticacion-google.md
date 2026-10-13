@@ -198,6 +198,6 @@ y `obtenerSessionUser` en `src/shared/lib/auth.ts`), pero no por una prueba end-
 
 ## 12. Trabajo futuro
 
-- ABM de funcionarios desde `/configuraciones` para no depender del seed.
+- ABM de funcionarios desde `/mantenedores` para no depender del seed.
 - Registrar los inicios y cierres de sesion con `AuditLogger`.
 - Definir las variables `AUTH_*` del entorno productivo y su redirect URI.

@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Inventario APS — Corporación Municipal de Valparaíso (CMV)  
 **Documento:** Especificación Funcional y de Usabilidad: Transición Terminológica de Configuraciones a Mantenedores  
-**Versión:** 1.1 (Aprobada)  
+**Versión:** 1.2 (Aprobada)  
 **Fecha:** 07 de Octubre de 2026  
 **Clasificación:** Usabilidad, Nomenclatura del Dominio e Interfaz de Usuario (Prioridad Media)  
 
@@ -37,27 +37,41 @@
  • Icono: Settings (Tuerca)                   • Icono: SlidersHorizontal (Parámetros)
  • Ambigüedad con perfil/contraseña           • Terminología estándar ERP salud CMV
  • Título: "Configuraciones"                  • Título: "Mantenedores"
- • Ruta: /configuraciones (estable)           • Ruta: /configuraciones (estable, sin cambios innecesarios)
+ • Ruta: /configuraciones                     • Ruta: /mantenedores (308 desde /configuraciones)
 ```
 
 ### Regla R-01: Estandarización de Etiquetas e Iconografía en UI
 - La opción de navegación en la barra lateral (`AppSidebarShell`) cambia de `"Configuraciones"` a `"Mantenedores"`.
 - El icono representativo cambia de `Settings` a `SlidersHorizontal`, comunicando claramente la administración de parámetros estructurales del sistema.
-- El enlace de la barra lateral se mantiene apuntando a la ruta existente `/configuraciones`.
-- El encabezado principal de la página (`src/app/configuraciones/page.tsx`) mostrará:
+- El enlace de la barra lateral apunta a `/mantenedores`.
+- El encabezado principal de la página (`src/app/mantenedores/page.tsx`) mostrará:
   - Título principal (`h2`): **Mantenedores**
   - Subtítulo descriptivo (`p`): **Gestión de centros de salud, bodegas, unidades y usuarios del sistema**
 
-*(Nota: La Regla R-02 original referente a renombrar la URL canónica y crear redirecciones 308 en Next.js fue descartada por considerarse innecesaria operativamente, priorizando la estabilidad de rutas existentes y focalizándose en la claridad de la interfaz para el usuario).*
+### Regla R-02: Unificación del Nombre en Código y Rutas
+Para que interfaz y código usen un único término, todo el módulo adopta el nombre `mantenedores`:
+
+| Antes | Ahora |
+|---|---|
+| Ruta `/configuraciones` | Ruta `/mantenedores` (`src/app/mantenedores/page.tsx`) |
+| `src/modules/configuraciones/` | `src/modules/mantenedores/` |
+| `actions/configuraciones.action.ts` | `actions/mantenedores.action.ts` |
+| `components/configuracion-forms.tsx` | `components/mantenedores-forms.tsx` |
+| `schemas/configuracion.schema.ts` | `schemas/mantenedores.schema.ts` |
+| `listarConfiguraciones()` | `listarMantenedores()` |
+| `ConfiguracionesPage` | `MantenedoresPage` |
+| `revalidatePath("/configuraciones")` | `revalidatePath("/mantenedores")` |
+
+- La ruta histórica `/configuraciones` redirige de forma permanente (308) a `/mantenedores` mediante `redirects()` en `next.config.ts`, para conservar marcadores y enlaces existentes.
 
 ---
 
 ## 3. Criterios de Aceptación (Verificados)
 
-- [x] **CA-1: Menú Lateral Actualizado:** El menú lateral muestra "Mantenedores" con el icono `SlidersHorizontal` y apunta a `/configuraciones`.
-- [x] **CA-2: Vista de Mantenedores:** La página `/configuraciones` renderiza las tarjetas de Centro, Bodega, Unidad, Usuario y la tabla de usuarios registrados bajo el título principal "Mantenedores".
-- [x] **CA-3: Estabilidad de Rutas:** La ruta `/configuraciones` se mantiene operativa sin requerir redirecciones externas ni alterar contratos de integración existentes.
-- [x] **CA-4: Cero Regresiones:** El linter, las pruebas unitarias automáticas (70/70) y el compilador estricto de TypeScript (`tsc --noEmit`) pasan al 100%.
+- [x] **CA-1: Menú Lateral Actualizado:** El menú lateral muestra "Mantenedores" con el icono `SlidersHorizontal` y apunta a `/mantenedores`.
+- [x] **CA-2: Vista de Mantenedores:** La página `/mantenedores` renderiza las tarjetas de Centro, Bodega, Unidad, Usuario y la tabla de usuarios registrados bajo el título principal "Mantenedores".
+- [x] **CA-3: Unificación y Compatibilidad de Rutas:** No quedan referencias a `configuraciones` en el código del módulo, y `/configuraciones` redirige (308) a `/mantenedores`.
+- [x] **CA-4: Cero Regresiones:** Las pruebas unitarias automáticas (`npx vitest run`), el build de Next.js (`npx next build`) y el compilador estricto de TypeScript (`tsc --noEmit`) pasan al 100%.
 
 ---
 
@@ -66,5 +80,6 @@
 1. **Pruebas de Navegación y Renderizado:**
    - Verificar que `AppSidebarShell` renderiza el texto "Mantenedores" con el icono `SlidersHorizontal`.
    - Verificar que al pulsar el enlace carga la vista con el título "Mantenedores".
+   - Verificar que `next.config.ts` declara la redirección permanente `/configuraciones` → `/mantenedores`.
 2. **Pruebas Automatizadas de Funcionalidad:**
    - Ejecutar la suite completa con `npx vitest run` y `npx tsc --noEmit`.
