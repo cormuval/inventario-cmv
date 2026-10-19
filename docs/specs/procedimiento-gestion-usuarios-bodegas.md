@@ -111,13 +111,13 @@
 
 ## 3. Criterios de Aceptación (Definición de Terminado)
 
-- [ ] **CA-1: Edición de Datos de Usuario:** El administrador puede abrir el modal de edición de cualquier usuario, modificar sus nombres, apellidos, teléfono, rol y centro, y guardar con éxito.
-- [ ] **CA-2: Asignación Múltiple de Bodegas:** El administrador puede marcar 2 o más bodegas para un usuario (en creación o edición), y estas se persisten correctamente en la tabla `EncargadosBodega`.
-- [ ] **CA-3: Desactivación Efectiva:** Al desactivar a un usuario, su estado pasa a `Inactivo` en la tabla. Si el usuario intenta iniciar sesión con Google OAuth, el sistema deniega el acceso.
-- [ ] **CA-4: Protección de Auto-desactivación:** El administrador conectado no puede desactivar su propio usuario ni removerse los privilegios de administrador.
-- [ ] **CA-5: Filtrado Dinámico de Bodegas por Centro:** Al cambiar el centro en el formulario, las opciones de bodegas se actualizan al centro seleccionado y se descartan las del centro anterior.
-- [ ] **CA-6: Reflejo Inmediato en Alcance y Barra Lateral:** Un operador con múltiples bodegas asignadas visualiza inmediatamente todas sus bodegas en el selector de alcance de stock, en los formularios de orden y en su perfil.
-- [ ] **CA-7: Cero Regresiones:** Todas las pruebas unitarias y de integración (`npx vitest run`) y la verificación estricta de tipos (`npx tsc --noEmit`) pasan al 100%.
+- [x] **CA-1: Edición de Datos de Usuario:** El administrador puede abrir el modal de edición de cualquier usuario, modificar sus nombres, apellidos, teléfono, rol y centro, y guardar con éxito.
+- [x] **CA-2: Asignación Múltiple de Bodegas:** El administrador puede marcar 2 o más bodegas para un usuario (en creación o edición), y estas se persisten correctamente en la tabla `EncargadosBodega`.
+- [x] **CA-3: Desactivación Efectiva:** Al desactivar a un usuario, su estado pasa a `Inactivo` en la tabla. Si el usuario intenta iniciar sesión con Google OAuth, el sistema deniega el acceso.
+- [x] **CA-4: Protección de Auto-desactivación:** El administrador conectado no puede desactivar su propio usuario ni removerse los privilegios de administrador.
+- [x] **CA-5: Filtrado Dinámico de Bodegas por Centro:** Al cambiar el centro en el formulario, las opciones de bodegas se actualizan al centro seleccionado y se descartan las del centro anterior.
+- [x] **CA-6: Reflejo Inmediato en Alcance y Barra Lateral:** Un operador con múltiples bodegas asignadas visualiza inmediatamente todas sus bodegas en el selector de alcance de stock, en los formularios de orden y en su perfil.
+- [x] **CA-7: Cero Regresiones:** Todas las pruebas unitarias y de integración (`npx vitest run`) y la verificación estricta de tipos (`npx tsc --noEmit`) pasan al 100%.
 
 ---
 

@@ -3,17 +3,22 @@ import type * as React from "react";
 // actions
 import { listarMantenedores } from "@/modules/mantenedores/actions/mantenedores.action";
 
+// lib
+import { requireSessionUser } from "@/shared/lib/auth";
+
 // components
 import { BodegaForm, CentroForm, UnidadForm, UsuarioForm } from "@/modules/mantenedores/components/mantenedores-forms";
-import { Badge } from "@/shared/components/ui/badge";
+import { UsuariosTabla } from "@/modules/mantenedores/components/usuarios-tabla";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { Td, Th, Table } from "@/shared/components/ui/table";
 import { AppLayout } from "@/shared/components/layout/app-layout";
 
 export const dynamic = "force-dynamic";
 
 export default async function MantenedoresPage(): Promise<React.ReactElement> {
-    const data = await listarMantenedores();
+    const [data, sessionUser] = await Promise.all([
+        listarMantenedores(),
+        requireSessionUser()
+    ]);
 
     return (
         <AppLayout>
@@ -60,35 +65,14 @@ export default async function MantenedoresPage(): Promise<React.ReactElement> {
                     <CardHeader>
                         <CardTitle>Usuarios registrados</CardTitle>
                     </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        <Table>
-                            <thead>
-                                <tr>
-                                    <Th>Nombre</Th>
-                                    <Th>Email</Th>
-                                    <Th>Rol</Th>
-                                    <Th>Centro</Th>
-                                    <Th>Bodega</Th>
-                                    <Th>Estado</Th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {data.usuarios.map((usuario) => (
-                                    <tr key={usuario.id}>
-                                        <Td>{usuario.nombre} {usuario.apPaterno}</Td>
-                                        <Td>{usuario.email}</Td>
-                                        <Td>{usuario.rol.descripcion}</Td>
-                                        <Td>{usuario.centro.nombre}</Td>
-                                        <Td>{usuario.bodega?.nombre ?? "Sin bodega"}</Td>
-                                        <Td>
-                                            <Badge tone={usuario.estado ? "success" : "muted"}>
-                                                {usuario.estado ? "Activo" : "Inactivo"}
-                                            </Badge>
-                                        </Td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </Table>
+                    <CardContent>
+                        <UsuariosTabla
+                            usuarios={data.usuarios}
+                            currentUserId={sessionUser.id}
+                            centros={data.centros}
+                            bodegas={data.bodegas}
+                            roles={data.roles}
+                        />
                     </CardContent>
                 </Card>
             </div>

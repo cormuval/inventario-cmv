@@ -1,13 +1,14 @@
 "use client";
 
-import type * as React from "react";
-import { useActionState } from "react";
+import * as React from "react";
+import { useActionState, useState } from "react";
 import type { Bodega, Centro, Rol } from "@prisma/client";
 
 // actions
 import { crearBodega, crearCentro, crearUnidad, crearUsuario } from "@/modules/mantenedores/actions/mantenedores.action";
 
 // components
+import { BodegasMultiSelect } from "@/modules/mantenedores/components/bodegas-multi-select";
 import { ActionMessage } from "@/shared/components/ui/action-message";
 import { FormSubmit } from "@/shared/components/ui/form-submit";
 import { Input } from "@/shared/components/ui/input";
@@ -74,35 +75,40 @@ export function UsuarioForm({
     roles: Rol[];
 }): React.ReactElement {
     const [state, formAction] = useActionState(crearUsuario, initialActionState);
+    const [selectedCentroId, setSelectedCentroId] = React.useState<string>(centros[0]?.id || "");
+
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-2">
             <Input name="nombre" required placeholder="Nombre" />
             <Input name="apPaterno" required placeholder="Apellido paterno" />
             <Input name="apMaterno" placeholder="Apellido materno" />
-            <Input type="email" name="email" required placeholder="correo@dominio.cl" />
+            <Input type="email" name="email" required placeholder="correo@cmvalparaiso.cl" />
             <Input name="telefono" placeholder="Telefono" />
-            <Select name="rolId" required>
+            <Select name="rolId" required defaultValue="R07">
                 {roles.map((rol) => (
                     <option key={rol.id} value={rol.id}>
                         {rol.id} · {rol.descripcion}
                     </option>
                 ))}
             </Select>
-            <Select name="centroId" required>
+            <Select
+                name="centroId"
+                required
+                value={selectedCentroId}
+                onChange={(e) => setSelectedCentroId(e.target.value)}
+            >
                 {centros.map((centro) => (
                     <option key={centro.id} value={centro.id}>
                         {centro.nombre}
                     </option>
                 ))}
             </Select>
-            <Select name="bodegaId" defaultValue="">
-                <option value="">Sin bodega</option>
-                {bodegas.map((bodega) => (
-                    <option key={bodega.id} value={bodega.id}>
-                        {bodega.nombre}
-                    </option>
-                ))}
-            </Select>
+            <div className="md:col-span-2">
+                <BodegasMultiSelect
+                    bodegas={bodegas}
+                    centroIdSeleccionado={selectedCentroId}
+                />
+            </div>
             <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="estado" defaultChecked />
                 Activo
