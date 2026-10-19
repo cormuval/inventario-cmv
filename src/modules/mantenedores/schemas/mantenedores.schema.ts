@@ -22,6 +22,20 @@ export const usuarioSchema = z.object({
     rolId: z.string().min(1),
     centroId: z.string().min(1),
     bodegaId: z.string().optional(),
+    bodegaIds: z.array(z.string()).default([]),
+    telefono: z.string().optional(),
+    email: z.string().email(),
+    estado: z.coerce.boolean().default(true)
+});
+
+export const editarUsuarioSchema = z.object({
+    id: z.string().min(1),
+    nombre: z.string().min(2),
+    apPaterno: z.string().min(2),
+    apMaterno: z.string().optional(),
+    rolId: z.string().min(1),
+    centroId: z.string().min(1),
+    bodegaIds: z.array(z.string()).default([]),
     telefono: z.string().optional(),
     email: z.string().email(),
     estado: z.coerce.boolean().default(true)
