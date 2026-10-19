@@ -9,6 +9,7 @@ import {
     ClipboardList,
     FileBarChart,
     HeartPulse,
+    History,
     Package,
     PanelLeftClose,
     PanelLeftOpen,
@@ -16,7 +17,7 @@ import {
     SlidersHorizontal,
     Warehouse
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";
 import type { ReactNode } from "react";
 
@@ -45,7 +46,7 @@ interface AppSidebarShellProps {
 
 const STORAGE_KEY = "inventario-aps-sidebar-collapsed";
 
-const navItems = [
+const baseNavItems = [
     { href: "/", label: "Resumen", icon: Boxes },
     { href: "/stock", label: "Stock", icon: Archive },
     { href: "/productos", label: "Productos", icon: Package },
@@ -59,6 +60,16 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mounted, setMounted] = useState(false);
+
+    const navItems = useMemo(() => {
+        if (profile.rol === "R01") {
+            return [
+                ...baseNavItems,
+                { href: "/auditoria", label: "Auditoría", icon: History }
+            ];
+        }
+        return baseNavItems;
+    }, [profile.rol]);
 
     useEffect(() => {
         setMounted(true);
