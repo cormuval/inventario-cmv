@@ -209,8 +209,11 @@ model Log {
     entidad   String   @map("Entidad") @db.VarChar(255)
     entidadId String?  @map("Entidad_ID") @db.VarChar(255)
     detalle   Json?    @map("Detalle")
+    fecha     DateTime @default(now()) @map("Fecha")
     usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
     @@index([usuarioId])
+    @@index([fecha])
+    @@index([entidad])
     @@map("logs")
 }
