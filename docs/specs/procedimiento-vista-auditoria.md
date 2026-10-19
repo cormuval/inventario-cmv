@@ -149,13 +149,13 @@ La pantalla de auditoría dispondrá de un formulario de filtros en la parte sup
 
 ## 4. Criterios de Aceptación (Definición de Terminado)
 
-- [ ] **CA-1: Restricción Estricta de Acceso:** Solo usuarios con rol R01 pueden ver el menú lateral de Auditoría y acceder a `/auditoria`. Otros roles son redirigidos de inmediato.
-- [ ] **CA-2: Registro con Fecha y Hora:** Cada evento registrado por `AuditLogger` almacena automáticamente su fecha y hora precisa en la columna `Fecha`.
-- [ ] **CA-3: Filtro por Rango Temporal:** El administrador puede consultar los eventos ocurridos en el día de hoy, o especificar cualquier rango de fechas.
-- [ ] **CA-4: Filtros en Cascada (Centro → Bodega → Usuario):** Al seleccionar un centro se filtran las bodegas asociadas, y al seleccionar una bodega se filtran los usuarios activos asociados a dicho centro y bodega, permitiendo aislar con exactitud los movimientos de ese funcionario.
-- [ ] **CA-5: Detalle Estructurado y Legible:** Al expandir el detalle de una orden de salida o entrada, se visualiza la bodega origen/destino, tipo de salida y cantidad de productos en un formato claro para el usuario.
-- [ ] **CA-6: Paginación Fluida:** Las consultas masivas se presentan paginadas de forma ágil sin sobrecargar la base de datos.
-- [ ] **CA-7: Cero Regresiones:** Compilación limpia con TypeScript (`npx tsc --noEmit`) y 100% de la suite de pruebas aprobada (`npx vitest run`).
+- [x] **CA-1: Restricción Estricta de Acceso:** Solo usuarios con rol R01 pueden ver el menú lateral de Auditoría y acceder a `/auditoria`. Otros roles son redirigidos de inmediato.
+- [x] **CA-2: Registro con Fecha y Hora:** Cada evento registrado por `AuditLogger` almacena automáticamente su fecha y hora precisa en la columna `Fecha`.
+- [x] **CA-3: Filtro por Rango Temporal:** El administrador puede consultar los eventos ocurridos en el día de hoy, o especificar cualquier rango de fechas.
+- [x] **CA-4: Filtros en Cascada (Centro → Bodega → Usuario):** Al seleccionar un centro se filtran las bodegas asociadas, y al seleccionar una bodega se filtran los usuarios activos asociados a dicho centro y bodega, permitiendo aislar con exactitud los movimientos de ese funcionario.
+- [x] **CA-5: Detalle Estructurado y Legible:** Al expandir el detalle de una orden de salida o entrada, se visualiza la bodega origen/destino, tipo de salida y cantidad de productos en un formato claro para el usuario.
+- [x] **CA-6: Paginación Fluida:** Las consultas masivas se presentan paginadas de forma ágil sin sobrecargar la base de datos.
+- [x] **CA-7: Cero Regresiones:** Compilación limpia con TypeScript (`npx tsc --noEmit`) y 100% de la suite de pruebas aprobada (`npx vitest run`).
 
 ---
 
