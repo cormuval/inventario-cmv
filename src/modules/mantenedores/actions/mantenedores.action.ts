@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 
 // config
 import { ROL_ADMINISTRADOR } from "@/config/auth";
@@ -90,14 +91,28 @@ async function validarBodegasDelCentro(bodegaIds: string[], centroId: string): P
     return unicas;
 }
 
-function mapearErrorPrisma(error: unknown, mensajePorDefecto: string): string {
+/** Mensaje por entidad cuando Prisma rechaza un valor duplicado (restriccion unica, codigo P2002). */
+const MENSAJES_DUPLICADO: Partial<Record<string, string>> = {
+    Usuario: "Ya existe un usuario con ese correo.",
+    Unidad: "Ya existe una unidad con esa descripción."
+};
+
+/**
+ * Traduce un error a un mensaje legible para el usuario:
+ * - ZodError: el primer mensaje de validacion (no el JSON completo de issues).
+ * - Prisma P2002: el mensaje de duplicado de la entidad indicada.
+ */
+function obtenerMensajeError(error: unknown, entidad: string, mensajePorDefecto: string): string {
+    if (error instanceof ZodError) {
+        return error.issues[0]?.message ?? mensajePorDefecto;
+    }
     if (
         error &&
         typeof error === "object" &&
         "code" in error &&
         (error as { code: string }).code === "P2002"
     ) {
-        return "Ya existe un usuario con ese correo.";
+        return MENSAJES_DUPLICADO[entidad] ?? `Ya existe un registro de ${entidad} con esos datos.`;
     }
     return error instanceof Error ? error.message : mensajePorDefecto;
 }
@@ -298,7 +313,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
     } catch (error) {
         return {
             ok: false,
-            message: mapearErrorPrisma(error, "No se pudo actualizar el usuario.")
+            message: obtenerMensajeError(error, "Usuario", "No se pudo actualizar el usuario.")
         };
     }
 }
@@ -357,7 +372,7 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
     } catch (error) {
         return {
             ok: false,
-            message: mapearErrorPrisma(error, "No se pudo cambiar el estado del usuario.")
+            message: obtenerMensajeError(error, "Usuario", "No se pudo cambiar el estado del usuario.")
         };
     }
 }
@@ -377,6 +392,6 @@ async function ejecutarAdmin(
         revalidatePath(path);
         return { ok: true, message };
     } catch (error) {
-        return { ok: false, message: mapearErrorPrisma(error, `No se pudo guardar ${entidad}.`) };
+        return { ok: false, message: obtenerMensajeError(error, entidad, `No se pudo guardar ${entidad}.`) };
     }
 }

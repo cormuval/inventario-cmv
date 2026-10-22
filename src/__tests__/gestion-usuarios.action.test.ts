@@ -6,6 +6,7 @@ import { prisma } from "@/shared/lib/prisma";
 
 // actions
 import {
+    crearUnidad,
     crearUsuario,
     editarUsuario,
     toggleEstadoUsuario
@@ -36,6 +37,9 @@ vi.mock("@/shared/lib/prisma", () => ({
         },
         bodega: {
             findMany: vi.fn()
+        },
+        unidad: {
+            create: vi.fn()
         },
         encargadosBodega: {
             deleteMany: vi.fn(),
@@ -240,7 +244,7 @@ describe("Gestión de Usuarios - Server Actions", () => {
             const res = await crearUsuario(initialActionState, formData);
 
             expect(res.ok).toBe(false);
-            expect(res.message).toMatch(/correo debe ser institucional/i);
+            expect(res.message).toBe("El correo debe ser institucional (@cmvalparaiso.cl).");
         });
 
         it("rechaza la edición de un usuario si se ingresa un correo no institucional", async () => {
@@ -255,7 +259,7 @@ describe("Gestión de Usuarios - Server Actions", () => {
             const res = await editarUsuario(initialActionState, formData);
 
             expect(res.ok).toBe(false);
-            expect(res.message).toMatch(/correo debe ser institucional/i);
+            expect(res.message).toBe("El correo debe ser institucional (@cmvalparaiso.cl).");
         });
 
         it("devuelve mensaje amigable cuando Prisma arroja error P2002 de correo duplicado", async () => {
@@ -275,6 +279,20 @@ describe("Gestión de Usuarios - Server Actions", () => {
 
             expect(res.ok).toBe(false);
             expect(res.message).toBe("Ya existe un usuario con ese correo.");
+        });
+
+        it("usa el mensaje de duplicado de la entidad correspondiente (no el de usuario)", async () => {
+            vi.mocked(authLib.requireSessionUser).mockResolvedValue(adminUser as any);
+            const errorP2002 = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+            vi.mocked(prisma.unidad.create).mockRejectedValueOnce(errorP2002);
+
+            const formData = new FormData();
+            formData.append("descripcion", "Caja");
+
+            const res = await crearUnidad(initialActionState, formData);
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toBe("Ya existe una unidad con esa descripción.");
         });
     });
 
