@@ -137,6 +137,8 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: parsed.centroId,
+            bodegaId: parsed.bodegaId,
             accion: "crear",
             entidad: "OrdenSalida",
             entidadId: orden.id,
@@ -234,6 +236,8 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: previo.ordenSalida.centroId,
+            bodegaId: previo.ordenSalida.bodegaId,
             accion: "actualizar",
             entidad: "OrdenSalidaDetalle",
             entidadId: detalleId,
@@ -301,6 +305,8 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: detalle.ordenSalida.centroId,
+            bodegaId: detalle.ordenSalida.bodegaId,
             accion: "eliminar",
             entidad: "OrdenSalidaDetalle",
             entidadId: detalleId,

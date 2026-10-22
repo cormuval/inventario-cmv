@@ -153,6 +153,16 @@ describe("traspaso a otra bodega en el mismo centro", () => {
                 })
             })
         );
+
+        const { AuditLogger } = await import("@/shared/lib/logger");
+        expect(AuditLogger.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                centroId: "centro-1",
+                bodegaId: "b1",
+                accion: "crear",
+                entidad: "OrdenSalida"
+            })
+        );
     });
 
     it("rechaza si no se selecciona bodega destino", async () => {
@@ -321,6 +331,16 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         );
 
         expect(tx.ordenSalidaDetalle.delete).toHaveBeenCalledWith({ where: { id: "det-traspaso-1" } });
+
+        const { AuditLogger } = await import("@/shared/lib/logger");
+        expect(AuditLogger.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                centroId: "centro-1",
+                bodegaId: "b1",
+                accion: "eliminar",
+                entidad: "OrdenSalidaDetalle"
+            })
+        );
     });
 
     it("actualiza detalle de traspaso ajustando cantidades en origen y destino bilateralmente", async () => {
@@ -373,6 +393,16 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         expect(resultado.message).toBe("Detalle de salida actualizado.");
         expect(tx.stock.upsert).toHaveBeenCalledTimes(2); // Devolver previo en origen y nuevo en destino
         expect(tx.stock.update).toHaveBeenCalledTimes(2); // Descontar previo en destino y nuevo en origen
+
+        const { AuditLogger } = await import("@/shared/lib/logger");
+        expect(AuditLogger.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                centroId: "centro-1",
+                bodegaId: "b1",
+                accion: "actualizar",
+                entidad: "OrdenSalidaDetalle"
+            })
+        );
     });
 
     it("falla si la orden de traspaso carece de bodegaDestinoId registrada al intentar revertir", async () => {
