@@ -9,6 +9,9 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 
+// constants
+import { ENTIDADES_AUDITORIA } from "@/modules/auditoria/constants/entidades";
+
 // types
 import type { FiltroAuditoriaInput } from "@/modules/auditoria/schemas/auditoria.schema";
 
@@ -115,8 +118,8 @@ export function AuditoriaFiltros({
             centroId,
             bodegaId,
             usuarioId,
-            accion: accion as any,
-            entidad: entidad as any,
+            accion: accion as FiltroAuditoriaInput["accion"],
+            entidad: entidad as FiltroAuditoriaInput["entidad"],
             pagina: 1
         });
     };
@@ -239,7 +242,7 @@ export function AuditoriaFiltros({
                     <Select
                         id={accionField}
                         value={accion}
-                        onChange={(e) => setAccion(e.target.value as any)}
+                        onChange={(e) => setAccion(e.target.value as FiltroAuditoriaInput["accion"])}
                     >
                         <option value="todas">Todas las acciones</option>
                         <option value="crear">Crear</option>
@@ -256,16 +259,14 @@ export function AuditoriaFiltros({
                     <Select
                         id={entidadField}
                         value={entidad}
-                        onChange={(e) => setEntidad(e.target.value as any)}
+                        onChange={(e) => setEntidad(e.target.value as FiltroAuditoriaInput["entidad"])}
                     >
                         <option value="todas">Todas las entidades</option>
-                        <option value="OrdenSalida">Orden de Salida</option>
-                        <option value="OrdenEntrada">Orden de Entrada</option>
-                        <option value="Producto">Producto</option>
-                        <option value="Usuario">Usuario</option>
-                        <option value="Centro">Centro de Salud</option>
-                        <option value="Bodega">Bodega</option>
-                        <option value="Unidad">Unidad</option>
+                        {ENTIDADES_AUDITORIA.map((item) => (
+                            <option key={item.value} value={item.value}>
+                                {item.label}
+                            </option>
+                        ))}
                     </Select>
                 </div>
 

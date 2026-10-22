@@ -7,6 +7,8 @@ const mockLogs = [
     {
         id: "log-1",
         usuarioId: "u1",
+        centroId: "c1",
+        bodegaId: "b1",
         accion: "crear",
         entidad: "OrdenSalida",
         entidadId: "salida-999",

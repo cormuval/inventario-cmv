@@ -9,23 +9,9 @@ import { AuditoriaDetalleVisor } from "@/modules/auditoria/components/auditoria-
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Td, Th, Table } from "@/shared/components/ui/table";
+import type { AuditoriaLogItem } from "@/modules/auditoria/actions/auditoria.action";
 
-export interface LogItem {
-    id: string;
-    usuarioId: string | null;
-    accion: string;
-    entidad: string;
-    entidadId: string | null;
-    detalle: unknown;
-    fecha: Date | string;
-    usuario?: {
-        id: string;
-        nombre: string;
-        apPaterno: string | null;
-        email: string;
-        rolId: string;
-    } | null;
-}
+export type LogItem = AuditoriaLogItem;
 
 interface AuditoriaTablaProps {
     logs: LogItem[];

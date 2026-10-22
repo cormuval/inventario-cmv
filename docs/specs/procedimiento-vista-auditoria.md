@@ -2,8 +2,8 @@
 
 **Proyecto:** Sistema de Inventario APS — Corporación Municipal de Valparaíso (CMV)  
 **Documento:** Especificación Funcional, de Seguridad y Usabilidad: Monitor de Trazabilidad y Logs de Auditoría  
-**Versión:** 1.0 (Borrador para Aprobación)  
-**Fecha:** 14 de Octubre de 2026  
+**Versión:** 1.0 (Aprobada)  
+**Fecha:** 22 de Octubre de 2026  
 **Clasificación:** Seguridad, Trazabilidad Operativa y Auditoría (Prioridad Alta)  
 
 ---
@@ -22,11 +22,12 @@
 ### Causa Raíz Detectada en Código:
 1. **Trazabilidad Oculta Sin Interfaz de Consulta:**
    - La clase `AuditLogger` (`src/shared/lib/logger.ts`) registra fielmente cada mutación relevante (`crear`, `actualizar`, `eliminar`) sobre `OrdenSalida`, `OrdenEntrada`, `Producto`, `Centro`, `Bodega`, etc. en la tabla `logs`.
-   - Sin embargo, no existe ninguna ruta ni página web para consultar estos registros, obligando al equipo de soporte o jefatura a recurrir a consultas manuales en base de datos.
-2. **Carencia de Timestamp Nativo en el Modelo `Log`:**
-   - En [`prisma/schema.prisma`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/prisma/schema.prisma), la tabla `Log` carece de una columna explícita de fecha y hora (`fecha DateTime @default(now())`), lo que impide de forma natural filtrar consultas por fechas ("hoy", "rango entre fecha inicio y fecha fin") e indexar cronológicamente.
+   - Sin embargo, no existía ninguna ruta para consultar estos registros.
+2. **Carencia de Timestamp y Ubicación Territorial en el Modelo `Log`:**
+   - En `prisma/schema.prisma`, la tabla `Log` carecía de `fecha` e índices cronológicos, así como de las columnas `centroId` y `bodegaId` para reflejar la ubicación real donde ocurrió cada movimiento.
+   - Sin estas columnas, filtrar por bodega dependía erróneamente de los funcionarios asignados actualmente a esa bodega, provocando que si un usuario cambiaba de bodega, su historial histórico "se mudaba" con él, o que las acciones de administradores centrales en una bodega específica no aparecieran.
 3. **Falta de Acceso Controlado R01:**
-   - Se requiere garantizar por diseño (RBAC) que esta vista sea de acceso exclusivo para el rol `R01` (Administrador Central), protegiendo la confidencialidad de los registros de actividad del personal.
+   - Se requiere garantizar por diseño (RBAC) que esta vista sea de acceso exclusivo para el rol `R01` (`ROL_ADMINISTRADOR`), protegiendo la confidencialidad de la actividad del personal.
 
 ---
 
@@ -39,44 +40,52 @@
                     ▼                                         ▼
             [ BARRA LATERAL ]                         [ ACCESO DIRECTO URL ]
             • Visible solo si                         • Validación de sesión con
-              usuario.rol === R01                       puedeAdministrar(user.rol)
+              usuario.rol === ROL_ADMINISTRADOR         puedeAdministrar(user.rol)
             • Icono: History                          • Si no es R01: redirección
-            • Ruta: /auditoria                          o 403 Forbidden
+            • Ruta: /auditoria                          a inicio (/)
                     │
                     └────────────────────┬────────────────────┘
                                          ▼
                                [ VISTA: /auditoria ]
             ┌─────────────────────────────────────────────────────────┐
             │ FILTROS:                                                │
-            │ • Fecha Desde y Hasta (Por defecto: Hoy)                │
-            │ • Filtros Territoriales Dependientes en Cascada:        │
-            │   - Centro de Salud -> Bodega activa -> Usuario activo  │
+            │ • Fecha Desde y Hasta (Zona Horaria America/Santiago)   │
+            │ • Filtros Territoriales Directos y Combinables:         │
+            │   - Centro de Salud (ID_Centro real del evento)         │
+            │   - Bodega (ID_Bodega real del evento)                  │
+            │   - Usuario (combinable con centro/bodega en Y lógico)  │
             │ • Acción (Todas, crear, actualizar, eliminar)           │
-            │ • Entidad (Todas, OrdenSalida, OrdenEntrada, ...)       │
+            │ • Entidad (Todas, OrdenSalida, OrdenSalidaDetalle, ...) │
             └────────────────────────────┬────────────────────────────┘
                                          ▼
             ┌─────────────────────────────────────────────────────────┐
             │ RESULTADOS:                                             │
             │ • Tabla ordenada cronológicamente descendente           │
             │ • Fecha y Hora | Usuario | Acción (Badge) | Entidad     │
-            │ • Fila expandible con detalle humano (Bodegas, tipo, ...)│
+            │ • Fila expandible con visor estructurado:               │
+            │   - Tabla 3 columnas (Campo | Antes | Después) para     │
+            │     objetos con formato { cambios }                     │
+            │   - Pares clave-valor para objetos planos               │
+            │   - Texto legible para detalles string/primitivos       │
             └─────────────────────────────────────────────────────────┘
 ```
 
 ### Regla R-01: Control de Acceso y Visibilidad Exclusiva (R01)
-- La vista `/auditoria` es de acceso estrictamente reservado para usuarios con rol `R01` (`ROL_ADMINISTRADOR`).
+- La vista `/auditoria` es de acceso estrictamente reservado para administradores (`puedeAdministrar(user.rol)` / `ROL_ADMINISTRADOR`).
 - **Navegación:**
-  - En [`src/shared/components/layout/app-sidebar-shell.tsx`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/shared/components/layout/app-sidebar-shell.tsx), el enlace a "Auditoría" se renderiza condicionalmente **únicamente si el rol del usuario conectado es R01**.
-  - Icono asignado: `History` de `lucide-react`.
+  - En `src/shared/components/layout/app-sidebar-shell.tsx`, la opción "Auditoría" se renderiza condicionalmente si `profile.rol === ROL_ADMINISTRADOR`.
+  - Icono: `History` de `lucide-react`.
 - **Protección de Ruta:**
-  - En `src/app/auditoria/page.tsx`, se valida la sesión mediante `requireSessionUser()`. Si `user.rol !== ROL_ADMINISTRADOR`, se redirige automáticamente al inicio (`/`).
+  - En `src/app/auditoria/page.tsx`, se valida la sesión mediante `requireSessionUser()`. Si `!puedeAdministrar(sessionUser.rol)`, se redirige automáticamente al inicio (`/`).
 
-### Regla R-02: Extensión del Modelo `Log` con Timestamp Cronológico
-- Se añade al modelo `Log` en `prisma/schema.prisma` la columna:
+### Regla R-02: Extensión del Modelo `Log` (Fecha, Centro y Bodega con Índices)
+- Se extiende el modelo `Log` en `prisma/schema.prisma`:
   ```prisma
   model Log {
       id        String   @id @default(cuid()) @map("ID_Log") @db.VarChar(255)
       usuarioId String?  @map("ID_User") @db.VarChar(255)
+      centroId  String?  @map("ID_Centro") @db.VarChar(255)
+      bodegaId  String?  @map("ID_Bodega") @db.VarChar(255)
       accion    String   @map("Accion") @db.VarChar(255)
       entidad   String   @map("Entidad") @db.VarChar(255)
       entidadId String?  @map("Entidad_ID") @db.VarChar(255)
@@ -85,89 +94,87 @@
       usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
       @@index([usuarioId])
+      @@index([centroId])
+      @@index([bodegaId])
       @@index([fecha])
       @@index([entidad])
       @@map("logs")
   }
   ```
-- Al persistir cada evento, se almacena la marca temporal precisa con zona horaria local.
+- **Migración de base de datos:** Se aplica con `npm run db:push`.
+- **Registros antiguos:** Los logs anteriores quedan con `centroId: null` y `bodegaId: null`. Aparecen en consultas globales sin filtro territorial.
 
-### Regla R-03: Panel de Filtros Multidimensional con Dependencia Territorial (Centro → Bodega → Usuario)
-La pantalla de auditoría dispondrá de un formulario de filtros en la parte superior con validación y dependencia en cascada:
-1. **Rango de Fechas:**
-   - `Fecha Desde` (por defecto: fecha de hoy `00:00:00`).
-   - `Fecha Hasta` (por defecto: fecha de hoy `23:59:59`).
-2. **Filtros Dependientes en Cascada (Territorial y Funcionario):**
-   - **Centro de Salud:** Selector que permite elegir un centro de salud del catálogo activo (con opción *"Todos los centros"*).
-   - **Bodega:** Selector dependiente del centro de salud seleccionado. Al seleccionar un centro, muestra únicamente las bodegas activas asociadas a dicho centro (con opción *"Todas las bodegas"*). Si no se ha elegido centro, muestra todas las bodegas activas o se restringe a *"Todos"*.
-   - **Usuario:** Selector dependiente del centro y de la bodega seleccionada. Al seleccionar una bodega, muestra únicamente los usuarios activos asociados al centro de salud y a la bodega seleccionada (a través de la asignación en `EncargadosBodega` o `Usuario.bodegaId`), ordenados alfabéticamente (con opción *"Todos los usuarios"*). Si se cambia el centro o la bodega, la lista de usuarios se actualiza dinámicamente y se resetea la selección de usuario para evitar inconsistencias territoriales.
-3. **Acción Realizada:**
-   - Selector: *"Todas las acciones"*, `crear`, `actualizar`, `eliminar`.
-4. **Entidad Afectada:**
-   - Selector: *"Todas las entidades"*, `OrdenSalida`, `OrdenEntrada`, `Producto`, `Usuario`, `Centro`, `Bodega`, `Unidad`.
-5. **Botones de Control:**
-   - Botón *"Filtrar"* (aplica filtros via Server Action / SearchParams).
-   - Botón *"Limpiar"* (restablece a la fecha de hoy y reinicia los selectores en cascada).
+### Regla R-03: Ubicación Real del Evento y Filtros Combinables (Y Lógico)
+- Cada llamada a `AuditLogger.log` registra la ubicación donde ocurrió la acción:
+  - En órdenes de entrada y sus detalles (`OrdenEntrada`, `OrdenEntradaDetalle`): se guarda el `centroId` y `bodegaId` de la orden receptora.
+  - En órdenes de salida y sus detalles (`OrdenSalida`, `OrdenSalidaDetalle`): se guarda el `centroId` y el `bodegaId` de origen (la bodega de destino en traspasos se mantiene en el detalle estructurado).
+  - En mantenedores de bodega: se guarda el `centroId` y `bodegaId`.
+  - En mantenedores de usuario: se guarda el `centroId` del usuario afectado.
+- En la consulta `consultarLogsAuditoria`, el filtro territorial busca directamente sobre `where.bodegaId` y `where.centroId`, y es combinable con `where.usuarioId` en un Y lógico (`where.bodegaId && where.usuarioId`).
 
-### Regla R-04: Tabla de Resultados y Visualizador de Detalle Enriquecido
-- Los registros se despliegan en orden cronológico inverso (`fecha DESC`).
-- **Columnas principales:**
-  1. **Fecha y Hora:** Formato legible `DD/MM/AAAA HH:mm:ss`.
-  2. **Usuario:** Nombre completo y correo del funcionario responsable (o *"Sistema"* si no hay `usuarioId`).
-  3. **Acción:** Insignia visual (`Badge`):
-     - `crear`: Tono éxito (`success` / verde).
-     - `actualizar`: Tono información (`info` / azul).
-     - `eliminar`: Tono alerta/peligro (`destructive` / rojo).
-  4. **Entidad e Identificador:** Nombre de la entidad y su ID recortado o referencial.
-  5. **Detalle / Resumen:** Botón interactivo *"Ver detalle"* (`ChevronDown`).
-- **Expansión de Detalle Humano (Fila Expandible):**
-  - Al expandir la fila, se interpretan los campos del JSON `Detalle` y se presentan en etiquetas estructuradas:
-    - Para `OrdenSalida`: Tipo de salida (ej. *Consumo Interno*, *Merma*, *A otra bodega*), Destino, Bodega Origen, Bodega Destino (si aplica) y cantidad de líneas.
-    - Para `OrdenEntrada`: Guía de despacho, Origen, Bodega receptora, cantidad de líneas.
-    - Para `Usuario`: Rol asignado, Centro, Bodegas asignadas, Estado.
-  - Se incluye un visor plegable de código JSON crudo para análisis técnico avanzado.
+### Regla R-04: Catálogo Centralizado de Entidades Auditables
+- Se define en `src/modules/auditoria/constants/entidades.ts`:
+  - `OrdenEntrada` ("Orden de entrada")
+  - `OrdenEntradaDetalle` ("Detalle de orden de entrada")
+  - `OrdenSalida` ("Orden de salida")
+  - `OrdenSalidaDetalle` ("Detalle de orden de salida")
+  - `Producto` ("Producto")
+  - `Usuario` ("Usuario")
+  - `Centro` ("Centro de salud")
+  - `Bodega` ("Bodega")
+  - `Unidad` ("Unidad")
+- El schema Zod `filtroAuditoriaSchema` y el componente `AuditoriaFiltros` consumen este catálogo centralizado, garantizando sincronización sin duplicación manual.
 
-### Regla R-05: Paginación y Rendimiento
-- Paginación eficiente (`take: 50`, `skip: ...`) para evitar transferir miles de eventos a la memoria del navegador.
-- Contador superior: *"Mostrando X eventos de auditoría encontrados"*.
+### Regla R-05: Rango Inicial con Zona Horaria de Chile (`America/Santiago`)
+- La constante `ZONA_HORARIA = "America/Santiago"` (`src/config/fechas.ts`) y la función utilitaria `obtenerRangoHoyChile()` (`src/shared/utils/fechas.ts`) calculan el inicio (`00:00:00.000`) y fin (`23:59:59.999`) del día actual en Chile mediante `Intl.DateTimeFormat`.
+- Respeta automáticamente las transiciones entre horario de verano (UTC-3) e invierno (UTC-4).
+- La página `page.tsx` utiliza este rango en el servidor y lo transfiere a los filtros iniciales del cliente, asegurando coherencia visual y de datos.
+
+### Regla R-06: Visor Polimórfico de Detalles (`AuditoriaDetalleVisor`)
+- Soporta todos los tipos posibles de la columna `Detalle`:
+  1. `null` o `undefined`: *"Sin detalle adicional registrado."*
+  2. `string`, `number` o `boolean`: Despliega el valor como texto legible en un párrafo.
+  3. `Array`: Despliega lista formateada con contador de elementos y bloque de código.
+  4. Objeto con `{ cambios }`: Despliega una tabla de 3 columnas: **Campo | Antes | Después**, formateando valores nulos, booleanos y listas de IDs.
+  5. Objeto plano: Mapeo de pares clave-valor en cuadrícula responsiva con botón para alternar vista JSON cruda.
+
+### Regla R-07: Paginación y Restricciones
+- Paginación estricta (`limite` máximo de 100, por defecto 50) para proteger la memoria del cliente y el rendimiento de la base de datos.
+- Tipado estricto `Prisma.LogWhereInput` y cero uso de `any` en todo el módulo.
 
 ---
 
-## 3. Impacto en Componentes y Archivos
+## 3. Plan de Pruebas y Verificación
 
-| Archivo | Tipo de Cambio | Descripción |
-|---|---|---|
-| `prisma/schema.prisma` | Modelo de Datos | Incorporación del campo `fecha` e índices por fecha y entidad en `model Log`. |
-| `src/shared/components/layout/app-sidebar-shell.tsx` | UI / Navegación | Inclusión condicional de la opción *"Auditoría"* con icono `History` únicamente para `R01`. |
-| `src/modules/auditoria/actions/auditoria.action.ts` | Server Actions | Consultas filtradas a la tabla `Log` con validación estricta de rol R01. |
-| `src/modules/auditoria/components/auditoria-filtros.tsx` | Componente UI | Barra de filtros por usuario, fechas, acción y entidad. |
-| `src/modules/auditoria/components/auditoria-tabla.tsx` | Componente UI | Tabla interactiva con badges de acción y filas expandibles de detalle estructurado. |
-| `src/app/auditoria/page.tsx` | Nueva Página | Ruta protegida `/auditoria` para Administrador Central. |
-| `src/__tests__/auditoria.test.ts` (y test UI) | Pruebas | Validación de control de acceso, filtros cronológicos y renderizado de detalles. |
+1. **Pruebas de Acciones del Servidor (`src/__tests__/auditoria.action.test.ts`):**
+   - Rechazo de acceso a usuarios no administradores.
+   - Consulta filtrada por fecha, acción y usuario para administradores.
+   - Filtro por bodega genera `where: { bodegaId }` directo sin consultar encargados.
+   - Filtro combinado usuario + bodega aplica ambas cláusulas a la vez.
+   - Datos de catálogo para selectores en cascada.
+2. **Pruebas del Visor de Detalles (`src/__tests__/auditoria-detalle-visor.test.tsx`):**
+   - Manejo de `null` / `undefined`.
+   - Renderizado de cadenas de texto y valores primitivos.
+   - Renderizado de objetos clave-valor planos.
+   - Renderizado de tabla de 3 columnas (Campo | Antes | Después) para objetos con `{ cambios }`.
+3. **Pruebas de Filtros y Schema (`src/__tests__/auditoria-filtros.test.tsx`):**
+   - Aceptación de `OrdenSalidaDetalle` y `OrdenEntradaDetalle` en el schema.
+   - Renderizado de las opciones de detalle en el `<select>` de entidades.
+   - Dependencia en cascada Centro → Bodega → Usuario.
+4. **Pruebas de Zona Horaria (`src/__tests__/fechas.test.ts`):**
+   - Simulación con reloj en `2026-10-22T01:30:00Z` comprobando que devuelve el rango del 21 de octubre en Chile.
+5. **Pruebas de Órdenes (`src/__tests__/traspaso-bodega.test.ts`):**
+   - Comprobación de que `AuditLogger.log` recibe `centroId` y `bodegaId` al crear, actualizar y eliminar salidas.
 
 ---
 
 ## 4. Criterios de Aceptación (Definición de Terminado)
 
-- [x] **CA-1: Restricción Estricta de Acceso:** Solo usuarios con rol R01 pueden ver el menú lateral de Auditoría y acceder a `/auditoria`. Otros roles son redirigidos de inmediato.
-- [x] **CA-2: Registro con Fecha y Hora:** Cada evento registrado por `AuditLogger` almacena automáticamente su fecha y hora precisa en la columna `Fecha`.
-- [x] **CA-3: Filtro por Rango Temporal:** El administrador puede consultar los eventos ocurridos en el día de hoy, o especificar cualquier rango de fechas.
-- [x] **CA-4: Filtros en Cascada (Centro → Bodega → Usuario):** Al seleccionar un centro se filtran las bodegas asociadas, y al seleccionar una bodega se filtran los usuarios activos asociados a dicho centro y bodega, permitiendo aislar con exactitud los movimientos de ese funcionario.
-- [x] **CA-5: Detalle Estructurado y Legible:** Al expandir el detalle de una orden de salida o entrada, se visualiza la bodega origen/destino, tipo de salida y cantidad de productos en un formato claro para el usuario.
-- [x] **CA-6: Paginación Fluida:** Las consultas masivas se presentan paginadas de forma ágil sin sobrecargar la base de datos.
-- [x] **CA-7: Cero Regresiones:** Compilación limpia con TypeScript (`npx tsc --noEmit`) y 100% de la suite de pruebas aprobada (`npx vitest run`).
-
----
-
-## 5. Plan de Verificación y Pruebas
-
-1. **Pruebas de Acceso y Autorización:**
-   - Verificar que un usuario R02, R03 o R07 no puede acceder a `/auditoria` ni ve el botón en la barra lateral.
-   - Verificar que un usuario R01 accede normalmente.
-2. **Pruebas de Consultas y Filtros:**
-   - Registrar eventos de prueba y validar que el filtro por rango de fechas devuelve únicamente los eventos en el intervalo.
-   - Probar filtro por usuario específico y por tipo de acción (`crear`, `actualizar`, `eliminar`).
-3. **Pruebas de Renderizado e Interacción:**
-   - Verificar la expansión de la fila y la interpretación de los datos JSON en español.
-4. **Regresión General:**
-   - Ejecutar la suite completa para asegurar que `AuditLogger.log` sigue funcionando en todos los módulos existentes sin alterar su comportamiento previo.
+- [x] **CA-1: Restricción Estricta de Acceso:** Solo usuarios administradores (`ROL_ADMINISTRADOR`) pueden ver el menú lateral y acceder a `/auditoria`. Otros roles son redirigidos de inmediato.
+- [x] **CA-2: Columnas Territoriales e Índices en Logs:** Modelo `Log` cuenta con `centroId` y `bodegaId` indexados para ubicar espacialmente cada evento.
+- [x] **CA-3: Filtro Territorial Directo y Combinable:** La búsqueda por bodega o centro refleja dónde ocurrió la acción y se combina con el filtro por usuario.
+- [x] **CA-4: Entidades de Detalle Disponibles:** `OrdenEntradaDetalle` y `OrdenSalidaDetalle` son seleccionables en el filtro y validadas en el schema.
+- [x] **CA-5: Zona Horaria America/Santiago:** El rango inicial del día se calcula en la zona horaria chilena respetando cambios estacionales.
+- [x] **CA-6: Visor Polimórfico de Detalles:** Se muestran adecuadamente detalles de texto, primitivos, objetos planos y tablas de cambios antes/después.
+- [x] **CA-7: Tipado Estricto:** Código libre de `any` en `src/modules/auditoria` y `src/app/auditoria`.
+- [x] **CA-8: Cero Regresiones:** 100% de tests aprobados (`npx vitest run`), TypeScript estricto (`npx tsc --noEmit`) y build de producción exitoso (`npx next build`).

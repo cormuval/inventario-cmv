@@ -4,11 +4,14 @@ import * as React from "react";
 import { useState, useTransition } from "react";
 
 // actions
-import { consultarLogsAuditoria } from "@/modules/auditoria/actions/auditoria.action";
+import {
+    consultarLogsAuditoria,
+    type AuditoriaLogItem
+} from "@/modules/auditoria/actions/auditoria.action";
 
 // components
 import { AuditoriaFiltros } from "@/modules/auditoria/components/auditoria-filtros";
-import { AuditoriaTabla, type LogItem } from "@/modules/auditoria/components/auditoria-tabla";
+import { AuditoriaTabla } from "@/modules/auditoria/components/auditoria-tabla";
 
 // types
 import type { FiltroAuditoriaInput } from "@/modules/auditoria/schemas/auditoria.schema";
@@ -25,9 +28,10 @@ interface AuditoriaVistaClienteProps {
         bodegaId?: string | null;
         encargos?: Array<{ bodegaId: string }>;
     }>;
-    initialLogs: LogItem[];
+    initialLogs: AuditoriaLogItem[];
     initialTotal: number;
     initialPaginasTotales: number;
+    initialValoresFiltros?: Partial<FiltroAuditoriaInput>;
 }
 
 export function AuditoriaVistaCliente({
@@ -36,13 +40,16 @@ export function AuditoriaVistaCliente({
     usuarios,
     initialLogs,
     initialTotal,
-    initialPaginasTotales
+    initialPaginasTotales,
+    initialValoresFiltros
 }: AuditoriaVistaClienteProps): React.ReactElement {
-    const [logs, setLogs] = useState<LogItem[]>(initialLogs);
+    const [logs, setLogs] = useState<AuditoriaLogItem[]>(initialLogs);
     const [total, setTotal] = useState(initialTotal);
     const [pagina, setPagina] = useState(1);
     const [paginasTotales, setPaginasTotales] = useState(initialPaginasTotales);
-    const [filtrosActuales, setFiltrosActuales] = useState<Partial<FiltroAuditoriaInput>>({});
+    const [filtrosActuales, setFiltrosActuales] = useState<Partial<FiltroAuditoriaInput>>(
+        initialValoresFiltros ?? {}
+    );
     const [isPending, startTransition] = useTransition();
 
     const ejecutarConsulta = (nuevosFiltros: Partial<FiltroAuditoriaInput>, targetPagina = 1) => {
@@ -54,7 +61,7 @@ export function AuditoriaVistaCliente({
                 ...nuevosFiltros,
                 pagina: targetPagina
             });
-            setLogs(res.logs as LogItem[]);
+            setLogs(res.logs);
             setTotal(res.total);
             setPaginasTotales(res.paginasTotales);
         });
@@ -66,6 +73,7 @@ export function AuditoriaVistaCliente({
                 centros={centros}
                 bodegas={bodegas}
                 usuarios={usuarios}
+                valoresIniciales={initialValoresFiltros}
                 onFiltrar={(f) => ejecutarConsulta(f, 1)}
             />
 

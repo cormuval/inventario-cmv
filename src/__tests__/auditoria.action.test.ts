@@ -29,12 +29,13 @@ describe("Auditoría - Server Actions", () => {
         vi.clearAllMocks();
     });
 
-    it("rechaza el acceso si el usuario no tiene rol R01 de administrador", async () => {
+    it("rechaza el acceso si el usuario no tiene permisos de administrador", async () => {
         vi.mocked(authLib.requireSessionUser).mockResolvedValue({
             id: "u-2",
             rol: "R07",
             email: "operador@cmvalparaiso.cl"
         } as any);
+        vi.mocked(authLib.puedeAdministrar).mockReturnValue(false);
 
         await expect(
             consultarLogsAuditoria({
@@ -44,12 +45,13 @@ describe("Auditoría - Server Actions", () => {
         ).rejects.toThrow(/solo administradores/i);
     });
 
-    it("permite consultar logs aplicando filtros de fecha, accion y usuario a un admin R01", async () => {
+    it("permite consultar logs aplicando filtros de fecha, accion y usuario a un administrador", async () => {
         vi.mocked(authLib.requireSessionUser).mockResolvedValue({
             id: "admin-1",
             rol: "R01",
             email: "admin@cmvalparaiso.cl"
         } as any);
+        vi.mocked(authLib.puedeAdministrar).mockReturnValue(true);
 
         const mockLogs = [
             {
@@ -91,12 +93,66 @@ describe("Auditoría - Server Actions", () => {
         );
     });
 
+    it("filtrar por bodega genera where: { bodegaId } y no consulta encargadosBodega", async () => {
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({
+            id: "admin-1",
+            rol: "R01",
+            email: "admin@cmvalparaiso.cl"
+        } as any);
+        vi.mocked(authLib.puedeAdministrar).mockReturnValue(true);
+
+        vi.mocked(prisma.log.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.log.count).mockResolvedValue(0);
+
+        await consultarLogsAuditoria({
+            bodegaId: "bodega-farmacia-1",
+            pagina: 1
+        });
+
+        expect(prisma.encargadosBodega.findMany).not.toHaveBeenCalled();
+        expect(prisma.log.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    bodegaId: "bodega-farmacia-1"
+                })
+            })
+        );
+    });
+
+    it("filtrar por usuario + bodega aplica ambas condiciones a la vez (Y lógico)", async () => {
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({
+            id: "admin-1",
+            rol: "R01",
+            email: "admin@cmvalparaiso.cl"
+        } as any);
+        vi.mocked(authLib.puedeAdministrar).mockReturnValue(true);
+
+        vi.mocked(prisma.log.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.log.count).mockResolvedValue(0);
+
+        await consultarLogsAuditoria({
+            bodegaId: "bodega-farmacia-1",
+            usuarioId: "user-carlos",
+            pagina: 1
+        });
+
+        expect(prisma.log.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    bodegaId: "bodega-farmacia-1",
+                    usuarioId: "user-carlos"
+                })
+            })
+        );
+    });
+
     it("obtiene los datos de catálogo para alimentar los combos en cascada", async () => {
         vi.mocked(authLib.requireSessionUser).mockResolvedValue({
             id: "admin-1",
             rol: "R01",
             email: "admin@cmvalparaiso.cl"
         } as any);
+        vi.mocked(authLib.puedeAdministrar).mockReturnValue(true);
 
         vi.mocked(prisma.centro.findMany).mockResolvedValue([{ id: "c1", nombre: "Centro 1" }] as any);
         vi.mocked(prisma.bodega.findMany).mockResolvedValue([{ id: "b1", nombre: "Bodega 1", centroId: "c1" }] as any);

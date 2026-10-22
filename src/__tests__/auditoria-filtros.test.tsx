@@ -73,4 +73,31 @@ describe("AuditoriaFiltros - Dependencia en Cascada", () => {
             })
         );
     });
+
+    it("el schema acepta OrdenSalidaDetalle y el filtro muestra la opción", async () => {
+        const { filtroAuditoriaSchema } = await import("@/modules/auditoria/schemas/auditoria.schema");
+
+        // Validación en schema
+        const parseResult = filtroAuditoriaSchema.safeParse({ entidad: "OrdenSalidaDetalle" });
+        expect(parseResult.success).toBe(true);
+        if (parseResult.success) {
+            expect(parseResult.data.entidad).toBe("OrdenSalidaDetalle");
+        }
+
+        // Renderizado en select de filtro
+        render(
+            <AuditoriaFiltros
+                centros={mockCentros}
+                bodegas={mockBodegas}
+                usuarios={mockUsuarios}
+                onFiltrar={vi.fn()}
+            />
+        );
+
+        const entidadSelect = screen.getByLabelText(/entidad afectada/i);
+        expect(entidadSelect).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: "Detalle de orden de salida" })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: "Detalle de orden de entrada" })).toBeInTheDocument();
+    });
 });
+

@@ -1,7 +1,8 @@
 "use server";
 
 // lib
-import { requireSessionUser } from "@/shared/lib/auth";
+import type { Prisma } from "@prisma/client";
+import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
 // schemas
@@ -12,7 +13,7 @@ import {
 
 export async function obtenerFiltrosCatalogoAuditoria() {
     const user = await requireSessionUser();
-    if (user.rol !== "R01") {
+    if (!puedeAdministrar(user.rol)) {
         throw new Error("Solo administradores pueden acceder a los datos de auditoría.");
     }
 
@@ -49,12 +50,12 @@ export async function obtenerFiltrosCatalogoAuditoria() {
 
 export async function consultarLogsAuditoria(inputFiltros: Partial<FiltroAuditoriaInput>) {
     const user = await requireSessionUser();
-    if (user.rol !== "R01") {
+    if (!puedeAdministrar(user.rol)) {
         throw new Error("Solo administradores pueden consultar el registro de auditoría.");
     }
 
     const filtros = filtroAuditoriaSchema.parse(inputFiltros);
-    const where: any = {};
+    const where: Prisma.LogWhereInput = {};
 
     // Filtro por Rango Temporal
     if (filtros.fechaDesde || filtros.fechaHasta) {
@@ -77,23 +78,16 @@ export async function consultarLogsAuditoria(inputFiltros: Partial<FiltroAuditor
         where.entidad = filtros.entidad;
     }
 
-    // Filtro por Usuario específico
+    // Filtro Territorial (ubicación real donde ocurrió la acción)
+    if (filtros.bodegaId && filtros.bodegaId !== "todas") {
+        where.bodegaId = filtros.bodegaId;
+    } else if (filtros.centroId && filtros.centroId !== "todos") {
+        where.centroId = filtros.centroId;
+    }
+
+    // Filtro por Usuario específico (combinable con centro/bodega en Y lógico)
     if (filtros.usuarioId && filtros.usuarioId !== "todos") {
         where.usuarioId = filtros.usuarioId;
-    } else if (filtros.bodegaId && filtros.bodegaId !== "todas") {
-        const encargados = await prisma.encargadosBodega.findMany({
-            where: { bodegaId: filtros.bodegaId },
-            select: { encargadoId: true }
-        });
-        const usuarioIds = encargados.map((e) => e.encargadoId);
-        where.usuarioId = { in: usuarioIds };
-    } else if (filtros.centroId && filtros.centroId !== "todos") {
-        const usuariosDelCentro = await prisma.usuario.findMany({
-            where: { centroId: filtros.centroId },
-            select: { id: true }
-        });
-        const usuarioIds = usuariosDelCentro.map((u) => u.id);
-        where.usuarioId = { in: usuarioIds };
     }
 
     const skip = (filtros.pagina - 1) * filtros.limite;
@@ -129,3 +123,6 @@ export async function consultarLogsAuditoria(inputFiltros: Partial<FiltroAuditor
         paginasTotales
     };
 }
+
+export type AuditoriaLogItem = Awaited<ReturnType<typeof consultarLogsAuditoria>>["logs"][number];
+

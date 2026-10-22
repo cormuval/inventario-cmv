@@ -28,6 +28,9 @@ import { cerrarSesion } from "@/modules/auth/actions/auth.action";
 import { BotonCerrarSesion } from "@/modules/auth/components/boton-cerrar-sesion";
 import { Button } from "@/shared/components/ui/button";
 
+// config
+import { ROL_ADMINISTRADOR } from "@/config/auth";
+
 // utils
 import { cn } from "@/shared/utils/cn";
 
@@ -62,7 +65,7 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
     const [mounted, setMounted] = useState(false);
 
     const navItems = useMemo(() => {
-        if (profile.rol === "R01") {
+        if (profile.rol === ROL_ADMINISTRADOR) {
             return [
                 ...baseNavItems,
                 { href: "/auditoria", label: "Auditoría", icon: History }
