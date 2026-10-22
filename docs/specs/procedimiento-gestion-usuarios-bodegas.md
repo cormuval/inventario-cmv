@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Inventario APS — Corporación Municipal de Valparaíso (CMV)  
 **Documento:** Especificación Funcional y de Seguridad: Ciclo de Vida de Usuarios y Asignación Multibodega  
-**Versión:** 1.0 (Borrador para Aprobación)  
+**Versión:** 1.0 (Aprobada)  
 **Fecha:** 14 de Octubre de 2026  
 **Clasificación:** Seguridad, Control de Acceso y Gestión de Datos Maestros (Prioridad Alta)  
 
@@ -21,13 +21,13 @@
 
 ### Causa Raíz Detectada en Código:
 1. **Flujo Unidireccional de Solo Creación:**
-   - En [`src/modules/configuraciones/actions/configuraciones.action.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/configuraciones/actions/configuraciones.action.ts), únicamente existe la acción `crearUsuario`. No existen acciones de servidor para actualizar datos ni modificar el estado (`estado: false`).
+   - En [`../../src/modules/mantenedores/actions/mantenedores.action.ts`](../../src/modules/mantenedores/actions/mantenedores.action.ts), únicamente existía la acción `crearUsuario`. No existían acciones de servidor para actualizar datos ni modificar el estado (`estado: false`).
 2. **Imposibilidad de Revocar Acceso a Exfuncionarios:**
-   - La regla de autenticación Google OAuth (`src/auth.ts`) exige que `usuario.estado === true`. Al no existir la opción de desactivar usuarios en pantalla, la única forma de dar de baja a un funcionario que deja el cargo es mediante consultas SQL manuales a la base de datos.
+   - La regla de autenticación Google OAuth (`../../src/auth.ts`) exige que `usuario.estado === true`. Al no existir la opción de desactivar usuarios en pantalla, la única forma de dar de baja a un funcionario que deja el cargo era mediante consultas SQL manuales a la base de datos.
 3. **Desconexión con la Tabla `EncargadosBodega` en UI:**
-   - La lógica de visibilidad por mínimo privilegio (`obtenerAlcanceBodegasAsociadas` en `src/shared/lib/inventario-alcance.ts`) y la barra lateral leen las bodegas asignadas desde la tabla `EncargadosBodega`. Sin embargo, el formulario actual solo permite asignar una única `bodegaId` en la tabla `Usuario`.
+   - La lógica de visibilidad por mínimo privilegio (`obtenerAlcanceBodegasAsociadas` en `../../src/shared/lib/inventario-alcance.ts`) y la barra lateral leen las bodegas asignadas desde la tabla `EncargadosBodega`. Sin embargo, el formulario original solo permitía asignar una única `bodegaId` en la tabla `Usuario`.
 4. **Tabla de Mantenedores Sin Acciones:**
-   - En [`src/app/configuraciones/page.tsx`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/app/configuraciones/page.tsx), la tabla de usuarios registrados solo expone columnas de texto plano sin columna de acciones ("Editar", "Desactivar" / "Activar").
+   - En [`../../src/app/mantenedores/page.tsx`](../../src/app/mantenedores/page.tsx), la tabla de usuarios registrados solo exponía columnas de texto plano sin columna de acciones ("Editar", "Desactivar" / "Activar").
 
 ---
 
@@ -50,62 +50,66 @@
                         • Transacción Prisma:
                           - Actualiza tabla `Usuario`
                           - Sincroniza `EncargadosBodega`
-                          - Revalida `/configuraciones`
+                          - Revalida `/mantenedores`
                           - Registro en tabla `logs`
 ```
 
 ### Regla R-01: Modal de Edición Completa de Usuario
-- En cada fila de la tabla de usuarios registrados se incorpora un botón con icono **"Editar"** (`Pencil`).
-- Al pulsarlo, se abre un diálogo modal (`SimpleModal` / `Dialog`) con los datos del usuario precargados:
+- En cada fila de la tabla de usuarios registrados se incorpora un botón con icono **"Editar"** (`Edit2`).
+- Al pulsarlo, se abre un diálogo modal accesible (con cierre vía botón o tecla `Escape`) con los datos del usuario precargados:
   - **Nombre**, **Apellido Paterno**, **Apellido Materno**
-  - **Email** (institucional `@cmvalparaiso.cl`, validado)
+  - **Email** (institucional `@cmvalparaiso.cl`, validado estrictamente en servidor)
   - **Teléfono**
   - **Rol:** Selector de roles activos fijos (`R01`, `R02`, `R03`, etc.).
   - **Centro de Salud:** Selector de centros activos.
-  - **Bodegas Asignadas:** Selector múltiple / grupo de casillas de verificación (checkboxes) con las bodegas pertenecientes al centro seleccionado.
-  - **Estado:** Interruptor / Checkbox de "Usuario Activo".
+  - **Bodegas Asignadas:** Selector múltiple reactivo (`BodegasMultiSelect`) con las bodegas pertenecientes al centro seleccionado.
+  - **Estado:** Checkbox de "Usuario Activo".
 - Botones de acción del modal: "Guardar Cambios" (con estado de carga) y "Cancelar".
 
 ### Regla R-02: Asignación Múltiple de Bodegas y Sincronización en `EncargadosBodega`
-- La selección de múltiples bodegas estará disponible tanto en el formulario de **creación** como en el de **edición**.
+- La selección de múltiples bodegas está disponible tanto en el formulario de **creación** como en el de **edición**.
 - En la base de datos se mantiene la integridad relacional mediante una transacción de Prisma (`prisma.$transaction`):
   1. Se actualizan los datos base del modelo `Usuario`.
   2. `Usuario.bodegaId` se asigna a la primera bodega seleccionada (o `null` si no hay bodegas seleccionadas) para compatibilidad hacia atrás.
   3. Se sincronizan las filas en la tabla `EncargadosBodega`:
-     - Se eliminan los encargos antiguos del usuario que ya no estén seleccionados.
+     - Se eliminan los encargos antiguos del usuario.
      - Se insertan las nuevas bodegas seleccionadas con `encargadoId: usuario.id`, `centroId: usuario.centroId`, `rolId: usuario.rolId`, y `email: usuario.email`.
-     - Se asegura que no se creen duplicados mediante la clave única compuesta `@@unique([encargadoId, centroId, bodegaId])`.
+     - Se previene duplicidad mediante `[...new Set(bodegaIds)]` y la clave única compuesta `@@unique([encargadoId, centroId, bodegaId])`.
 
 ### Regla R-03: Dependencia Reactiva Centro -> Bodegas
-- Las bodegas seleccionables dependen estrictamente del `centroId` elegido.
+- Las bodegas seleccionables dependen estrictamente del `centroId` elegido y deben encontrarse activas (`estado: true`).
 - Si el administrador cambia el centro de salud del usuario en el formulario (de creación o edición):
   - La lista de bodegas seleccionables se actualiza dinámicamente para mostrar solo las bodegas activas del nuevo centro.
   - Las bodegas seleccionadas previamente del centro anterior se desmarcan y limpian automáticamente para evitar inconsistencias territoriales.
 
 ### Regla R-04: Desactivación Rápida y Protección de Bloqueo Propio (Self-Lockout)
 - En la tabla de usuarios se añade un botón directo de acción según el estado del usuario:
-  - Si está activo: botón **"Desactivar"** (icono `UserX` / tono advertencia).
-  - Si está inactivo: botón **"Activar"** (icono `UserCheck` / tono éxito).
+  - Si está activo: botón **"Desactivar"** (icono `Power` / tono advertencia).
+  - Si está inactivo: botón **"Activar"** (icono `Power` / tono éxito).
+- **Feedback visual:** El resultado se despliega con notificaciones `toast` de sonner (`toast.success` / `toast.error`) y el botón permanece deshabilitado durante la transición.
 - **Protección contra auto-desactivación:**
   - Si el usuario en sesión es el mismo que se intenta desactivar (`usuarioTarget.id === sessionUser.id`), el sistema bloquea la acción arrojando un error:
-    `"No puedes desactivar tu propia cuenta de administrador."`
-  - Igualmente, un administrador no puede cambiarse a sí mismo el rol a uno no administrativo mientras esté en sesión.
+    `"No puedes desactivar tu propia cuenta de usuario."`
+  - Igualmente, un administrador no puede cambiarse a sí mismo el rol a uno no administrativo mientras esté en sesión (`rolId !== ROL_ADMINISTRADOR`).
 
 ### Regla R-05: Inmutabilidad de Permisos de Roles
 - Los permisos y descripciones de cada rol se mantienen 100% fijos desde el seed del sistema (`R01` Administrador Central, `R02` Encargado de Centro, `R03` Operador Farmacia, `R07` Operador Bodega, etc.).
 - La interfaz no provee ninguna pantalla ni acción para editar los permisos internos de los roles; la administración se limita exclusivamente a asignar el rol al funcionario.
 
 ### Regla R-06: Visualización Enriquecida en la Tabla de Mantenedores
-- La columna **"Bodega"** en la tabla de usuarios registrados se transforma para soportar múltiples asignaciones:
+- La columna **"Bodegas Asignadas"** en la tabla de usuarios registrados soporta múltiples asignaciones:
   - Si tiene 1 o más bodegas asignadas: se muestran como insignias (`Badge`) con el nombre de cada bodega.
-  - Si no tiene bodegas: se visualiza una insignia neutra *"Sin bodegas asociadas"*.
+  - Si no tiene bodegas: se visualiza un texto neutro en cursiva *"Sin bodega"*.
 - La columna **"Acciones"** agrupa el botón de "Editar" y el de "Desactivar / Activar".
 
 ### Regla R-07: Trazabilidad y Auditoría
-- Todas las operaciones quedan registradas mediante `AuditLogger.log`:
-  - `crear`: Entidad `Usuario` con detalle de bodegas asignadas.
-  - `editar`: Entidad `Usuario` con detalle de campos modificados.
-  - `desactivar` / `activar`: Entidad `Usuario` con el nuevo estado asignado.
+- Todas las operaciones quedan registradas mediante `AuditLogger.log` con detalle estructurado como objeto JSON:
+  - `crear` (entidad `Usuario`):
+    `{ email, rolId, centroId, bodegaIds, estado }`
+  - `actualizar` (entidad `Usuario` en edición):
+    `{ cambios: { [campo]: { antes, despues } } }` registrando únicamente los campos modificados (comparando `bodegaIds` sin importar el orden).
+  - `actualizar` (entidad `Usuario` en activación/desactivación):
+    `{ cambios: { estado: { antes, despues } } }`
 
 ---
 
@@ -123,15 +127,17 @@
 
 ## 4. Plan de Verificación y Pruebas
 
-1. **Pruebas de Acciones del Servidor (`mantenedores-usuarios.action.test.ts`):**
+1. **Pruebas de Acciones del Servidor (`gestion-usuarios.action.test.ts`):**
    - Probar `editarUsuario` con actualización de datos personales y rol.
    - Probar asignación y sincronización de múltiples bodegas en `EncargadosBodega`.
    - Probar `toggleEstadoUsuario` (activación y desactivación).
    - Probar que un administrador no puede auto-desactivarse.
-   - Probar rechazo al intentar asignar bodegas de un centro distinto al del usuario.
-2. **Pruebas de Interfaz de Usuario (`mantenedores-usuarios-ui.test.tsx`):**
+   - Probar rechazo de bodegas inactivas y bodegas de otro centro.
+   - Probar rechazo de correos no institucionales (`persona@gmail.com`).
+   - Probar mensaje amigable para correos duplicados (`P2002`).
+   - Probar estructura de auditoría `{ cambios }`.
+2. **Pruebas de Interfaz de Usuario (`gestion-usuarios-ui.test.tsx`):**
    - Verificar renderizado de la tabla con columna de acciones ("Editar", "Desactivar/Activar").
-   - Verificar apertura y cierre del modal de edición con datos precargados.
+   - Verificar apertura y cierre del modal de edición con datos precargados y tecla `Escape`.
+   - Verificar feedback visual de `toast.success` y `toast.error`.
    - Verificar visualización de múltiples insignias de bodegas en la tabla.
-3. **Pruebas de Regresión General:**
-   - Ejecutar la suite completa de 73 tests para garantizar compatibilidad con los módulos existentes.

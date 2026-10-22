@@ -1,6 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
+
+// config
+import { ROL_ADMINISTRADOR } from "@/config/auth";
 
 // lib
 import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
@@ -73,6 +77,31 @@ export async function crearUnidad(prevState: ActionState, formData: FormData): P
     });
 }
 
+async function validarBodegasDelCentro(bodegaIds: string[], centroId: string): Promise<string[]> {
+    const unicas = [...new Set(bodegaIds)];
+    if (unicas.length === 0) return [];
+    const validas = await prisma.bodega.findMany({
+        where: { id: { in: unicas }, centroId, estado: true },
+        select: { id: true }
+    });
+    if (validas.length !== unicas.length) {
+        throw new Error("Una o más bodegas no están activas o no pertenecen al centro seleccionado.");
+    }
+    return unicas;
+}
+
+function mapearErrorPrisma(error: unknown, mensajePorDefecto: string): string {
+    if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code: string }).code === "P2002"
+    ) {
+        return "Ya existe un usuario con ese correo.";
+    }
+    return error instanceof Error ? error.message : mensajePorDefecto;
+}
+
 export async function crearUsuario(prevState: ActionState, formData: FormData): Promise<ActionState> {
     return ejecutarAdmin("Usuario", "/mantenedores", async (usuarioId) => {
         const rawBodegaIds = formData.getAll("bodegaIds").map(String).filter(Boolean);
@@ -92,17 +121,7 @@ export async function crearUsuario(prevState: ActionState, formData: FormData): 
             estado: formData.get("estado") === "on" || formData.get("estado") === "true"
         });
 
-        if (parsed.bodegaIds.length > 0) {
-            const bodegasValidas = await prisma.bodega.findMany({
-                where: {
-                    id: { in: parsed.bodegaIds },
-                    centroId: parsed.centroId
-                }
-            });
-            if (bodegasValidas.length !== parsed.bodegaIds.length) {
-                throw new Error("Una o más bodegas no pertenecen al centro seleccionado.");
-            }
-        }
+        const bodegasValidadas = await validarBodegasDelCentro(parsed.bodegaIds, parsed.centroId);
 
         const usuario = await prisma.$transaction(async (tx) => {
             const nuevo = await tx.usuario.create({
@@ -112,16 +131,16 @@ export async function crearUsuario(prevState: ActionState, formData: FormData): 
                     apMaterno: parsed.apMaterno,
                     rolId: parsed.rolId,
                     centroId: parsed.centroId,
-                    bodegaId: parsed.bodegaIds[0] ?? null,
+                    bodegaId: bodegasValidadas[0] ?? null,
                     telefono: parsed.telefono,
                     email: parsed.email,
                     estado: parsed.estado
                 }
             });
 
-            if (parsed.bodegaIds.length > 0) {
+            if (bodegasValidadas.length > 0) {
                 await tx.encargadosBodega.createMany({
-                    data: parsed.bodegaIds.map((bId) => ({
+                    data: bodegasValidadas.map((bId) => ({
                         encargadoId: nuevo.id,
                         centroId: parsed.centroId,
                         bodegaId: bId,
@@ -139,7 +158,13 @@ export async function crearUsuario(prevState: ActionState, formData: FormData): 
             accion: "crear",
             entidad: "Usuario",
             entidadId: usuario.id,
-            detalle: `Usuario ${usuario.email} creado con ${parsed.bodegaIds.length} bodegas asignadas.`
+            detalle: {
+                email: usuario.email,
+                rolId: usuario.rolId,
+                centroId: usuario.centroId,
+                bodegaIds: bodegasValidadas,
+                estado: usuario.estado
+            }
         });
         return "Usuario creado.";
     });
@@ -175,21 +200,56 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
         }
 
         // Protección contra auto-degradación de rol R01
-        if (parsed.id === user.id && parsed.rolId !== "R01") {
+        if (parsed.id === user.id && parsed.rolId !== ROL_ADMINISTRADOR) {
             return { ok: false, message: "No puedes quitarte el rol de administrador." };
         }
 
-        // Validar que las bodegas correspondan al centro indicado
-        if (parsed.bodegaIds.length > 0) {
-            const bodegasValidas = await prisma.bodega.findMany({
-                where: {
-                    id: { in: parsed.bodegaIds },
-                    centroId: parsed.centroId
-                }
-            });
-            if (bodegasValidas.length !== parsed.bodegaIds.length) {
-                return { ok: false, message: "Una o más bodegas no pertenecen al centro seleccionado." };
-            }
+        // Validar que las bodegas estén activas y pertenezcan al centro
+        const bodegasValidadas = await validarBodegasDelCentro(parsed.bodegaIds, parsed.centroId);
+
+        // Obtener datos previos para registrar cambios estructurados
+        const previo = await prisma.usuario.findUnique({
+            where: { id: parsed.id },
+            include: { encargos: true }
+        });
+
+        if (!previo) {
+            return { ok: false, message: "Usuario no encontrado." };
+        }
+
+        const cambios: Record<string, { antes: any; despues: any }> = {};
+        if (previo.nombre !== parsed.nombre) {
+            cambios.nombre = { antes: previo.nombre, despues: parsed.nombre };
+        }
+        if (previo.apPaterno !== parsed.apPaterno) {
+            cambios.apPaterno = { antes: previo.apPaterno, despues: parsed.apPaterno };
+        }
+        if ((previo.apMaterno ?? null) !== (parsed.apMaterno ?? null)) {
+            cambios.apMaterno = { antes: previo.apMaterno, despues: parsed.apMaterno ?? null };
+        }
+        if (previo.email !== parsed.email) {
+            cambios.email = { antes: previo.email, despues: parsed.email };
+        }
+        if ((previo.telefono ?? null) !== (parsed.telefono ?? null)) {
+            cambios.telefono = { antes: previo.telefono, despues: parsed.telefono ?? null };
+        }
+        if (previo.rolId !== parsed.rolId) {
+            cambios.rolId = { antes: previo.rolId, despues: parsed.rolId };
+        }
+        if (previo.centroId !== parsed.centroId) {
+            cambios.centroId = { antes: previo.centroId, despues: parsed.centroId };
+        }
+        if (previo.estado !== parsed.estado) {
+            cambios.estado = { antes: previo.estado, despues: parsed.estado };
+        }
+
+        const bodegasPrevias = [...(previo.encargos ?? []).map((e) => e.bodegaId)].sort();
+        const bodegasNuevas = [...bodegasValidadas].sort();
+        if (
+            bodegasPrevias.length !== bodegasNuevas.length ||
+            !bodegasPrevias.every((id, idx) => id === bodegasNuevas[idx])
+        ) {
+            cambios.bodegaIds = { antes: bodegasPrevias, despues: bodegasNuevas };
         }
 
         await prisma.$transaction(async (tx) => {
@@ -201,7 +261,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
                     apMaterno: parsed.apMaterno ?? null,
                     rolId: parsed.rolId,
                     centroId: parsed.centroId,
-                    bodegaId: parsed.bodegaIds[0] ?? null,
+                    bodegaId: bodegasValidadas[0] ?? null,
                     telefono: parsed.telefono ?? null,
                     email: parsed.email,
                     estado: parsed.estado
@@ -212,9 +272,9 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
                 where: { encargadoId: parsed.id }
             });
 
-            if (parsed.bodegaIds.length > 0) {
+            if (bodegasValidadas.length > 0) {
                 await tx.encargadosBodega.createMany({
-                    data: parsed.bodegaIds.map((bodegaId) => ({
+                    data: bodegasValidadas.map((bodegaId) => ({
                         encargadoId: parsed.id,
                         centroId: parsed.centroId,
                         bodegaId,
@@ -230,7 +290,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
             accion: "actualizar",
             entidad: "Usuario",
             entidadId: parsed.id,
-            detalle: `Usuario ${parsed.email} actualizado con ${parsed.bodegaIds.length} bodegas.`
+            detalle: { cambios }
         });
 
         revalidatePath("/mantenedores");
@@ -238,7 +298,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
     } catch (error) {
         return {
             ok: false,
-            message: error instanceof Error ? error.message : "No se pudo actualizar el usuario."
+            message: mapearErrorPrisma(error, "No se pudo actualizar el usuario.")
         };
     }
 }
@@ -263,6 +323,15 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
             return { ok: false, message: "No puedes desactivar tu propia cuenta de usuario." };
         }
 
+        const previo = await prisma.usuario.findUnique({
+            where: { id },
+            select: { estado: true }
+        });
+
+        if (!previo) {
+            return { ok: false, message: "Usuario no encontrado." };
+        }
+
         await prisma.usuario.update({
             where: { id },
             data: { estado: nuevoEstado }
@@ -273,7 +342,11 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
             accion: "actualizar",
             entidad: "Usuario",
             entidadId: id,
-            detalle: `Estado de usuario cambiado a ${nuevoEstado ? "activo" : "inactivo"}.`
+            detalle: {
+                cambios: {
+                    estado: { antes: previo.estado, despues: nuevoEstado }
+                }
+            }
         });
 
         revalidatePath("/mantenedores");
@@ -284,7 +357,7 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
     } catch (error) {
         return {
             ok: false,
-            message: error instanceof Error ? error.message : "No se pudo cambiar el estado del usuario."
+            message: mapearErrorPrisma(error, "No se pudo cambiar el estado del usuario.")
         };
     }
 }
@@ -304,6 +377,6 @@ async function ejecutarAdmin(
         revalidatePath(path);
         return { ok: true, message };
     } catch (error) {
-        return { ok: false, message: error instanceof Error ? error.message : `No se pudo guardar ${entidad}.` };
+        return { ok: false, message: mapearErrorPrisma(error, `No se pudo guardar ${entidad}.`) };
     }
 }

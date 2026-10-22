@@ -1,11 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type * as React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 // components
 import { BodegasMultiSelect } from "@/modules/mantenedores/components/bodegas-multi-select";
 import { UsuarioEditModal } from "@/modules/mantenedores/components/usuario-edit-modal";
 import { UsuariosTabla, type UsuarioTablaItem } from "@/modules/mantenedores/components/usuarios-tabla";
+
+vi.mock("sonner", () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn()
+    }
+}));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/modules/mantenedores/actions/mantenedores.action", () => ({
@@ -129,6 +137,11 @@ describe("Gestión de Usuarios - Componentes UI", () => {
     });
 
     describe("UsuariosTabla", () => {
+        beforeEach(() => {
+            vi.clearAllMocks();
+            vi.spyOn(window, "confirm").mockReturnValue(true);
+        });
+
         it("renderiza la lista de usuarios con sus datos y badges de bodegas múltiples", () => {
             render(
                 <UsuariosTabla
@@ -192,6 +205,56 @@ describe("Gestión de Usuarios - Componentes UI", () => {
             expect(screen.getByRole("dialog")).toBeInTheDocument();
             expect(screen.getByText(/actualiza los datos, rol y bodegas asignadas de juan\.perez@cmvalparaiso\.cl/i)).toBeInTheDocument();
         });
+
+        it("muestra toast.error cuando toggleEstadoUsuario devuelve ok: false", async () => {
+            const { toggleEstadoUsuario } = await import("@/modules/mantenedores/actions/mantenedores.action");
+            vi.mocked(toggleEstadoUsuario).mockResolvedValueOnce({
+                ok: false,
+                message: "No tienes permisos para modificar este usuario."
+            });
+
+            render(
+                <UsuariosTabla
+                    usuarios={mockUsuarios}
+                    currentUserId="admin-1"
+                    centros={mockCentros}
+                    bodegas={mockBodegas}
+                    roles={mockRoles}
+                />
+            );
+
+            const btnDesactivarJuan = screen.getByRole("button", { name: /desactivar juan\.perez@cmvalparaiso\.cl/i });
+            fireEvent.click(btnDesactivarJuan);
+
+            await waitFor(() => {
+                expect(toast.error).toHaveBeenCalledWith("No tienes permisos para modificar este usuario.");
+            });
+        });
+
+        it("muestra toast.success cuando toggleEstadoUsuario devuelve ok: true", async () => {
+            const { toggleEstadoUsuario } = await import("@/modules/mantenedores/actions/mantenedores.action");
+            vi.mocked(toggleEstadoUsuario).mockResolvedValueOnce({
+                ok: true,
+                message: "Usuario desactivado exitosamente."
+            });
+
+            render(
+                <UsuariosTabla
+                    usuarios={mockUsuarios}
+                    currentUserId="admin-1"
+                    centros={mockCentros}
+                    bodegas={mockBodegas}
+                    roles={mockRoles}
+                />
+            );
+
+            const btnDesactivarJuan = screen.getByRole("button", { name: /desactivar juan\.perez@cmvalparaiso\.cl/i });
+            fireEvent.click(btnDesactivarJuan);
+
+            await waitFor(() => {
+                expect(toast.success).toHaveBeenCalledWith("Usuario desactivado exitosamente.");
+            });
+        });
     });
 
     describe("UsuarioEditModal", () => {
@@ -227,5 +290,23 @@ describe("Gestión de Usuarios - Componentes UI", () => {
             expect(screen.getByLabelText(/usuario activo en el sistema/i)).toBeInTheDocument();
             expect(screen.queryByText(/tu rol propio no puede modificarse/i)).not.toBeInTheDocument();
         });
+
+        it("cierra el modal al presionar la tecla Escape", () => {
+            const onClose = vi.fn();
+            render(
+                <UsuarioEditModal
+                    usuario={mockUsuarios[1]}
+                    currentUserId="admin-1"
+                    centros={mockCentros}
+                    bodegas={mockBodegas}
+                    roles={mockRoles}
+                    onClose={onClose}
+                />
+            );
+
+            fireEvent.keyDown(window, { key: "Escape" });
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
     });
 });
+

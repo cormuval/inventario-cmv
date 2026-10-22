@@ -19,6 +19,7 @@ import { Td, Th, Table } from "@/shared/components/ui/table";
 
 // types
 import { initialActionState } from "@/shared/types/action-state";
+import { toast } from "sonner";
 
 export interface UsuarioTablaItem extends UsuarioConDetalles {
     rol: Rol;
@@ -58,7 +59,12 @@ export function UsuariosTabla({
         formData.append("estado", String(nuevoEstado));
 
         startTransition(async () => {
-            await toggleEstadoUsuario(initialActionState, formData);
+            const resultado = await toggleEstadoUsuario(initialActionState, formData);
+            if (resultado.ok) {
+                toast.success(resultado.message);
+            } else {
+                toast.error(resultado.message);
+            }
         });
     };
 
