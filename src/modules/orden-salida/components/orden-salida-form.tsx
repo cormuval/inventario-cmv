@@ -7,6 +7,7 @@ import type { Bodega, Centro, Stock } from "@prisma/client";
 import { crearOrdenSalida } from "@/modules/orden-salida/actions/orden-salida.action";
 
 // components
+import { BotonDescargarComprobante } from "@/modules/orden-salida/components/boton-descargar-comprobante";
 import { OrdenSalidaDetallesField } from "@/modules/orden-salida/components/orden-salida-detalles-field";
 import { ActionMessage } from "@/shared/components/ui/action-message";
 import { FormSubmit } from "@/shared/components/ui/form-submit";
@@ -215,6 +216,21 @@ export function OrdenSalidaForm({
                 <p className="mb-3 text-sm font-medium">Detalle</p>
                 <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={stocks} tipoSalida={tipoSalida} />
             </div>
+            {state.ok && state.id && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 md:col-span-3">
+                    <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">✓ Salida registrada con éxito</span>
+                        <span className="text-muted-foreground">· N°: {state.id}</span>
+                    </div>
+                    <BotonDescargarComprobante
+                        ordenId={state.id}
+                        label="Descargar Comprobante PDF"
+                        variant="default"
+                        size="sm"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white"
+                    />
+                </div>
+            )}
             <div className="flex items-center gap-3 md:col-span-3">
                 <FormSubmit label="Registrar salida" />
                 <ActionMessage state={state} />

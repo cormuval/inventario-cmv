@@ -154,7 +154,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
-        return { ok: true, message: "Orden de salida registrada." };
+        return { ok: true, message: "Orden de salida registrada.", id: orden.id };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
     }
