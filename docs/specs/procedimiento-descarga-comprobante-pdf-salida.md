@@ -160,9 +160,9 @@ El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible
 
 ## 6. Criterios de Aceptación (Definición de Terminado)
 
-- [ ] **CA-1: Descarga Directa en Historial:** Cada registro en la tabla de salidas cuenta con un botón accesible para descargar su comprobante PDF.
-- [ ] **CA-2: Descarga Inmediata al Crear:** Al confirmar una nueva salida, la interfaz despliega una opción directa para descargar el comprobante sin buscarlo en la tabla.
-- [ ] **CA-3: Plantilla Formal Institucional:** El PDF contiene membrete CMV, folio, datos de origen y destino, tabla detallada de insumos con lote y caducidad, y recuadros de firma física.
-- [ ] **CA-4: Seguridad y Alcance en Server Action:** La acción `descargarComprobanteSalidaAction` valida que el usuario tenga privilegios sobre la bodega de la salida antes de generar el documento.
-- [ ] **CA-5: Cero Dependencias Pesadas ni API Routes Internas:** Se genera en Node.js nativo vía Server Action sin navegadores headless ni rutas API externas.
-- [ ] **CA-6: Pruebas y Tipado Estricto:** Pasan todos los tests en Vitest, cero errores de TypeScript y build exitoso de Next.js.
+- [x] **CA-1: Descarga Directa en Historial:** Cada registro en la tabla de salidas cuenta con un botón accesible para descargar su comprobante PDF.
+- [x] **CA-2: Descarga Inmediata al Crear:** Al confirmar una nueva salida, la interfaz despliega una opción directa para descargar el comprobante sin buscarlo en la tabla.
+- [x] **CA-3: Plantilla Formal Institucional:** El PDF contiene membrete CMV, folio, datos de origen y destino, tabla detallada de insumos con lote y caducidad, y recuadros de firma física.
+- [x] **CA-4: Seguridad y Alcance en Server Action:** La acción `descargarComprobanteSalidaAction` valida que el usuario tenga privilegios sobre la bodega de la salida antes de generar el documento.
+- [x] **CA-5: Cero Dependencias Pesadas ni API Routes Internas:** Se genera en Node.js nativo vía Server Action sin navegadores headless ni rutas API externas.
+- [x] **CA-6: Pruebas y Tipado Estricto:** Pasan todos los tests en Vitest, cero errores de TypeScript y build exitoso de Next.js.
