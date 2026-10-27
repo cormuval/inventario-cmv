@@ -21,14 +21,20 @@ export interface BodegasMultiSelectProps {
     onChange?: (selectedIds: string[]) => void;
 }
 
+const EMPTY_BODEGA_IDS: string[] = [];
+
 export function BodegasMultiSelect({
     bodegas,
     centroIdSeleccionado,
-    selectedBodegaIds = [],
+    selectedBodegaIds = EMPTY_BODEGA_IDS,
     name = "bodegaIds",
     onChange
 }: BodegasMultiSelectProps): React.ReactElement {
     const [selected, setSelected] = useState<string[]>(selectedBodegaIds);
+    const onChangeRef = React.useRef(onChange);
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    });
 
     // Filtrar bodegas por centro seleccionado
     const bodegasDelCentro = React.useMemo(() => {
@@ -42,17 +48,23 @@ export function BodegasMultiSelect({
             const validIds = new Set(bodegasDelCentro.map((b) => b.id));
             const filtered = prev.filter((id) => validIds.has(id));
             if (filtered.length !== prev.length) {
-                onChange?.(filtered);
+                onChangeRef.current?.(filtered);
                 return filtered;
             }
             return prev;
         });
-    }, [bodegasDelCentro, onChange]);
+    }, [bodegasDelCentro]);
 
-    // Permitir actualización externa de selectedBodegaIds (por ej. al abrir modal con otro usuario)
+    // Permitir actualización externa de selectedBodegaIds evitando re-renders infinitos
+    const serializedSelectedIds = (selectedBodegaIds ?? []).join(",");
+    const lastSerializedRef = React.useRef(serializedSelectedIds);
+
     useEffect(() => {
-        setSelected(selectedBodegaIds);
-    }, [selectedBodegaIds]);
+        if (lastSerializedRef.current !== serializedSelectedIds) {
+            lastSerializedRef.current = serializedSelectedIds;
+            setSelected(selectedBodegaIds ?? []);
+        }
+    }, [serializedSelectedIds, selectedBodegaIds]);
 
     const handleToggle = (id: string) => {
         const next = selected.includes(id)
