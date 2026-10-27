@@ -212,7 +212,7 @@ export async function confirmarRecepcionPrestamoAction(
                     create: {
                         productoId: detalle.productoId,
                         bodegaId: parsed.bodegaDestinoId,
-                        cantidad: detalle.cantidad,
+                        cantidadDisponible: detalle.cantidad,
                         lote: detalle.lote,
                         fechaCaducidad: detalle.fechaCaducidad
                     }
@@ -225,9 +225,9 @@ export async function confirmarRecepcionPrestamoAction(
                     fecha: new Date(),
                     usuarioId: user.id,
                     bodegaId: parsed.bodegaDestinoId,
-                    tipoEntrada: "Préstamo Intercentros",
                     centroId: orden.centroDestinoId ?? user.centroId,
                     origen: `Traspaso desde ${orden.centro?.nombre ?? "Centro Origen"} (${orden.bodega?.nombre ?? "Bodega Origen"})`,
+                    codigoRecepcion: codigoNormalizado,
                     detalles: {
                         create: orden.detalles.map((d) => ({
                             productoId: d.productoId,
