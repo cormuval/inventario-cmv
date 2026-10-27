@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { PrismaClient } from "@prisma/client";
 
 // lib
-import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
+import { requireSessionUser, puedeOperarSalida, obtenerSessionUser } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
@@ -18,6 +18,7 @@ import type { ActionState } from "@/shared/types/action-state";
 
 // utils
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
+import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -406,4 +407,71 @@ async function devolverStock(
             fechaUltimaActualizacion: new Date()
         }
     });
+}
+
+export async function descargarComprobanteSalidaAction(
+    ordenId: string
+): Promise<{ ok: boolean; base64?: string; filename?: string; error?: string }> {
+    try {
+        const sessionUser = await obtenerSessionUser();
+        if (!sessionUser) {
+            return { ok: false, error: "Usuario no autenticado" };
+        }
+
+        const orden = await prisma.ordenSalida.findUnique({
+            where: { id: ordenId },
+            include: {
+                centro: { select: { nombre: true } },
+                bodega: { select: { nombre: true } },
+                bodegaDestino: { select: { nombre: true } },
+                usuario: { select: { nombre: true, apPaterno: true, email: true } },
+                detalles: {
+                    include: {
+                        producto: { select: { descripcion: true } }
+                    }
+                }
+            }
+        });
+
+        if (!orden) {
+            return { ok: false, error: "Orden de salida no encontrada" };
+        }
+
+        // Validación de permisos según rol y alcance
+        const esAdmin = sessionUser.rol === "R01";
+        const esDirectorCentro = sessionUser.rol === "R02" && sessionUser.centroId === orden.centroId;
+
+        let tienePermiso = esAdmin || esDirectorCentro;
+
+        if (!tienePermiso) {
+            // Comprobar si el usuario tiene asignada la bodega emisora
+            const encargos = await prisma.encargadosBodega.findMany({
+                where: { encargadoId: sessionUser.id },
+                select: { bodegaId: true }
+            });
+            const bodegasPermitidas = new Set([
+                ...(sessionUser.bodegaId ? [sessionUser.bodegaId] : []),
+                ...encargos.map((e) => e.bodegaId)
+            ]);
+
+            tienePermiso = bodegasPermitidas.has(orden.bodegaId);
+        }
+
+        if (!tienePermiso) {
+            return { ok: false, error: "No autorizado para descargar este comprobante" };
+        }
+
+        const pdfBuffer = await generarComprobanteSalidaPDF(orden);
+
+        return {
+            ok: true,
+            base64: pdfBuffer.toString("base64"),
+            filename: `comprobante-salida-${orden.id}.pdf`
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : "Error al generar comprobante PDF"
+        };
+    }
 }
