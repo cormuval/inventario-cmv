@@ -17,8 +17,8 @@ import { descargarArchivoBase64 } from "@/shared/utils/descargar-base64";
 interface BotonDescargarComprobanteProps {
     ordenId: string;
     label?: string;
-    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
-    size?: "default" | "sm" | "lg" | "icon";
+    variant?: "default" | "secondary" | "ghost" | "destructive" | "outline";
+    size?: "sm" | "md";
     className?: string;
 }
 
