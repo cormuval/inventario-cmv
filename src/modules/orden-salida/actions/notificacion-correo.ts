@@ -54,7 +54,7 @@ export async function despacharNotificacionPrestamoAction(
             accion: "notificar",
             entidad: "OrdenSalida",
             entidadId: input.ordenSalidaId,
-            detalles: {
+            detalle: {
                 asunto: `Préstamo Intercentros Código #${input.codigoRecepcion}`,
                 centroOrigen: input.centroOrigenNombre,
                 bodegaOrigen: input.bodegaOrigenNombre,
