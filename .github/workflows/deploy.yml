@@ -4,10 +4,13 @@ name: Deploy Produccion
 # (server-das, label `produccion`). Al vivir en el mismo host, se conecta a MySQL
 # por localhost (el usuario `inventario` es solo-localhost).
 #
-# Por ahora solo se lanza manualmente (Actions > Deploy Produccion > Run workflow).
-# Tras la salida a produccion se agregara el disparador `push` a main.
+# Se dispara con cada push a main (incluye la fusion de un PR) y tambien
+# manualmente (Actions > Deploy Produccion > Run workflow).
+# Los PR contra main no despliegan: se verifican en ci.yml.
 
 on:
+    push:
+        branches: [main]
     workflow_dispatch:
 
 # Un deploy a la vez; no cancelar uno en curso (evita dejar la BD a medio migrar).
