@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { descargarComprobanteSalidaAction } from "@/modules/orden-salida/actions/orden-salida.action";
 import { prisma } from "@/shared/lib/prisma";
-import * as auth from "@/shared/lib/auth";
+import { validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 
-vi.mock("@/shared/lib/auth", () => ({
-    obtenerSessionUser: vi.fn(),
-    requireSessionUser: vi.fn()
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/shared/lib/logger", () => ({ AuditLogger: { log: vi.fn() } }));
+
+vi.mock("@/shared/lib/inventario-alcance", () => ({
+    validarCentroBodegaEnAlcance: vi.fn()
 }));
 
 vi.mock("@/shared/lib/prisma", () => ({
     prisma: {
         ordenSalida: {
             findUnique: vi.fn()
-        },
-        encargadosBodega: {
-            findMany: vi.fn()
         }
     }
 }));
@@ -24,24 +24,7 @@ describe("descargarComprobanteSalidaAction", () => {
         vi.clearAllMocks();
     });
 
-    it("retorna error cuando no hay sesión de usuario", async () => {
-        vi.spyOn(auth, "obtenerSessionUser").mockResolvedValue(null);
-
-        const res = await descargarComprobanteSalidaAction("sal-1");
-        expect(res.ok).toBe(false);
-        expect(res.error).toMatch(/no autenticado/i);
-    });
-
     it("retorna error cuando la orden no existe", async () => {
-        vi.spyOn(auth, "obtenerSessionUser").mockResolvedValue({
-            id: "u-1",
-            nombre: "Admin",
-            apPaterno: "Central",
-            email: "admin@cmvalparaiso.cl",
-            rol: "R01",
-            centroId: "c-1",
-            bodegaId: "b-1"
-        });
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue(null);
 
         const res = await descargarComprobanteSalidaAction("orden-inexistente");
@@ -49,39 +32,24 @@ describe("descargarComprobanteSalidaAction", () => {
         expect(res.error).toMatch(/no encontrada/i);
     });
 
-    it("retorna error cuando un operador intenta acceder a una orden fuera de su alcance", async () => {
-        vi.spyOn(auth, "obtenerSessionUser").mockResolvedValue({
-            id: "u-2",
-            nombre: "Operador",
-            apPaterno: "Bodega 1",
-            email: "op@cmvalparaiso.cl",
-            rol: "R07",
-            centroId: "c-1",
-            bodegaId: "b-1"
-        });
-        vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
+    it("retorna error cuando validarCentroBodegaEnAlcance rechaza por falta de permisos de alcance", async () => {
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
             id: "sal-ajena",
             bodegaId: "b-otra",
             centroId: "c-1"
         } as any);
+        vi.mocked(validarCentroBodegaEnAlcance).mockRejectedValue(
+            new Error("No tienes permiso para operar en el centro o bodega seleccionada.")
+        );
 
         const res = await descargarComprobanteSalidaAction("sal-ajena");
         expect(res.ok).toBe(false);
-        expect(res.error).toMatch(/no autorizado/i);
+        expect(res.error).toBe("No tienes permiso para operar en el centro o bodega seleccionada.");
+        expect(validarCentroBodegaEnAlcance).toHaveBeenCalledWith("c-1", "b-otra");
     });
 
-    it("permite la descarga a un administrador R01 y retorna base64 con nombre de archivo", async () => {
-        vi.spyOn(auth, "obtenerSessionUser").mockResolvedValue({
-            id: "u-admin",
-            nombre: "Admin",
-            apPaterno: "Central",
-            email: "admin@cmvalparaiso.cl",
-            rol: "R01",
-            centroId: "c-1",
-            bodegaId: "b-1"
-        });
-
+    it("permite la descarga cuando la orden existe y está en alcance, retornando base64 con nombre de archivo", async () => {
+        vi.mocked(validarCentroBodegaEnAlcance).mockResolvedValue(undefined);
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
             id: "sal-valida",
             fecha: new Date(),
@@ -110,5 +78,6 @@ describe("descargarComprobanteSalidaAction", () => {
         expect(res.filename).toBe("comprobante-salida-sal-valida.pdf");
         expect(res.base64).toBeDefined();
         expect(typeof res.base64).toBe("string");
+        expect(validarCentroBodegaEnAlcance).toHaveBeenCalledWith("c-1", "b-1");
     });
 });

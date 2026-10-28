@@ -2,8 +2,8 @@
 
 **Proyecto:** Sistema de Inventario APS — Corporación Municipal de Valparaíso (CMV)  
 **Documento:** Especificación Funcional, Técnica y de Respaldo Físico: Generación y Descarga de Comprobante PDF de Orden de Salida  
-**Versión:** 1.0 (Borrador para Aprobación)  
-**Fecha:** 23 de Octubre de 2026  
+**Versión:** 1.1 (Actualizado con Paginación Inteligente y Control de Alcance Canónico)  
+**Fecha:** 28 de Octubre de 2026  
 **Clasificación:** Operación de Inventario, Trazabilidad Sanitaria y Respaldo Documental (Prioridad Alta)  
 
 ---
@@ -76,16 +76,16 @@
 ### Regla R-03: Control de Acceso y Arquitectura Server Action (Seguridad)
 - Siguiendo la convención arquitectónica del proyecto (`AGENTS.md`: *API Routes solo para integraciones externas; lógica interna mediante Server Actions*), la generación y descarga se implementa como Server Action:
   `descargarComprobanteSalidaAction(ordenId: string)` en `src/modules/orden-salida/actions/orden-salida.action.ts`.
-- Protegida estrictamente por sesión de usuario con `requireSessionUser()`.
+- Reutiliza la función canónica de autorización por alcance del sistema: `validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId)` de `@/shared/lib/inventario-alcance`, que internamente valida la sesión con `requireSessionUser()`.
 - Aplica la matriz de alcance del sistema:
-  - **Rol R01 (Administrador Central):** Puede descargar el comprobante de cualquier salida comunal.
+  - **Rol R01 (Administrador Central):** Puede descargar el comprobante de cualquier salida comunal activa.
   - **Rol R02 (Director / Encargado de Centro):** Puede descargar salidas pertenecientes a su `centroId`.
-  - **Encargados y Operadores de Bodega:** Solo pueden descargar comprobantes de salidas pertenecientes a las bodegas que tienen asignadas (`bodegaId` principal o en `Encargados_Bodegas`).
-- Peticiones no autorizadas o inexistentes retornan `{ ok: false, error: "No autorizado o no encontrada" }` sin exponer detalles sensibles.
+  - **Encargados y Operadores de Bodega (R03, R06, R07):** Solo pueden descargar comprobantes de salidas de bodegas activas asignadas en su alcance.
+- Si la orden no existe o el usuario carece de alcance, la acción aborta y el error es capturado devolviendo `{ ok: false, error: error.message }`, notificando al usuario mediante toast sin exponer información interna.
 
-### Regla R-04: Estructura y Contenido Formal del Documento PDF
-El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible y diseño institucional formal:
-1. **Encabezado Institucional:**
+### Regla R-04: Estructura, Contenido y Comportamiento Multipágina del Documento PDF
+El PDF se genera en tamaño Carta (Letter) vertical con tipografía legible, márgenes de 40 pt y diseño institucional formal:
+1. **Encabezado Institucional (Página 1):**
    - Membrete: *"CORPORACIÓN MUNICIPAL DE VALPARAÍSO — ÁREA SALUD"*.
    - Subtítulo: *"Sistema de Control y Trazabilidad de Inventario APS"*.
    - Recuadro de identificación: Título *"COMPROBANTE DE SALIDA DE INVENTARIO"*, Folio/ID de Orden y Fecha/Hora exacta de emisión.
@@ -95,14 +95,15 @@ El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible
    - Tipo de Salida (Consumo interno, Merma/Caducidad, A otra bodega, A otros centros / Préstamo).
    - Destino del insumo (Establecimiento/Bodega de destino o justificación del retiro).
    - Código de verificación (si la salida es un traspaso/préstamo con código).
-3. **Tabla de Insumos y Fármacos Despachados:**
-   - Columnas: Item N°, Código/Descripción del Producto, Número de Lote, Fecha de Caducidad, Cantidad Despachada y Unidad de Medida.
-   - Fila de totales con la sumatoria de unidades y conteo de ítems únicos.
-4. **Recuadros de Respaldo y Firma Física:**
-   - **Recuadro Despachador (Origen):** Línea de firma, timbre, nombre y RUT del encargado que entrega.
-   - **Recuadro Receptor (Físico):** Línea de firma, timbre, nombre, RUT y fecha/hora de la persona que retira el insumo.
-5. **Pie de Página Legal:**
-   - Texto informativo de validez interna de movimiento de existencias y fecha de generación del archivo.
+3. **Tabla de Insumos y Comportamiento Multipágina:**
+   - Columnas: Item N°, Código/Descripción del Producto, Número de Lote, Fecha de Caducidad y Cantidad Despachada.
+   - **Paginación Inteligente:** Antes de renderizar cada fila (altura 18 pt), se comprueba si excede el límite inferior de la página (`currentY + rowHeight > LIMITE_INFERIOR - ESPACIO_PIE`). Si no cabe, se invoca `doc.addPage()` y se repite automáticamente el encabezado de la tabla (`dibujarEncabezadoTabla`) al inicio de la nueva página.
+   - **Total General:** Fila de totales con suma de unidades despachadas; si no cabe en la página actual, salta de página y repite el encabezado antes de imprimir la fila.
+4. **Recuadros de Respaldo y Firma Física (Indivisibles en Última Página):**
+   - Bloque de firmas de 80 pt de altura con recuadros para "ENTREGADO POR" y "RECIBIDO CONFORME".
+   - Si el bloque de firmas no cabe íntegro en la página actual, se genera una nueva página para garantizar que ambas firmas permanezcan juntas en la última hoja y nunca queden partidas ni desfasadas.
+5. **Pie de Página Legal y Paginación Transversal:**
+   - Configurado con `bufferPages: true` en `PDFDocument`. Antes de `doc.end()`, se recorren todas las páginas bufferizadas (`doc.bufferedPageRange()`) con `doc.switchToPage(i)` para imprimir en cada una el texto legal y el indicador `"Página X de Y"` (con `margins.bottom = 0` temporal para prevenir saltos accidentales de página).
 
 ### Regla R-05: Arquitectura Ultraliviana y de Bajo Costo
 - Generación de PDF en el backend utilizando una biblioteca nativa y ligera (`pdfkit`), evitando navegadores headless (como Puppeteer o Playwright) que consumen cientos de megabytes de RAM y ralentizan contenedores Docker.
@@ -115,17 +116,18 @@ El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible
 
 ### 4.1 Server Action: `descargarComprobanteSalidaAction` en `src/modules/orden-salida/actions/orden-salida.action.ts`
 - Declarada con `'use server'`.
-- Obtiene la sesión con `requireSessionUser()`.
 - Consulta la orden con `prisma.ordenSalida.findUnique` incluyendo `usuario`, `bodega`, `bodegaDestino`, `centro` y `detalles.producto`.
-- Valida los permisos de alcance del usuario solicitante según su rol (`R01`, `R02` o encargado de la bodega de origen).
+- Valida el alcance ejecutando `await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId)`.
 - Invoca la función utilitaria `generarComprobanteSalidaPDF(orden)`.
 - Retorna `{ ok: true, base64: buffer.toString("base64"), filename: "comprobante-salida-${id}.pdf" }`.
 
 ### 4.2 Módulo de Utilidad PDF: `src/modules/orden-salida/utils/pdf-comprobante.ts`
 - Encapsula la lógica de maquetación vectorial del documento con `pdfkit`:
-  - Definición de márgenes, fuentes estándar (`Helvetica`, `Helvetica-Bold`), paleta de grises institucional y cálculo dinámico de coordenadas.
-  - Función de dibujo de tablas con soporte para múltiples filas sin desborde.
-  - Bloque de recuadros de firma con medidas estandarizadas para timbre de farmacia.
+  - Instanciado con `bufferPages: true`, tamaño `LETTER` y márgenes de 40 pt.
+  - Constantes de límites dinámicos: `LIMITE_INFERIOR = doc.page.height - doc.page.margins.bottom`, `ESPACIO_PIE = 35`, `ALTURA_FIRMAS = 80`.
+  - Función de dibujo repetible `dibujarEncabezadoTabla(y)` invocada al inicio de cada página.
+  - Verificación de desborde por fila y por bloque de firmas.
+  - Recorrido final de `doc.bufferedPageRange()` para renderizar pie de página institucional y número de página `Página X de Y`.
   - Retorna una `Promise<Buffer>`.
 
 ### 4.3 Componente Cliente de Descarga: `src/modules/orden-salida/components/boton-descargar-comprobante.tsx`
@@ -145,14 +147,14 @@ El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible
 ## 5. Estrategia de Pruebas Automatizadas
 
 1. **Pruebas de Seguridad y Alcance (`src/__tests__/orden-salida-pdf.test.ts`):**
-   - Retorno de `{ ok: false, error: "No autenticado" }` si no hay sesión.
-   - Retorno de `{ ok: false, error: "No autorizado" }` para operadores intentando descargar órdenes de bodegas ajenas.
-   - Retorno de `{ ok: false, error: "Orden no encontrada" }` para identificadores inexistentes.
-   - Retorno de `{ ok: true, base64: string, filename: string }` con contenido de PDF válido para administradores R01 y encargados legítimos.
-2. **Pruebas de Generación del Documento:**
-   - Formateo correcto de folios, fechas, nombres de productos, lotes y fechas de vencimiento.
-   - Resistencia ante órdenes con gran volumen de ítems (paginación limpia).
-3. **Pruebas de Interfaz:**
+   - Retorno de error controlado si la orden no existe.
+   - Retorno de rechazo cuando `validarCentroBodegaEnAlcance` lanza error por falta de permisos.
+   - Retorno de `{ ok: true, base64: string, filename: string }` cuando la orden existe y está dentro del alcance del usuario.
+2. **Pruebas de Generación del Documento y Paginación (`src/__tests__/pdf-comprobante.test.ts`):**
+   - Verificación de cabecera mágica `%PDF-`.
+   - Verificación de generación de exactamente 1 página cuando hay 5 detalles.
+   - Verificación de paginación controlada con 80 detalles (número de páginas razonable `<= 4`).
+3. **Pruebas de Interfaz (`src/__tests__/boton-descargar-comprobante.test.tsx`):**
    - Verificación de la columna "Acciones" y botón de descarga en la tabla de salidas.
    - Verificación del diálogo de descarga tras guardar la orden.
 
@@ -162,7 +164,7 @@ El PDF se genera en tamaño Carta (Letter) / A4 vertical con tipografía legible
 
 - [x] **CA-1: Descarga Directa en Historial:** Cada registro en la tabla de salidas cuenta con un botón accesible para descargar su comprobante PDF.
 - [x] **CA-2: Descarga Inmediata al Crear:** Al confirmar una nueva salida, la interfaz despliega una opción directa para descargar el comprobante sin buscarlo en la tabla.
-- [x] **CA-3: Plantilla Formal Institucional:** El PDF contiene membrete CMV, folio, datos de origen y destino, tabla detallada de insumos con lote y caducidad, y recuadros de firma física.
-- [x] **CA-4: Seguridad y Alcance en Server Action:** La acción `descargarComprobanteSalidaAction` valida que el usuario tenga privilegios sobre la bodega de la salida antes de generar el documento.
+- [x] **CA-3: Plantilla Formal Institucional y Paginación:** El PDF contiene membrete CMV, folio, datos de origen y destino, tabla detallada de insumos con repetición de encabezado en saltos de página, firmas indivisibles en última hoja y numeración `Página X de Y`.
+- [x] **CA-4: Seguridad y Alcance en Server Action:** La acción `descargarComprobanteSalidaAction` utiliza `validarCentroBodegaEnAlcance` garantizando el principio de mínimo privilegio.
 - [x] **CA-5: Cero Dependencias Pesadas ni API Routes Internas:** Se genera en Node.js nativo vía Server Action sin navegadores headless ni rutas API externas.
-- [x] **CA-6: Pruebas y Tipado Estricto:** Pasan todos los tests en Vitest, cero errores de TypeScript y build exitoso de Next.js.
+- [x] **CA-6: Pruebas y Tipado Estricto:** Pasan todos los tests en Vitest (112 tests), cero errores de TypeScript y build exitoso de Next.js.

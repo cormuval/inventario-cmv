@@ -32,6 +32,7 @@ export function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<
             const doc = new PDFDocument({
                 size: "LETTER",
                 margin: 40,
+                bufferPages: true,
                 info: {
                     Title: `Comprobante de Salida - ${orden.id}`,
                     Author: "Corporación Municipal de Valparaíso"
@@ -47,7 +48,29 @@ export function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<
             const secondaryColor = "#475569";
             const borderColor = "#cbd5e1";
 
-            // Encabezado CMV
+            const LIMITE_INFERIOR = doc.page.height - doc.page.margins.bottom;
+            const ESPACIO_PIE = 35;
+            const ALTURA_FIRMAS = 80;
+
+            const tableX = 40;
+            const colItem = 40;
+            const colDesc = 65;
+            const colLote = 330;
+            const colVenc = 430;
+            const colCant = 510;
+
+            function dibujarEncabezadoTabla(y: number): number {
+                doc.rect(tableX, y, 532, 18).fillColor("#f1f5f9").fill();
+                doc.fontSize(8).font("Helvetica-Bold").fillColor(primaryColor);
+                doc.text("#", colItem + 5, y + 5);
+                doc.text("Producto / Descripción", colDesc, y + 5);
+                doc.text("Lote", colLote, y + 5);
+                doc.text("F. Vencimiento", colVenc, y + 5);
+                doc.text("Cantidad", colCant, y + 5, { width: 55, align: "right" });
+                return y + 18;
+            }
+
+            // Encabezado CMV (Página 1)
             doc.fontSize(13).font("Helvetica-Bold").fillColor(primaryColor)
                 .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", 40, 40);
             doc.fontSize(9).font("Helvetica").fillColor(secondaryColor)
@@ -112,33 +135,27 @@ export function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<
                 .text("DETALLE DE INSUMOS Y MEDICAMENTOS ENTREGADOS", 40, currentY);
 
             currentY += 14;
-            const tableX = 40;
-            const colItem = 40;
-            const colDesc = 65;
-            const colLote = 330;
-            const colVenc = 430;
-            const colCant = 510;
+            currentY = dibujarEncabezadoTabla(currentY);
 
-            // Encabezado de tabla
-            doc.rect(tableX, currentY, 532, 18).fillColor("#f1f5f9").fill();
-            doc.fontSize(8).font("Helvetica-Bold").fillColor(primaryColor);
-            doc.text("#", colItem + 5, currentY + 5);
-            doc.text("Producto / Descripción", colDesc, currentY + 5);
-            doc.text("Lote", colLote, currentY + 5);
-            doc.text("F. Vencimiento", colVenc, currentY + 5);
-            doc.text("Cantidad", colCant, currentY + 5, { width: 55, align: "right" });
-
-            currentY += 18;
             doc.font("Helvetica").fontSize(8).fillColor(primaryColor);
 
             let totalUnidades = 0;
-            orden.detalles.forEach((det, idx) => {
-                const rowHeight = 18;
+            const rowHeight = 18;
+
+            for (let idx = 0; idx < orden.detalles.length; idx++) {
+                const det = orden.detalles[idx];
+
+                if (currentY + rowHeight > LIMITE_INFERIOR - ESPACIO_PIE) {
+                    doc.addPage();
+                    currentY = doc.page.margins.top;
+                    currentY = dibujarEncabezadoTabla(currentY);
+                }
+
                 if (idx % 2 === 1) {
                     doc.rect(tableX, currentY, 532, rowHeight).fillColor("#f8fafc").fill();
                 }
 
-                doc.fillColor(primaryColor);
+                doc.font("Helvetica").fontSize(8).fillColor(primaryColor);
                 doc.text(String(idx + 1), colItem + 5, currentY + 5);
                 doc.text(det.producto.descripcion, colDesc, currentY + 5, { width: 260, height: 12, ellipsis: true });
                 doc.text(det.lote, colLote, currentY + 5);
@@ -147,19 +164,32 @@ export function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<
 
                 totalUnidades += det.cantidad;
                 currentY += rowHeight;
-            });
+            }
 
             // Fila de totales
+            if (currentY + 18 > LIMITE_INFERIOR - ESPACIO_PIE) {
+                doc.addPage();
+                currentY = doc.page.margins.top;
+                currentY = dibujarEncabezadoTabla(currentY);
+            }
+
             doc.rect(tableX, currentY, 532, 18).strokeColor(borderColor).stroke();
             doc.font("Helvetica-Bold").fontSize(8).fillColor(primaryColor);
             doc.text("TOTAL GENERAL:", 330, currentY + 5, { width: 90, align: "right" });
             doc.text(formatNumber(totalUnidades), colCant, currentY + 5, { width: 55, align: "right" });
+            currentY += 18;
 
-            // Recuadros de Firma Física
-            currentY = Math.max(currentY + 50, 600);
+            // Recuadros de Firma Física (deben quedar juntos en la última página)
+            const targetFirmasY = Math.max(currentY + 30, 590);
+            if (targetFirmasY + ALTURA_FIRMAS > LIMITE_INFERIOR - ESPACIO_PIE) {
+                doc.addPage();
+                currentY = doc.page.margins.top + 30;
+            } else {
+                currentY = targetFirmasY;
+            }
 
             // Firma Emisor
-            doc.rect(60, currentY, 210, 80).strokeColor(borderColor).stroke();
+            doc.rect(60, currentY, 210, ALTURA_FIRMAS).strokeColor(borderColor).stroke();
             doc.moveTo(80, currentY + 55).lineTo(250, currentY + 55).strokeColor(borderColor).stroke();
             doc.fontSize(8).font("Helvetica-Bold").fillColor(secondaryColor)
                 .text("ENTREGADO POR (BODEGA/FARMACIA)", 60, currentY + 60, { width: 210, align: "center" });
@@ -167,21 +197,38 @@ export function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<
                 .text("Firma y Timbre Responsable Emisión", 60, currentY + 70, { width: 210, align: "center" });
 
             // Firma Receptor
-            doc.rect(342, currentY, 210, 80).strokeColor(borderColor).stroke();
+            doc.rect(342, currentY, 210, ALTURA_FIRMAS).strokeColor(borderColor).stroke();
             doc.moveTo(362, currentY + 55).lineTo(532, currentY + 55).strokeColor(borderColor).stroke();
             doc.fontSize(8).font("Helvetica-Bold").fillColor(secondaryColor)
                 .text("RECIBIDO CONFORME (RECEPTOR FÍSICO)", 342, currentY + 60, { width: 210, align: "center" });
             doc.fontSize(7.5).font("Helvetica").fillColor(secondaryColor)
                 .text("Nombre, RUT, Firma y Fecha/Hora", 342, currentY + 70, { width: 210, align: "center" });
 
-            // Pie de página legal
-            doc.fontSize(7).fillColor("#94a3b8")
-                .text(
+            // Pie de página legal y paginación en todas las páginas bufferizadas
+            const range = doc.bufferedPageRange();
+            for (let i = range.start; i < range.start + range.count; i++) {
+                doc.switchToPage(i);
+                const oldBottomMargin = doc.page.margins.bottom;
+                doc.page.margins.bottom = 0;
+
+                doc.fontSize(7).font("Helvetica").fillColor("#94a3b8").text(
                     "Documento generado por el Sistema de Inventario CMV · Válido como respaldo físico interno de entrega y recepción de insumos.",
                     40,
-                    740,
-                    { width: 532, align: "center" }
+                    735,
+                    { width: 532, align: "center", lineBreak: false }
                 );
+
+                const pageNum = i + 1;
+                const totalPages = range.count;
+                doc.fontSize(7).font("Helvetica").fillColor("#94a3b8").text(
+                    `Página ${pageNum} de ${totalPages}`,
+                    40,
+                    746,
+                    { width: 532, align: "center", lineBreak: false }
+                );
+
+                doc.page.margins.bottom = oldBottomMargin;
+            }
 
             doc.end();
         } catch (error) {
