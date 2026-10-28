@@ -114,6 +114,8 @@ export async function crearOrdenEntrada(prevState: ActionState, formData: FormDa
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: parsed.centroId,
+            bodegaId: parsed.bodegaId,
             accion: "crear",
             entidad: "OrdenEntrada",
             entidadId: orden.id,
@@ -172,7 +174,14 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
             });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "actualizar", entidad: "OrdenEntradaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: previo.ordenEntrada.centroId,
+            bodegaId: previo.ordenEntrada.bodegaId,
+            accion: "actualizar",
+            entidad: "OrdenEntradaDetalle",
+            entidadId: detalleId
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-entrada");
         return { ok: true, message: "Detalle de entrada actualizado." };
@@ -205,7 +214,14 @@ export async function eliminarDetalleEntrada(detalleId: string): Promise<ActionS
             await tx.ordenEntradaDetalle.delete({ where: { id: detalleId } });
         });
 
-        await AuditLogger.log({ usuarioId: user.id, accion: "eliminar", entidad: "OrdenEntradaDetalle", entidadId: detalleId });
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: detalle.ordenEntrada.centroId,
+            bodegaId: detalle.ordenEntrada.bodegaId,
+            accion: "eliminar",
+            entidad: "OrdenEntradaDetalle",
+            entidadId: detalleId
+        });
         revalidatePath("/stock");
         revalidatePath("/orden-entrada");
         return { ok: true, message: "Detalle de entrada eliminado." };

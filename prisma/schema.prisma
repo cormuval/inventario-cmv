@@ -205,12 +205,20 @@ model EncargadosBodega {
 model Log {
     id        String   @id @default(cuid()) @map("ID_Log") @db.VarChar(255)
     usuarioId String?  @map("ID_User") @db.VarChar(255)
+    centroId  String?  @map("ID_Centro") @db.VarChar(255)
+    bodegaId  String?  @map("ID_Bodega") @db.VarChar(255)
     accion    String   @map("Accion") @db.VarChar(255)
     entidad   String   @map("Entidad") @db.VarChar(255)
     entidadId String?  @map("Entidad_ID") @db.VarChar(255)
     detalle   Json?    @map("Detalle")
+    fecha     DateTime @default(now()) @map("Fecha")
     usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
     @@index([usuarioId])
+    @@index([centroId])
+    @@index([bodegaId])
+    @@index([fecha])
+    @@index([entidad])
     @@map("logs")
 }
+

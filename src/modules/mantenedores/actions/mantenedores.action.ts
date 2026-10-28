@@ -51,7 +51,7 @@ export async function crearCentro(prevState: ActionState, formData: FormData): P
             estado: formData.get("estado") === "on"
         });
         const centro = await prisma.centro.create({ data: parsed });
-        await AuditLogger.log({ usuarioId, accion: "crear", entidad: "Centro", entidadId: centro.id });
+        await AuditLogger.log({ usuarioId, centroId: centro.id, accion: "crear", entidad: "Centro", entidadId: centro.id });
         return "Centro creado.";
     });
 }
@@ -64,7 +64,14 @@ export async function crearBodega(prevState: ActionState, formData: FormData): P
             estado: formData.get("estado") === "on"
         });
         const bodega = await prisma.bodega.create({ data: parsed });
-        await AuditLogger.log({ usuarioId, accion: "crear", entidad: "Bodega", entidadId: bodega.id });
+        await AuditLogger.log({
+            usuarioId,
+            centroId: parsed.centroId,
+            bodegaId: bodega.id,
+            accion: "crear",
+            entidad: "Bodega",
+            entidadId: bodega.id
+        });
         return "Bodega creada.";
     });
 }
@@ -170,6 +177,7 @@ export async function crearUsuario(prevState: ActionState, formData: FormData): 
 
         await AuditLogger.log({
             usuarioId,
+            centroId: usuario.centroId,
             accion: "crear",
             entidad: "Usuario",
             entidadId: usuario.id,
@@ -302,6 +310,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: parsed.centroId,
             accion: "actualizar",
             entidad: "Usuario",
             entidadId: parsed.id,
@@ -340,7 +349,7 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
 
         const previo = await prisma.usuario.findUnique({
             where: { id },
-            select: { estado: true }
+            select: { estado: true, centroId: true }
         });
 
         if (!previo) {
@@ -354,6 +363,7 @@ export async function toggleEstadoUsuario(prevState: ActionState, formData: Form
 
         await AuditLogger.log({
             usuarioId: user.id,
+            centroId: previo.centroId,
             accion: "actualizar",
             entidad: "Usuario",
             entidadId: id,
