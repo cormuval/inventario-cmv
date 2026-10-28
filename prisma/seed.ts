@@ -2,6 +2,39 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// SEED_DEMO=false (produccion): solo roles y administradores, sin datos de prueba.
+// Por defecto (desarrollo) se cargan tambien centro, bodegas, productos, stock y usuarios demo.
+const SEED_DEMO = process.env.SEED_DEMO !== "false";
+
+// Centro tecnico para los administradores en produccion mientras no se migren los centros reales.
+const CENTRO_ADMINISTRACION = {
+    id: "centro-administracion-das",
+    nombre: "Administracion DAS"
+};
+
+// Administradores institucionales habilitados para el login con Google.
+// Solo se aceptan correos del dominio @cmvalparaiso.cl (ver src/config/auth.ts).
+const ADMINISTRADORES = [
+    {
+        id: "usuario-admin-rvergara",
+        nombre: "Renzo",
+        apPaterno: "Vergara",
+        email: "rvergara@cmvalparaiso.cl"
+    },
+    {
+        id: "usuario-admin-dsantibanez",
+        nombre: "Daniel",
+        apPaterno: "Santibanez",
+        email: "dsantibanez@cmvalparaiso.cl"
+    },
+    {
+        id: "usuario-admin-practicasdas",
+        nombre: "Practicas",
+        apPaterno: "DAS",
+        email: "practicasdas@cmvalparaiso.cl"
+    }
+];
+
 async function main(): Promise<void> {
     const roles = [
         ["R01", "Administrador"],
@@ -17,6 +50,11 @@ async function main(): Promise<void> {
             update: { descripcion },
             create: { id, descripcion }
         });
+    }
+
+    if (!SEED_DEMO) {
+        await seedAdministradoresProduccion();
+        return;
     }
 
     const centro = await prisma.centro.upsert({
@@ -151,30 +189,7 @@ async function main(): Promise<void> {
         }
     });
 
-    // Administradores institucionales habilitados para el login con Google.
-    // Solo se aceptan correos del dominio @cmvalparaiso.cl (ver src/config/auth.ts).
-    const administradores = [
-        {
-            id: "usuario-admin-rvergara",
-            nombre: "Renzo",
-            apPaterno: "Vergara",
-            email: "rvergara@cmvalparaiso.cl"
-        },
-        {
-            id: "usuario-admin-dsantibanez",
-            nombre: "Daniel",
-            apPaterno: "Santibanez",
-            email: "dsantibanez@cmvalparaiso.cl"
-        },
-        {
-            id: "usuario-admin-practicasdas",
-            nombre: "Practicas",
-            apPaterno: "DAS",
-            email: "practicasdas@cmvalparaiso.cl"
-        }
-    ];
-
-    for (const administrador of administradores) {
+    for (const administrador of ADMINISTRADORES) {
         await prisma.usuario.upsert({
             where: { email: administrador.email },
             update: {
@@ -240,6 +255,32 @@ async function main(): Promise<void> {
                 stockMinimo: stock.stockMinimo
             },
             create: stock
+        });
+    }
+}
+
+// Crea los administradores solo si no existen: en produccion no se sobrescriben
+// cambios hechos desde la app (centro, bodega, estado) en deploys posteriores.
+async function seedAdministradoresProduccion(): Promise<void> {
+    await prisma.centro.upsert({
+        where: { id: CENTRO_ADMINISTRACION.id },
+        update: {},
+        create: { ...CENTRO_ADMINISTRACION, estado: true }
+    });
+
+    for (const administrador of ADMINISTRADORES) {
+        await prisma.usuario.upsert({
+            where: { email: administrador.email },
+            update: {},
+            create: {
+                id: administrador.id,
+                nombre: administrador.nombre,
+                apPaterno: administrador.apPaterno,
+                rolId: "R01",
+                email: administrador.email,
+                centroId: CENTRO_ADMINISTRACION.id,
+                estado: true
+            }
         });
     }
 }
