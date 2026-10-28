@@ -51,7 +51,7 @@ export async function crearCentro(prevState: ActionState, formData: FormData): P
             estado: formData.get("estado") === "on"
         });
         const centro = await prisma.centro.create({ data: parsed });
-        await AuditLogger.log({ usuarioId, accion: "crear", entidad: "Centro", entidadId: centro.id });
+        await AuditLogger.log({ usuarioId, centroId: centro.id, accion: "crear", entidad: "Centro", entidadId: centro.id });
         return "Centro creado.";
     });
 }

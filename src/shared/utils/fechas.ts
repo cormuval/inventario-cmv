@@ -41,7 +41,8 @@ export function obtenerRangoHoyChile(
     const seg = getPart("second");
 
     const localTimeAsUtc = Date.UTC(anio, mes - 1, dia, hora, min, seg);
-    const offsetMinutos = (localTimeAsUtc - referencia.getTime()) / 60000;
+    // Se redondea porque localTimeAsUtc no incluye los milisegundos de la referencia
+    const offsetMinutos = Math.round((localTimeAsUtc - referencia.getTime()) / 60000);
 
     const desdeEpoch = Date.UTC(anio, mes - 1, dia, 0, 0, 0, 0) - offsetMinutos * 60000;
     const hastaEpoch = Date.UTC(anio, mes - 1, dia, 23, 59, 59, 999) - offsetMinutos * 60000;

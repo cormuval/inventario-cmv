@@ -25,14 +25,14 @@ export default async function AuditoriaPage(): Promise<React.ReactElement> {
     }
 
     const rangoHoy = obtenerRangoHoyChile();
+    const filtrosConsultaInicial = {
+        fechaDesde: rangoHoy.desde.toISOString(),
+        fechaHasta: rangoHoy.hasta.toISOString()
+    };
 
     const [catalogo, resultadoInicial] = await Promise.all([
         obtenerFiltrosCatalogoAuditoria(),
-        consultarLogsAuditoria({
-            fechaDesde: rangoHoy.desde.toISOString(),
-            fechaHasta: rangoHoy.hasta.toISOString(),
-            pagina: 1
-        })
+        consultarLogsAuditoria({ ...filtrosConsultaInicial, pagina: 1 })
     ]);
 
     return (
@@ -52,6 +52,7 @@ export default async function AuditoriaPage(): Promise<React.ReactElement> {
                     initialLogs={resultadoInicial.logs}
                     initialTotal={resultadoInicial.total}
                     initialPaginasTotales={resultadoInicial.paginasTotales}
+                    initialFiltrosConsulta={filtrosConsultaInicial}
                     initialValoresFiltros={{
                         fechaDesde: rangoHoy.fechaInicioLocal,
                         fechaHasta: rangoHoy.fechaFinLocal

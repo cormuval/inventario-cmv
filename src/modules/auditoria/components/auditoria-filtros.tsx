@@ -52,6 +52,16 @@ function obtenerFechaHoyString(hora: "inicio" | "fin"): string {
     return hora === "inicio" ? `${anio}-${mes}-${dia}T00:00` : `${anio}-${mes}-${dia}T23:59`;
 }
 
+// Convierte un valor "YYYY-MM-DDTHH:mm" (hora local del navegador) a ISO
+function inicioMinutoIso(valorLocal: string): string {
+    return new Date(valorLocal).toISOString();
+}
+
+// Igual que inicioMinutoIso, pero incluye el minuto completo (hasta el segundo 59.999)
+function finMinutoIso(valorLocal: string): string {
+    return new Date(new Date(valorLocal).getTime() + 59_999).toISOString();
+}
+
 export function AuditoriaFiltros({
     centros,
     bodegas,
@@ -113,8 +123,8 @@ export function AuditoriaFiltros({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onFiltrar({
-            fechaDesde: fechaDesde ? new Date(fechaDesde).toISOString() : undefined,
-            fechaHasta: fechaHasta ? new Date(fechaHasta).toISOString() : undefined,
+            fechaDesde: fechaDesde ? inicioMinutoIso(fechaDesde) : undefined,
+            fechaHasta: fechaHasta ? finMinutoIso(fechaHasta) : undefined,
             centroId,
             bodegaId,
             usuarioId,
@@ -136,8 +146,8 @@ export function AuditoriaFiltros({
         setEntidad("todas");
 
         onFiltrar({
-            fechaDesde: new Date(fDesde).toISOString(),
-            fechaHasta: new Date(fHasta).toISOString(),
+            fechaDesde: inicioMinutoIso(fDesde),
+            fechaHasta: finMinutoIso(fHasta),
             centroId: "todos",
             bodegaId: "todas",
             usuarioId: "todos",

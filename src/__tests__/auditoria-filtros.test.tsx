@@ -99,5 +99,24 @@ describe("AuditoriaFiltros - Dependencia en Cascada", () => {
         expect(screen.getByRole("option", { name: "Detalle de orden de salida" })).toBeInTheDocument();
         expect(screen.getByRole("option", { name: "Detalle de orden de entrada" })).toBeInTheDocument();
     });
-});
 
+    it("al filtrar, la fecha Hasta incluye el minuto completo", () => {
+        const onFiltrar = vi.fn();
+
+        render(
+            <AuditoriaFiltros
+                centros={mockCentros}
+                bodegas={mockBodegas}
+                usuarios={mockUsuarios}
+                valoresIniciales={{ fechaDesde: "2026-10-21T00:00", fechaHasta: "2026-10-21T23:59" }}
+                onFiltrar={onFiltrar}
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: /^filtrar$/i }));
+
+        const filtros = onFiltrar.mock.calls[0][0];
+        expect(new Date(filtros.fechaDesde).getTime()).toBe(new Date("2026-10-21T00:00").getTime());
+        expect(new Date(filtros.fechaHasta).getTime()).toBe(new Date("2026-10-21T23:59:59.999").getTime());
+    });
+});

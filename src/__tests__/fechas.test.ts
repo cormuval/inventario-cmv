@@ -27,4 +27,13 @@ describe("Utilidad de Fechas - Zona Horaria Chile", () => {
         expect(rango.fechaInicioLocal).toBe("2026-10-21T00:00");
         expect(rango.fechaFinLocal).toBe("2026-10-21T23:59");
     });
+
+    it("con milisegundos en la referencia, el rango no se desplaza", () => {
+        vi.setSystemTime(new Date("2026-10-22T01:30:00.999Z"));
+
+        const rango = obtenerRangoHoyChile();
+
+        expect(rango.desde.toISOString()).toBe("2026-10-21T03:00:00.000Z");
+        expect(rango.hasta.toISOString()).toBe("2026-10-22T02:59:59.999Z");
+    });
 });

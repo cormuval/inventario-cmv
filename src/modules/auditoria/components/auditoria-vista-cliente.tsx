@@ -32,6 +32,8 @@ interface AuditoriaVistaClienteProps {
     initialTotal: number;
     initialPaginasTotales: number;
     initialValoresFiltros?: Partial<FiltroAuditoriaInput>;
+    // Filtros de la consulta inicial con fechas en ISO (UTC), usados al paginar antes de filtrar
+    initialFiltrosConsulta?: Partial<FiltroAuditoriaInput>;
 }
 
 export function AuditoriaVistaCliente({
@@ -41,14 +43,15 @@ export function AuditoriaVistaCliente({
     initialLogs,
     initialTotal,
     initialPaginasTotales,
-    initialValoresFiltros
+    initialValoresFiltros,
+    initialFiltrosConsulta
 }: AuditoriaVistaClienteProps): React.ReactElement {
     const [logs, setLogs] = useState<AuditoriaLogItem[]>(initialLogs);
     const [total, setTotal] = useState(initialTotal);
     const [pagina, setPagina] = useState(1);
     const [paginasTotales, setPaginasTotales] = useState(initialPaginasTotales);
     const [filtrosActuales, setFiltrosActuales] = useState<Partial<FiltroAuditoriaInput>>(
-        initialValoresFiltros ?? {}
+        initialFiltrosConsulta ?? {}
     );
     const [isPending, startTransition] = useTransition();
 
