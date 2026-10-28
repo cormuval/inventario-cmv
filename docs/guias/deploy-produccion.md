@@ -31,7 +31,9 @@ Se ejecuta en el runner del propio servidor, por lo que se conecta a MySQL por `
 7. `next build`.
 8. `pm2 startOrReload ecosystem.config.js --update-env` y `pm2 save`.
 
-Por ahora el deploy es **manual**: *Actions → Deploy Produccion → Run workflow*. Tras la salida a producción se agregará el disparador `push` a `main`.
+El deploy se dispara con cada **push a `main`** (incluida la fusión de un PR) y también manualmente: *Actions → Deploy Produccion → Run workflow*.
+
+Los **PR contra `main`** no despliegan: el workflow `.github/workflows/ci.yml` corre `tsc`, tests y `next build` en un runner de GitHub para validar el cambio antes de fusionarlo.
 
 ---
 
