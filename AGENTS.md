@@ -27,14 +27,21 @@ Modulos: `stock`, `vista de productos`, `reporte`, `orden de entrada`, `orden de
 ## Comandos
 
 - `npm run dev` · `npm run build` · `npm run lint` · `npm test`
-- `npm run db:generate | db:push | db:seed | db:studio`
+- `npm run db:generate | db:migrate | db:migrate:deploy | db:seed | db:studio`
 - `npm run services:up | services:down` (MySQL por Docker, host **3308**)
+
+## Migraciones de base de datos
+
+- El esquema se versiona con migraciones de Prisma (`prisma/migrations/`). **No usar `db:push`** fuera de pruebas desechables.
+- Todo cambio en `prisma/schema.prisma` debe incluir su migracion en el mismo PR: `npm run db:migrate -- --name <descripcion>`.
+- Produccion aplica las migraciones con `prisma migrate deploy` en el pipeline (`.github/workflows/deploy.yml`). Guia: `docs/guias/deploy-produccion.md`.
 
 ## Entorno local
 
 1. `cp .env.example .env`; completar `AUTH_GOOGLE_ID/SECRET`, `AUTH_SECRET` (`npx auth secret`), `DATABASE_URL` (puerto 3308).
-2. `npm run services:up && npm run db:generate && npm run db:push && npm run db:seed && npm run db:seed:ref`
-   - `db:seed`: rol, menus, usuarios demo. `db:seed:ref`: datos de referencia reales (unidad, producto, centro, bodega) desde `prisma/seed-data/referencia.sql`.
+2. `npm run services:up && npm run db:generate && npm run db:migrate:deploy && npm run db:seed`
+   - `db:seed`: roles, administradores y datos demo (centro, bodegas, productos, stock). Con `SEED_DEMO=false` (produccion) solo roles y administradores.
+   - Base local creada antes con `db:push`: marcarla una vez con `npx prisma migrate resolve --applied 0_init`.
 3. `npm run dev` → http://localhost:3000
 - Login Google requiere redirect URI `http://localhost:3000/api/auth/callback/google` registrado en el cliente OAuth.
 
