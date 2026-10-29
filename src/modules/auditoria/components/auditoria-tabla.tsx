@@ -117,7 +117,7 @@ export function AuditoriaTabla({
                                         </Td>
                                         <Td>
                                             <Badge tone={getTonePorAccion(log.accion)}>
-                                                {log.accion.charAt(0).toUpperCase() + log.accion.slice(1)}
+                                                {(log.accion.charAt(0).toUpperCase() + log.accion.slice(1)).replace(/_/g, " ")}
                                             </Badge>
                                         </Td>
                                         <Td className="text-xs font-medium">{log.entidad}</Td>
