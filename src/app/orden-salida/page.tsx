@@ -6,6 +6,8 @@ import { listarOrdenesSalida } from "@/modules/orden-salida/actions/orden-salida
 // components
 import { OrdenSalidaForm } from "@/modules/orden-salida/components/orden-salida-form";
 import { BotonDescargarComprobante } from "@/modules/orden-salida/components/boton-descargar-comprobante";
+import { BotonEnviarComprobante } from "@/modules/orden-salida/components/boton-enviar-comprobante";
+import { EstadoCorreoBadge } from "@/modules/orden-salida/components/estado-correo-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Td, Th, Table } from "@/shared/components/ui/table";
 import { AppLayout } from "@/shared/components/layout/app-layout";
@@ -85,6 +87,7 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                                     <Th>Bodega</Th>
                                     <Th>Usuario</Th>
                                     <Th>Detalle</Th>
+                                    <Th>Correo</Th>
                                     <Th className="text-right">Acciones</Th>
                                 </tr>
                             </thead>
@@ -103,8 +106,19 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                                                 </div>
                                             ))}
                                         </Td>
+                                        <Td>
+                                            <EstadoCorreoBadge
+                                                enviado={orden.enviarCorreo}
+                                                fechaEnvio={orden.fechaEnvioCorreo}
+                                                error={orden.errorEnvioCorreo}
+                                                correoDestino={orden.correoDestino}
+                                            />
+                                        </Td>
                                         <Td className="text-right">
-                                            <BotonDescargarComprobante ordenId={orden.id} size="sm" />
+                                            <div className="flex justify-end gap-2">
+                                                <BotonDescargarComprobante ordenId={orden.id} size="sm" />
+                                                <BotonEnviarComprobante ordenId={orden.id} correoInicial={orden.correoDestino} />
+                                            </div>
                                         </Td>
                                     </tr>
                                 ))}
