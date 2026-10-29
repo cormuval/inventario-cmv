@@ -8,6 +8,7 @@ import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
+import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
 
 // schemas
@@ -19,6 +20,7 @@ import type { ActionState } from "@/shared/types/action-state";
 // utils
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
+import { cargarOrdenParaComprobante, enviarComprobanteSalida } from "@/modules/orden-salida/utils/envio-comprobante";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -48,6 +50,16 @@ export async function listarOrdenesSalida() {
         },
         orderBy: { fecha: "desc" }
     });
+}
+
+function respuestaSalidaRegistrada(id: string, envio: ResultadoCorreo | null, para?: string): ActionState {
+    if (envio?.ok) {
+        return { ok: true, message: `Orden de salida registrada. Comprobante enviado a ${para}.`, id };
+    }
+    if (envio && !envio.omitido) {
+        return { ok: true, message: "Orden de salida registrada.", id, advertencia: `No se pudo enviar el comprobante: ${envio.error}` };
+    }
+    return { ok: true, message: "Orden de salida registrada.", id };
 }
 
 export async function crearOrdenSalida(prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -152,11 +164,26 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
         });
 
+        // El envío del comprobante nunca debe revertir ni ocultar la salida ya registrada
+        const envio = parsed.correoDestino
+            ? await enviarComprobanteSalida({
+                  ordenId: orden.id,
+                  usuarioId: user.id,
+                  para: parsed.correoDestino,
+                  reenvio: false
+              }).catch(
+                  (error: unknown): ResultadoCorreo => ({
+                      ok: false,
+                      error: error instanceof Error ? error.message : "Error inesperado al enviar el comprobante"
+                  })
+              )
+            : null;
+
         revalidatePath("/");
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
-        return { ok: true, message: "Orden de salida registrada.", id: orden.id };
+        return respuestaSalidaRegistrada(orden.id, envio, parsed.correoDestino);
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
     }
@@ -419,20 +446,7 @@ export async function descargarComprobanteSalidaAction(
     ordenId: string
 ): Promise<{ ok: boolean; base64?: string; filename?: string; error?: string }> {
     try {
-        const orden = await prisma.ordenSalida.findUnique({
-            where: { id: ordenId },
-            include: {
-                centro: { select: { nombre: true } },
-                bodega: { select: { nombre: true } },
-                bodegaDestino: { select: { nombre: true } },
-                usuario: { select: { nombre: true, apPaterno: true, email: true } },
-                detalles: {
-                    include: {
-                        producto: { select: { descripcion: true } }
-                    }
-                }
-            }
-        });
+        const orden = await cargarOrdenParaComprobante(ordenId);
 
         if (!orden) {
             return { ok: false, error: "Orden de salida no encontrada" };
