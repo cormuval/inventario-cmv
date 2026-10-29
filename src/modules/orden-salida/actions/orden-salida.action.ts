@@ -12,7 +12,7 @@ import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
 
 // schemas
-import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
+import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema, reenvioComprobanteSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
@@ -466,5 +466,53 @@ export async function descargarComprobanteSalidaAction(
             ok: false,
             error: error instanceof Error ? error.message : "Error al generar comprobante PDF"
         };
+    }
+}
+
+export async function reenviarComprobanteSalidaAction(ordenId: string, correo: string): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeOperarSalida(user.rol)) {
+            return { ok: false, message: "No tienes permiso para enviar comprobantes." };
+        }
+
+        const parsed = reenvioComprobanteSchema.safeParse({ ordenId, correo });
+        if (!parsed.success) {
+            return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+        }
+
+        const orden = await prisma.ordenSalida.findUnique({
+            where: { id: parsed.data.ordenId },
+            select: { id: true, centroId: true, bodegaId: true, correoDestino: true }
+        });
+        if (!orden) {
+            return { ok: false, message: "Orden de salida no encontrada." };
+        }
+        await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId);
+
+        if (orden.correoDestino !== parsed.data.correo) {
+            await prisma.ordenSalida.update({
+                where: { id: orden.id },
+                data: { correoDestino: parsed.data.correo }
+            });
+        }
+
+        const envio = await enviarComprobanteSalida({
+            ordenId: orden.id,
+            usuarioId: user.id,
+            para: parsed.data.correo,
+            reenvio: true
+        });
+        revalidatePath("/orden-salida");
+
+        if (envio.ok) {
+            return { ok: true, message: `Comprobante enviado a ${parsed.data.correo}.` };
+        }
+        if (envio.omitido) {
+            return { ok: false, message: "El envío de correos no está configurado en este entorno." };
+        }
+        return { ok: false, message: `No se pudo enviar el comprobante: ${envio.error}` };
+    } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : "No se pudo enviar el comprobante." };
     }
 }

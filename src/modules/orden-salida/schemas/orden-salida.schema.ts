@@ -68,3 +68,8 @@ export const crearOrdenSalidaSchema = z.object({
 
 export type CrearOrdenSalidaInput = z.infer<typeof crearOrdenSalidaSchema>;
 export type OrdenSalidaDetalleInput = z.infer<typeof ordenSalidaDetalleSchema>;
+
+export const reenvioComprobanteSchema = z.object({
+    ordenId: z.string().min(1),
+    correo: z.string().trim().email("Ingrese un correo válido.")
+});
