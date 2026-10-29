@@ -1,7 +1,7 @@
 // lib
 import { Resend } from "resend";
 
-const REMITENTE_POR_DEFECTO = "Inventario CMV <inventario@cmvalparaiso.cl>";
+const REMITENTE_POR_DEFECTO = "Inventario CMV <inventario@gi.cmvalparaiso.cl>";
 
 // Tiempo máximo de espera de Resend: el SDK no define timeout y el envío es síncrono tras registrar la salida.
 const TIEMPO_MAXIMO_ENVIO_MS = 15_000;

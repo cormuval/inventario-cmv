@@ -60,7 +60,7 @@ export async function enviarCorreo(input: CorreoInput): Promise<ResultadoCorreo>
 
 - **Nunca lanza excepciones.** El SDK devuelve `{ data, error }`; tanto ese error como cualquier excepción de red se traducen a `{ ok: false, error }`.
 - **Sin `RESEND_API_KEY`** (CI, tests o entorno local sin clave) devuelve `{ ok: false, omitido: true, error: "Envío de correo no configurado" }` sin llamar a Resend.
-- **Remitente:** sale de `CORREO_REMITENTE`, con valor por defecto `Inventario CMV <inventario@cmvalparaiso.cl>`.
+- **Remitente:** sale de `CORREO_REMITENTE`, con valor por defecto `Inventario CMV <inventario@gi.cmvalparaiso.cl>`.
 - El cliente Resend se crea de forma perezosa, una sola vez por proceso.
 
 ### 4.2 `src/modules/orden-salida/utils/correo-comprobante.ts`
@@ -136,9 +136,9 @@ Cada intento, incluidos los omitidos, se registra con `AuditLogger.log`:
 | Variable | Requerida | Descripción |
 |---|---|---|
 | `RESEND_API_KEY` | No (sin ella no se envía) | API key de Resend del proyecto |
-| `CORREO_REMITENTE` | No | Remitente; por defecto `Inventario CMV <inventario@cmvalparaiso.cl>` |
+| `CORREO_REMITENTE` | No | Remitente; por defecto `Inventario CMV <inventario@gi.cmvalparaiso.cl>` |
 
-- El dominio `cmvalparaiso.cl` ya está verificado en Resend.
+- El subdominio `gi.cmvalparaiso.cl` está verificado en Resend; el remitente debe pertenecer a él.
 - Se agregan a `.env.example`, al secret `ENV_PRODUCTION` y a `docs/guias/deploy-produccion.md`.
 - El CI (`ci.yml`) corre sin clave, por lo que no envía correos.
 

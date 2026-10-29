@@ -42,7 +42,7 @@ describe("enviarCorreo", () => {
 
         expect(resultado).toEqual({ ok: true, id: "email-123" });
         expect(sendMock).toHaveBeenCalledWith({
-            from: "Inventario CMV <inventario@cmvalparaiso.cl>",
+            from: "Inventario CMV <inventario@gi.cmvalparaiso.cl>",
             to: "destino@cmvalparaiso.cl",
             subject: "Asunto",
             html: "<p>Hola</p>",
