@@ -34,7 +34,7 @@ Además, otras funcionalidades necesitarán enviar correos, como el aviso de pr�
 
 ### 4.1 `src/shared/lib/correo.ts` (servicio genérico)
 
-Es el único archivo que conoce Resend. Lleva `import "server-only"`.
+Es el único archivo que conoce Resend. Es un módulo de servidor sin `"use server"` (no se expone como acción) y solo lo importa código de servidor.
 
 ```ts
 export interface AdjuntoCorreo {
@@ -74,10 +74,12 @@ Arma el correo del comprobante a partir de los datos de la orden (`OrdenSalidaPD
 
 Es una función pura (`construirCorreoComprobante(orden, pdf): CorreoInput`), así que se puede probar sin red.
 
-### 4.3 Cambios en `src/modules/orden-salida/actions/orden-salida.action.ts`
+### 4.3 `src/modules/orden-salida/utils/envio-comprobante.ts` y cambios en `orden-salida.action.ts`
 
-- **`cargarOrdenParaComprobante(ordenId)`:** helper interno con el `findUnique` + `include` que hoy está en `descargarComprobanteSalidaAction`. Lo comparten la descarga y el envío.
-- **`enviarComprobanteSalida(ordenId, usuarioId, correo, reenvio)`:** función interna, **no exportada como acción**:
+La lógica compartida vive en un módulo de servidor sin `"use server"`, para que no quede expuesta como Server Action y se pueda probar de forma aislada:
+
+- **`cargarOrdenParaComprobante(ordenId)`:** el `findUnique` + `include` que hoy está en `descargarComprobanteSalidaAction`. Lo comparten la descarga y el envío.
+- **`enviarComprobanteSalida({ ordenId, usuarioId, para, reenvio })`:**
   1. Carga la orden y valida el alcance (`validarCentroBodegaEnAlcance`).
   2. Genera el PDF, construye el correo y llama a `enviarCorreo`.
   3. Actualiza el estado del envío en la orden (sección 5).
@@ -85,7 +87,7 @@ Es una función pura (`construirCorreoComprobante(orden, pdf): CorreoInput`), as
   5. Devuelve el `ResultadoCorreo`.
 - **`crearOrdenSalida`:** después de la transacción y de la auditoría de creación, si existe `correoDestino`, llama a `enviarComprobanteSalida(..., reenvio: false)`. La salida **nunca se revierte** por un fallo de correo. El mensaje de respuesta según el resultado:
   - envío exitoso: `"Orden de salida registrada. Comprobante enviado a {correo}."`
-  - fallo: `"Orden de salida registrada, pero no se pudo enviar el comprobante: {error}"` (`ok: true` y el nuevo campo opcional `advertencia?: string` en `src/shared/types/action-state.ts`)
+  - fallo: `"Orden de salida registrada."` con `ok: true` y el nuevo campo opcional `advertencia?: string` en `src/shared/types/action-state.ts` = `"No se pudo enviar el comprobante: {error}"`
   - omitido o sin correo: `"Orden de salida registrada."`
 - **`reenviarComprobanteSalidaAction(ordenId, correo)`:** nueva Server Action exportada.
   - Exige sesión (`requireSessionUser`) y permiso `puedeOperarSalida`.
@@ -95,7 +97,7 @@ Es una función pura (`construirCorreoComprobante(orden, pdf): CorreoInput`), as
 
 ### 4.4 UI
 
-- **Formulario de salida:** el toast muestra el mensaje de la respuesta. Si viene `advertencia`, se usa `toast.warning`.
+- **Formulario de salida:** el mensaje se sigue mostrando con `ActionMessage`. Si viene `advertencia`, se muestra en ámbar bajo el recuadro de "Salida registrada con éxito".
 - **Historial (`src/app/orden-salida/page.tsx`):**
   - Badge de estado de correo:
     - **Enviado** (`enviarCorreo = true`), con tooltip de fecha y destinatario.
