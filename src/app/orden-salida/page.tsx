@@ -5,6 +5,7 @@ import { listarOrdenesSalida } from "@/modules/orden-salida/actions/orden-salida
 
 // components
 import { OrdenSalidaForm } from "@/modules/orden-salida/components/orden-salida-form";
+import { BotonDescargarComprobante } from "@/modules/orden-salida/components/boton-descargar-comprobante";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Td, Th, Table } from "@/shared/components/ui/table";
 import { AppLayout } from "@/shared/components/layout/app-layout";
@@ -84,6 +85,7 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                                     <Th>Bodega</Th>
                                     <Th>Usuario</Th>
                                     <Th>Detalle</Th>
+                                    <Th className="text-right">Acciones</Th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -100,6 +102,9 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                                                     {detalle.producto.descripcion}: {formatNumber(detalle.cantidad)} · {detalle.lote}
                                                 </div>
                                             ))}
+                                        </Td>
+                                        <Td className="text-right">
+                                            <BotonDescargarComprobante ordenId={orden.id} size="sm" />
                                         </Td>
                                     </tr>
                                 ))}

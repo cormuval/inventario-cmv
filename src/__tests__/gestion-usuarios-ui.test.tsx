@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type * as React from "react";
+import * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
 // components
 import { BodegasMultiSelect } from "@/modules/mantenedores/components/bodegas-multi-select";
+import { UsuarioForm } from "@/modules/mantenedores/components/mantenedores-forms";
 import { UsuarioEditModal } from "@/modules/mantenedores/components/usuario-edit-modal";
 import { UsuariosTabla, type UsuarioTablaItem } from "@/modules/mantenedores/components/usuarios-tabla";
 
@@ -17,6 +18,7 @@ vi.mock("sonner", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/modules/mantenedores/actions/mantenedores.action", () => ({
+    crearUsuario: vi.fn(),
     editarUsuario: vi.fn(),
     toggleEstadoUsuario: vi.fn()
 }));
@@ -133,6 +135,19 @@ describe("Gestión de Usuarios - Componentes UI", () => {
             const btnNinguna = screen.getByRole("button", { name: /ninguna/i });
             fireEvent.click(btnNinguna);
             expect(onChange).toHaveBeenCalledWith([]);
+        });
+
+        it("no entra en bucle infinito de re-renders cuando no se especifica selectedBodegaIds o se re-renderiza con StrictMode", () => {
+            render(
+                <React.StrictMode>
+                    <BodegasMultiSelect
+                        bodegas={mockBodegas}
+                        centroIdSeleccionado="centro-1"
+                    />
+                </React.StrictMode>
+            );
+
+            expect(screen.getByText("Bodega Farmacia")).toBeInTheDocument();
         });
     });
 
@@ -306,6 +321,23 @@ describe("Gestión de Usuarios - Componentes UI", () => {
 
             fireEvent.keyDown(window, { key: "Escape" });
             expect(onClose).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("UsuarioForm", () => {
+        it("renderiza el formulario de usuario en StrictMode sin provocar bucle de re-renders", () => {
+            render(
+                <React.StrictMode>
+                    <UsuarioForm
+                        centros={mockCentros}
+                        bodegas={mockBodegas}
+                        roles={mockRoles}
+                    />
+                </React.StrictMode>
+            );
+
+            expect(screen.getByPlaceholderText("correo@cmvalparaiso.cl")).toBeInTheDocument();
+            expect(screen.getByText("Bodega Farmacia")).toBeInTheDocument();
         });
     });
 });

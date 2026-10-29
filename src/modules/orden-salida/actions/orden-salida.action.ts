@@ -18,6 +18,7 @@ import type { ActionState } from "@/shared/types/action-state";
 
 // utils
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
+import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -155,7 +156,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
-        return { ok: true, message: "Orden de salida registrada." };
+        return { ok: true, message: "Orden de salida registrada.", id: orden.id };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
     }
@@ -412,4 +413,44 @@ async function devolverStock(
             fechaUltimaActualizacion: new Date()
         }
     });
+}
+
+export async function descargarComprobanteSalidaAction(
+    ordenId: string
+): Promise<{ ok: boolean; base64?: string; filename?: string; error?: string }> {
+    try {
+        const orden = await prisma.ordenSalida.findUnique({
+            where: { id: ordenId },
+            include: {
+                centro: { select: { nombre: true } },
+                bodega: { select: { nombre: true } },
+                bodegaDestino: { select: { nombre: true } },
+                usuario: { select: { nombre: true, apPaterno: true, email: true } },
+                detalles: {
+                    include: {
+                        producto: { select: { descripcion: true } }
+                    }
+                }
+            }
+        });
+
+        if (!orden) {
+            return { ok: false, error: "Orden de salida no encontrada" };
+        }
+
+        await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId);
+
+        const pdfBuffer = await generarComprobanteSalidaPDF(orden);
+
+        return {
+            ok: true,
+            base64: pdfBuffer.toString("base64"),
+            filename: `comprobante-salida-${orden.id}.pdf`
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : "Error al generar comprobante PDF"
+        };
+    }
 }
