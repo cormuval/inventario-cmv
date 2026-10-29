@@ -48,7 +48,10 @@ export function BotonEnviarComprobante({ ordenId, correoInicial }: BotonEnviarCo
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setAbierto(true)}
+                onClick={() => {
+                    setCorreo(correoInicial ?? "");
+                    setAbierto(true);
+                }}
                 title="Enviar comprobante por correo"
                 aria-label="Enviar comprobante"
             >

@@ -81,4 +81,18 @@ describe("enviarCorreo", () => {
 
         expect(resultado).toEqual({ ok: false, error: "fetch failed" });
     });
+
+    it("devuelve error por tiempo de espera cuando Resend no responde", async () => {
+        vi.useFakeTimers();
+        try {
+            sendMock.mockReturnValue(new Promise(() => undefined));
+
+            const pendiente = enviarCorreo(correoBase);
+            await vi.advanceTimersByTimeAsync(15_000);
+
+            expect(await pendiente).toEqual({ ok: false, error: "Tiempo de espera agotado al enviar el correo" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

@@ -3,6 +3,9 @@ import { Resend } from "resend";
 
 const REMITENTE_POR_DEFECTO = "Inventario CMV <inventario@cmvalparaiso.cl>";
 
+// Tiempo máximo de espera de Resend: el SDK no define timeout y el envío es síncrono tras registrar la salida.
+const TIEMPO_MAXIMO_ENVIO_MS = 15_000;
+
 export interface AdjuntoCorreo {
     nombre: string;
     contenido: Buffer;
@@ -38,8 +41,9 @@ export async function enviarCorreo(input: CorreoInput): Promise<ResultadoCorreo>
         return { ok: false, omitido: true, error: "Envío de correo no configurado" };
     }
 
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
     try {
-        const { data, error } = await obtenerCliente(apiKey).emails.send({
+        const envio = obtenerCliente(apiKey).emails.send({
             from: process.env.CORREO_REMITENTE || REMITENTE_POR_DEFECTO,
             to: input.para,
             subject: input.asunto,
@@ -50,6 +54,17 @@ export async function enviarCorreo(input: CorreoInput): Promise<ResultadoCorreo>
                 ? { attachments: input.adjuntos.map((adjunto) => ({ filename: adjunto.nombre, content: adjunto.contenido })) }
                 : {})
         });
+        const tiempoAgotado = new Promise<"timeout">((resolve) => {
+            temporizador = setTimeout(() => resolve("timeout"), TIEMPO_MAXIMO_ENVIO_MS);
+        });
+
+        const respuesta = await Promise.race([envio, tiempoAgotado]);
+        if (respuesta === "timeout") {
+            // Si el SDK termina después con un rechazo, se absorbe para no dejar una promesa sin manejar.
+            envio.catch(() => undefined);
+            return { ok: false, error: "Tiempo de espera agotado al enviar el correo" };
+        }
+        const { data, error } = respuesta;
 
         if (error || !data) {
             return { ok: false, error: error?.message ?? "Resend no devolvió respuesta" };
@@ -58,5 +73,7 @@ export async function enviarCorreo(input: CorreoInput): Promise<ResultadoCorreo>
         return { ok: true, id: data.id };
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : "Error desconocido al enviar el correo" };
+    } finally {
+        clearTimeout(temporizador);
     }
 }

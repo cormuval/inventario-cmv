@@ -14,6 +14,7 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
+import { puedeOperarSalida } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 
 // utils
@@ -117,7 +118,9 @@ export default async function OrdenSalidaPage(): Promise<React.ReactElement> {
                                         <Td className="text-right">
                                             <div className="flex justify-end gap-2">
                                                 <BotonDescargarComprobante ordenId={orden.id} size="sm" />
-                                                <BotonEnviarComprobante ordenId={orden.id} correoInicial={orden.correoDestino} />
+                                                {puedeOperarSalida(alcance.usuario.rol) ? (
+                                                    <BotonEnviarComprobante ordenId={orden.id} correoInicial={orden.correoDestino} />
+                                                ) : null}
                                             </div>
                                         </Td>
                                     </tr>

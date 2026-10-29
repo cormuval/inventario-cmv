@@ -8,13 +8,14 @@ import { prisma } from "@/shared/lib/prisma";
 
 // utils
 import { enviarComprobanteSalida } from "@/modules/orden-salida/utils/envio-comprobante";
+import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/shared/lib/correo", () => ({ enviarCorreo: vi.fn() }));
 vi.mock("@/shared/lib/logger", () => ({ AuditLogger: { log: vi.fn() } }));
 vi.mock("@/shared/lib/inventario-alcance", () => ({ validarCentroBodegaEnAlcance: vi.fn() }));
 vi.mock("@/modules/orden-salida/utils/pdf-comprobante", () => ({
-    generarComprobanteSalidaPDF: vi.fn().mockResolvedValue(Buffer.from("pdf"))
+    generarComprobanteSalidaPDF: vi.fn()
 }));
 vi.mock("@/shared/lib/prisma", () => ({
     prisma: { ordenSalida: { findUnique: vi.fn(), update: vi.fn() } }
@@ -39,7 +40,11 @@ const input = { ordenId: "sal-1", usuarioId: "u-1", para: "destino@cmvalparaiso.
 
 describe("enviarComprobanteSalida", () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        // resetAllMocks descarta implementaciones previas (p. ej. rechazos) y se reestablecen los valores por defecto
+        vi.resetAllMocks();
+        vi.mocked(generarComprobanteSalidaPDF).mockResolvedValue(Buffer.from("pdf"));
+        vi.mocked(prisma.ordenSalida.update).mockResolvedValue({} as never);
+        vi.mocked(AuditLogger.log).mockResolvedValue(undefined as never);
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue(ordenCompleta as never);
         vi.mocked(validarCentroBodegaEnAlcance).mockResolvedValue(undefined);
     });

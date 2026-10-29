@@ -79,4 +79,14 @@ describe("BotonEnviarComprobante", () => {
         });
         expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
+
+    it("restablece el correo inicial al cancelar y reabrir el modal", () => {
+        render(<BotonEnviarComprobante ordenId="sal-1" correoInicial="antiguo@cmvalparaiso.cl" />);
+        fireEvent.click(screen.getByRole("button", { name: /enviar comprobante/i }));
+        fireEvent.change(screen.getByLabelText(/correo destino/i), { target: { value: "editado@cmvalparaiso.cl" } });
+        fireEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /enviar comprobante/i }));
+
+        expect(screen.getByLabelText(/correo destino/i)).toHaveValue("antiguo@cmvalparaiso.cl");
+    });
 });
