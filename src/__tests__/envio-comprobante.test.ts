@@ -119,4 +119,32 @@ describe("enviarComprobanteSalida", () => {
         expect(enviarCorreo).not.toHaveBeenCalled();
         expect(prisma.ordenSalida.update).not.toHaveBeenCalled();
     });
+
+    it("si falla guardar el estado, igual devuelve el resultado y audita", async () => {
+        vi.mocked(enviarCorreo).mockResolvedValue({ ok: true, id: "email-1" });
+        vi.mocked(prisma.ordenSalida.update).mockRejectedValue(new Error("db caída"));
+
+        const resultado = await enviarComprobanteSalida(input);
+
+        expect(resultado).toEqual({ ok: true, id: "email-1" });
+        expect(AuditLogger.log).toHaveBeenCalled();
+    });
+
+    it("si falla la auditoría, igual devuelve el resultado", async () => {
+        vi.mocked(enviarCorreo).mockResolvedValue({ ok: true, id: "email-1" });
+        vi.mocked(AuditLogger.log).mockRejectedValue(new Error("db caída"));
+
+        await expect(enviarComprobanteSalida(input)).resolves.toEqual({ ok: true, id: "email-1" });
+    });
+
+    it("si enviarCorreo lanza, devuelve fallo y audita como fallido", async () => {
+        vi.mocked(enviarCorreo).mockRejectedValue(new Error("boom"));
+
+        const resultado = await enviarComprobanteSalida(input);
+
+        expect(resultado).toEqual({ ok: false, error: "boom" });
+        expect(AuditLogger.log).toHaveBeenCalledWith(
+            expect.objectContaining({ detalle: expect.objectContaining({ resultado: "fallido", error: "boom" }) })
+        );
+    });
 });

@@ -71,33 +71,41 @@ export async function enviarComprobanteSalida(input: EnvioComprobanteInput): Pro
     }
 
     if (resultado.ok || !resultado.omitido) {
-        await prisma.ordenSalida.update({
-            where: { id: orden.id },
-            data: resultado.ok
-                ? { enviarCorreo: true, fechaEnvioCorreo: new Date(), errorEnvioCorreo: null }
-                : {
-                      enviarCorreo: false,
-                      fechaEnvioCorreo: new Date(),
-                      errorEnvioCorreo: resultado.error.slice(0, LARGO_MAXIMO_ERROR)
-                  }
-        });
+        try {
+            await prisma.ordenSalida.update({
+                where: { id: orden.id },
+                data: resultado.ok
+                    ? { enviarCorreo: true, fechaEnvioCorreo: new Date(), errorEnvioCorreo: null }
+                    : {
+                          enviarCorreo: false,
+                          fechaEnvioCorreo: new Date(),
+                          errorEnvioCorreo: resultado.error.slice(0, LARGO_MAXIMO_ERROR)
+                      }
+            });
+        } catch {
+            // Se ignora: el correo ya se intentó y un fallo al guardar el estado no debe ocultar su resultado ni provocar un reenvío.
+        }
     }
 
-    await AuditLogger.log({
-        usuarioId: input.usuarioId,
-        centroId: orden.centroId,
-        bodegaId: orden.bodegaId,
-        accion: "enviar_correo",
-        entidad: "OrdenSalida",
-        entidadId: orden.id,
-        detalle: {
-            para: input.para,
-            reenvio: input.reenvio,
-            ...(resultado.ok
-                ? { resultado: "enviado", resendId: resultado.id }
-                : { resultado: resultado.omitido ? "omitido" : "fallido", error: resultado.error })
-        }
-    });
+    try {
+        await AuditLogger.log({
+            usuarioId: input.usuarioId,
+            centroId: orden.centroId,
+            bodegaId: orden.bodegaId,
+            accion: "enviar_correo",
+            entidad: "OrdenSalida",
+            entidadId: orden.id,
+            detalle: {
+                para: input.para,
+                reenvio: input.reenvio,
+                ...(resultado.ok
+                    ? { resultado: "enviado", resendId: resultado.id }
+                    : { resultado: resultado.omitido ? "omitido" : "fallido", error: resultado.error })
+            }
+        });
+    } catch {
+        // Se ignora: la auditoría no debe hacer fallar una operación cuyo correo ya fue enviado.
+    }
 
     return resultado;
 }
