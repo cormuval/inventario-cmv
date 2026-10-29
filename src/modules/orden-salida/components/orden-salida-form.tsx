@@ -12,6 +12,8 @@ import { ActionMessage } from "@/shared/components/ui/action-message";
 import { FormSubmit } from "@/shared/components/ui/form-submit";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
+import { Button } from "@/shared/components/ui/button";
+import { toast } from "sonner";
 
 // constants
 import {
@@ -72,12 +74,19 @@ export function OrdenSalidaForm({
         () => centros.filter((c) => c.id !== centroSeleccionado && c.estado !== false),
         [centros, centroSeleccionado]
     );
+    const [centroDestinoId, setCentroDestinoId] = useState(otrosCentrosDisponibles[0]?.id ?? "");
 
     useEffect(() => {
         if (!bodegasDestinoDisponibles.some((b) => b.id === bodegaDestinoId)) {
             setBodegaDestinoId(bodegasDestinoDisponibles[0]?.id ?? "");
         }
     }, [bodegasDestinoDisponibles, bodegaDestinoId]);
+
+    useEffect(() => {
+        if (!otrosCentrosDisponibles.some((c) => c.id === centroDestinoId)) {
+            setCentroDestinoId(otrosCentrosDisponibles[0]?.id ?? "");
+        }
+    }, [otrosCentrosDisponibles, centroDestinoId]);
 
     function cambiarCentro(nuevoCentroId: string): void {
         setCentroSeleccionado(nuevoCentroId);
@@ -87,6 +96,41 @@ export function OrdenSalidaForm({
 
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-3">
+            {state.ok && state.codigoRecepcion && (
+                <div className="md:col-span-3 rounded-lg border border-teal-200 bg-teal-50 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-600 text-white font-bold">
+                            ✔
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wider font-semibold text-teal-800">
+                                Código de Recepción Generado (Traspaso en Tránsito)
+                            </p>
+                            <p className="text-xl font-mono font-bold text-teal-950 tracking-wider">
+                                {state.codigoRecepcion}
+                            </p>
+                            <p className="text-xs text-teal-700">
+                                Comparta este código de 7 caracteres con el centro receptor para su ingreso físico.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-teal-300 bg-white hover:bg-teal-100 text-teal-900 shrink-0"
+                        onClick={() => {
+                            if (state.codigoRecepcion) {
+                                navigator.clipboard.writeText(state.codigoRecepcion);
+                                toast.success("Código copiado al portapapeles");
+                            }
+                        }}
+                    >
+                        Copiar Código
+                    </Button>
+                </div>
+            )}
+
             <label className="space-y-1 text-sm">
                 <span>Fecha</span>
                 <Input type="date" name="fecha" defaultValue={toDateInputValue()} required />
@@ -173,16 +217,27 @@ export function OrdenSalidaForm({
             ) : esOtrosCentros ? (
                 <label className="space-y-1 text-sm">
                     <span>Centro de salud destino *</span>
-                    <Select key="a-otros-centros" name="destino" required defaultValue={otrosCentrosDisponibles[0]?.nombre ?? ""}>
+                    <Select
+                        key="a-otros-centros"
+                        name="centroDestinoId"
+                        required
+                        value={centroDestinoId}
+                        onChange={(event) => setCentroDestinoId(event.currentTarget.value)}
+                    >
                         {otrosCentrosDisponibles.length === 0 && (
                             <option value="">No hay otros centros disponibles</option>
                         )}
                         {otrosCentrosDisponibles.map((centro) => (
-                            <option key={centro.id} value={centro.nombre}>
+                            <option key={centro.id} value={centro.id}>
                                 {centro.nombre}
                             </option>
                         ))}
                     </Select>
+                    <input
+                        type="hidden"
+                        name="destino"
+                        value={otrosCentrosDisponibles.find((c) => c.id === centroDestinoId)?.nombre ?? ""}
+                    />
                 </label>
             ) : esMerma ? (
                 <label className="space-y-1 text-sm">
@@ -211,6 +266,23 @@ export function OrdenSalidaForm({
                 <span>Correo destino</span>
                 <Input type="email" name="correoDestino" placeholder="Opcional" />
             </label>
+
+            {esOtrosCentros && (
+                <div className="md:col-span-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+                    <input
+                        type="checkbox"
+                        id="advertenciaCaducidadAceptada"
+                        name="advertenciaCaducidadAceptada"
+                        value="true"
+                        className="mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <label htmlFor="advertenciaCaducidadAceptada" className="cursor-pointer select-none">
+                        <span className="font-semibold text-amber-950">Advertencia sanitaria (Insumos con vencimiento próximo): </span>
+                        Confirmo que si alguno de los insumos seleccionados vence dentro del plazo de 1 semana, el centro de salud de destino está debidamente notificado y se destinará a uso urgente e inmediato antes de su fecha de caducidad.
+                    </label>
+                </div>
+            )}
+
             <div className="border-t pt-3 md:col-span-3">
                 <p className="mb-3 text-sm font-medium">Detalle</p>
                 <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={stocks} tipoSalida={tipoSalida} />

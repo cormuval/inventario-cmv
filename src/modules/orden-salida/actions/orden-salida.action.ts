@@ -12,12 +12,15 @@ import { prisma } from "@/shared/lib/prisma";
 
 // schemas
 import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
+import { z } from "zod";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
 
 // utils
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
+import { generarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
+import { despacharNotificacionPrestamoAction } from "@/modules/orden-salida/actions/notificacion-correo";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -56,21 +59,31 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             return { ok: false, message: "No tienes permiso para registrar salidas." };
         }
 
+        const rawAdvertencia = formData.get("advertenciaCaducidadAceptada");
+        const advertenciaAceptada = rawAdvertencia === "true" || rawAdvertencia === "on" || rawAdvertencia === "1";
+
         const parsed = crearOrdenSalidaSchema.parse({
             fecha: formData.get("fecha"),
             bodegaId: formData.get("bodegaId"),
             bodegaDestinoId: formData.get("bodegaDestinoId")?.toString()?.trim() || undefined,
             centroId: formData.get("centroId"),
+            centroDestinoId: formData.get("centroDestinoId")?.toString()?.trim() || undefined,
             tipoSalida: formData.get("tipoSalida"),
             destino: formData.get("destino"),
             codigoSalida: formData.get("codigoSalida")?.toString() || undefined,
             correoDestino: formData.get("correoDestino")?.toString() || undefined,
+            advertenciaCaducidadAceptada: advertenciaAceptada,
             detalles: leerDetallesSalida(formData)
         });
         await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
 
         const esTraspasoBodega = parsed.tipoSalida.trim().toLowerCase() === "a otra bodega";
+        const esAOtroCentro = parsed.tipoSalida.trim().toLowerCase() === "a otros centros";
         let bodegaDestinoId: string | null = null;
+        let centroDestinoId: string | null = null;
+        let codigoRecepcion: string | null = null;
+        let fechaLimiteRecepcion: Date | null = null;
+        let estadoPrestamo: string | null = null;
 
         if (esTraspasoBodega) {
             bodegaDestinoId = parsed.bodegaDestinoId ?? null;
@@ -89,18 +102,44 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             parsed.destino = bodegaDestino.nombre;
         }
 
+        if (esAOtroCentro) {
+            centroDestinoId = parsed.centroDestinoId ?? null;
+            if (!centroDestinoId) {
+                return { ok: false, message: "Debe seleccionar el centro de destino para el traspaso." };
+            }
+            if (centroDestinoId === parsed.centroId) {
+                return { ok: false, message: "El centro destino no puede ser el mismo centro de origen." };
+            }
+            const centroDestino = await prisma.centro.findUnique({
+                where: { id: centroDestinoId }
+            });
+            if (!centroDestino || !centroDestino.estado) {
+                return { ok: false, message: "El centro de destino seleccionado no existe o no está activo." };
+            }
+            parsed.destino = centroDestino.nombre;
+            codigoRecepcion = generarCodigoRecepcion();
+            estadoPrestamo = "EN_TRANSITO";
+            // Plazo de 1 semana (7 días)
+            fechaLimiteRecepcion = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+
         const orden = await prisma.$transaction(async (tx) => {
             const nuevaOrden = await tx.ordenSalida.create({
                 data: {
                     fecha: parsed.fecha,
                     usuarioId: user.id,
                     bodegaId: parsed.bodegaId,
-                    bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : null,
+                    bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : (parsed.bodegaDestinoId ?? null),
                     tipoSalida: parsed.tipoSalida,
                     centroId: parsed.centroId,
+                    centroDestinoId: esAOtroCentro ? centroDestinoId : null,
                     destino: parsed.destino,
                     codigoSalida: parsed.codigoSalida || null,
-                    correoDestino: parsed.correoDestino || null
+                    correoDestino: parsed.correoDestino || null,
+                    codigoRecepcion: esAOtroCentro ? codigoRecepcion : null,
+                    estadoPrestamo: esAOtroCentro ? estadoPrestamo : null,
+                    fechaLimiteRecepcion: esAOtroCentro ? fechaLimiteRecepcion : null,
+                    advertenciaCaducidadAceptada: parsed.advertenciaCaducidadAceptada ?? false
                 }
             });
 
@@ -147,16 +186,50 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                 destino: parsed.destino,
                 bodegaOrigenId: parsed.bodegaId,
                 ...(esTraspasoBodega && bodegaDestinoId ? { bodegaDestinoId } : {}),
+                ...(esAOtroCentro && centroDestinoId ? { centroDestinoId, codigoRecepcion, estadoPrestamo } : {}),
                 detalles: parsed.detalles.length
             }
         });
+
+        if (esAOtroCentro && centroDestinoId && codigoRecepcion) {
+            const [centroOrigen, bodegaOrigen] = await Promise.all([
+                prisma.centro.findUnique({ where: { id: parsed.centroId }, select: { nombre: true } }),
+                prisma.bodega.findUnique({ where: { id: parsed.bodegaId }, select: { nombre: true } })
+            ]);
+
+            await despacharNotificacionPrestamoAction({
+                ordenSalidaId: orden.id,
+                codigoRecepcion,
+                centroOrigenNombre: centroOrigen?.nombre ?? "Centro de Origen",
+                bodegaOrigenNombre: bodegaOrigen?.nombre ?? "Bodega de Origen",
+                centroDestinoId,
+                correoDestinoOpcional: parsed.correoDestino,
+                items: parsed.detalles.map((d) => ({
+                    productoNombre: `Insumo #${d.productoId}`,
+                    cantidad: d.cantidad,
+                    lote: d.lote
+                }))
+            });
+        }
 
         revalidatePath("/");
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
-        return { ok: true, message: "Orden de salida registrada." };
+        revalidatePath("/orden-entrada");
+
+        return {
+            ok: true,
+            message: esAOtroCentro
+                ? `Traspaso intercentros registrado en tránsito. Código de verificación: ${codigoRecepcion}`
+                : "Orden de salida registrada.",
+            ordenId: orden.id,
+            codigoRecepcion: codigoRecepcion || undefined
+        };
     } catch (error) {
+        if (error instanceof z.ZodError) {
+            return { ok: false, message: error.issues.map((i) => i.message).join(" ") };
+        }
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
     }
 }

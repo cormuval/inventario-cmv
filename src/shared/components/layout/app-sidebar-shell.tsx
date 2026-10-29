@@ -34,6 +34,12 @@ import { ROL_ADMINISTRADOR } from "@/config/auth";
 // utils
 import { cn } from "@/shared/utils/cn";
 
+// components
+import { BotonNotificacionesPrestamos } from "@/shared/components/layout/boton-notificaciones-prestamos";
+
+// types
+import type { NotificacionesPrestamoResultado } from "@/modules/orden-entrada/actions/notificaciones-prestamos.action";
+
 export interface LayoutUserProfile {
     nombreCompleto: string;
     email: string;
@@ -45,6 +51,7 @@ export interface LayoutUserProfile {
 interface AppSidebarShellProps {
     children: ReactNode;
     profile: LayoutUserProfile;
+    notificaciones?: NotificacionesPrestamoResultado;
 }
 
 const STORAGE_KEY = "inventario-aps-sidebar-collapsed";
@@ -59,7 +66,7 @@ const baseNavItems = [
     { href: "/mantenedores", label: "Mantenedores", icon: SlidersHorizontal }
 ] as const;
 
-export function AppSidebarShell({ children, profile }: AppSidebarShellProps): React.ReactElement {
+export function AppSidebarShell({ children, profile, notificaciones }: AppSidebarShellProps): React.ReactElement {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -179,6 +186,7 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
                                     </Link>
                                 ))}
                             </div>
+                            <BotonNotificacionesPrestamos initialData={notificaciones} />
                             <form action={cerrarSesion}>
                                 <BotonCerrarSesion />
                             </form>

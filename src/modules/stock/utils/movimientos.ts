@@ -47,6 +47,13 @@ export function esLoteCaducado(fechaCaducidad: Date, hoy: Date = new Date()): bo
     return caducidadNormalizada <= hoyNormalizado;
 }
 
+export function esLoteCaducidadProximaSieteDias(fechaCaducidad: Date, hoy: Date = new Date()): boolean {
+    const hoyNormalizado = soloFecha(hoy).getTime();
+    const caducidadNormalizada = soloFecha(fechaCaducidad).getTime();
+    const sieteDiasDespues = hoyNormalizado + 7 * 24 * 60 * 60 * 1000;
+    return caducidadNormalizada > hoyNormalizado && caducidadNormalizada <= sieteDiasDespues;
+}
+
 export function validarSalidaLoteCaducado(
     tipoSalida: string,
     fechaCaducidad: Date,
