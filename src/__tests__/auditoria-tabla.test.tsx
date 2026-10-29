@@ -51,4 +51,18 @@ describe("AuditoriaTabla", () => {
         expect(screen.getByText(/consumo interno/i)).toBeInTheDocument();
         expect(screen.getByText(/bodega farmacia/i)).toBeInTheDocument();
     });
+
+    it("muestra acciones compuestas con espacios y sin guion bajo", () => {
+        render(
+            <AuditoriaTabla
+                logs={[{ ...mockLogs[0], id: "log-2", accion: "enviar_correo" }]}
+                total={1}
+                paginaActual={1}
+                paginasTotales={1}
+                onCambiarPagina={() => {}}
+            />
+        );
+
+        expect(screen.getByText("Enviar correo")).toBeInTheDocument();
+    });
 });

@@ -231,6 +231,11 @@ export function OrdenSalidaForm({
                     />
                 </div>
             )}
+            {state.ok && state.advertencia && (
+                <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 md:col-span-3" role="alert">
+                    {state.advertencia}
+                </p>
+            )}
             <div className="flex items-center gap-3 md:col-span-3">
                 <FormSubmit label="Registrar salida" />
                 <ActionMessage state={state} />

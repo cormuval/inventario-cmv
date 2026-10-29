@@ -138,6 +138,8 @@ model OrdenSalida {
     codigoSalida    String?              @map("Codigo_Salida") @db.VarChar(255)
     enviarCorreo    Boolean              @default(false) @map("Enviar_Correo")
     correoDestino   String?              @map("Correo_Destino") @db.VarChar(255)
+    fechaEnvioCorreo DateTime?           @map("Fecha_Envio_Correo")
+    errorEnvioCorreo String?             @map("Error_Envio_Correo") @db.VarChar(500)
     usuario         Usuario              @relation(fields: [usuarioId], references: [id])
     bodega          Bodega               @relation("OrdenSalidaBodegaOrigen", fields: [bodegaId], references: [id])
     bodegaDestino   Bodega?              @relation("OrdenSalidaBodegaDestino", fields: [bodegaDestinoId], references: [id])

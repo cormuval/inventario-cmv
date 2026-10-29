@@ -119,4 +119,17 @@ describe("AuditoriaFiltros - Dependencia en Cascada", () => {
         expect(new Date(filtros.fechaDesde).getTime()).toBe(new Date("2026-10-21T00:00").getTime());
         expect(new Date(filtros.fechaHasta).getTime()).toBe(new Date("2026-10-21T23:59:59.999").getTime());
     });
+
+    it("el filtro de acción ofrece la opción Enviar correo", () => {
+        render(
+            <AuditoriaFiltros
+                centros={mockCentros}
+                bodegas={mockBodegas}
+                usuarios={mockUsuarios}
+                onFiltrar={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole("option", { name: "Enviar correo" })).toHaveAttribute("value", "enviar_correo");
+    });
 });

@@ -48,7 +48,11 @@ AUTH_GOOGLE_ID="<client id>"
 AUTH_GOOGLE_SECRET="<client secret>"
 AUTH_URL="https://inventario.cmvalparaiso.cl"
 AUTH_TRUST_HOST="true"
+RESEND_API_KEY="<api key de Resend del proyecto>"
+CORREO_REMITENTE="Inventario CMV <inventario@gi.cmvalparaiso.cl>"
 ```
+
+El envío de correos (comprobante de salida) usa Resend. El subdominio `gi.cmvalparaiso.cl` está verificado en la cuenta de Resend (el remitente debe usar ese subdominio); sin `RESEND_API_KEY` la app funciona igual pero no envía correos (queda registrado como `omitido` en auditoría).
 
 Para modificarlo: *Settings → Environments → produccion → ENV_PRODUCTION* (se reemplaza completo).
 

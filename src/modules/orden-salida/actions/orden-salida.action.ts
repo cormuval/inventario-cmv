@@ -8,10 +8,11 @@ import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
+import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
 
 // schemas
-import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
+import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema, reenvioComprobanteSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
@@ -19,6 +20,7 @@ import type { ActionState } from "@/shared/types/action-state";
 // utils
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
+import { cargarOrdenParaComprobante, enviarComprobanteSalida } from "@/modules/orden-salida/utils/envio-comprobante";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -48,6 +50,16 @@ export async function listarOrdenesSalida() {
         },
         orderBy: { fecha: "desc" }
     });
+}
+
+function respuestaSalidaRegistrada(id: string, envio: ResultadoCorreo | null, para?: string): ActionState {
+    if (envio?.ok) {
+        return { ok: true, message: `Orden de salida registrada. Comprobante enviado a ${para}.`, id };
+    }
+    if (envio && !envio.omitido) {
+        return { ok: true, message: "Orden de salida registrada.", id, advertencia: `No se pudo enviar el comprobante: ${envio.error}` };
+    }
+    return { ok: true, message: "Orden de salida registrada.", id };
 }
 
 export async function crearOrdenSalida(prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -152,11 +164,26 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
         });
 
+        // El envío del comprobante nunca debe revertir ni ocultar la salida ya registrada
+        const envio = parsed.correoDestino
+            ? await enviarComprobanteSalida({
+                  ordenId: orden.id,
+                  usuarioId: user.id,
+                  para: parsed.correoDestino,
+                  reenvio: false
+              }).catch(
+                  (error: unknown): ResultadoCorreo => ({
+                      ok: false,
+                      error: error instanceof Error ? error.message : "Error inesperado al enviar el comprobante"
+                  })
+              )
+            : null;
+
         revalidatePath("/");
         revalidatePath("/stock");
         revalidatePath("/orden-salida");
         revalidatePath("/reporte");
-        return { ok: true, message: "Orden de salida registrada.", id: orden.id };
+        return respuestaSalidaRegistrada(orden.id, envio, parsed.correoDestino);
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
     }
@@ -419,20 +446,7 @@ export async function descargarComprobanteSalidaAction(
     ordenId: string
 ): Promise<{ ok: boolean; base64?: string; filename?: string; error?: string }> {
     try {
-        const orden = await prisma.ordenSalida.findUnique({
-            where: { id: ordenId },
-            include: {
-                centro: { select: { nombre: true } },
-                bodega: { select: { nombre: true } },
-                bodegaDestino: { select: { nombre: true } },
-                usuario: { select: { nombre: true, apPaterno: true, email: true } },
-                detalles: {
-                    include: {
-                        producto: { select: { descripcion: true } }
-                    }
-                }
-            }
-        });
+        const orden = await cargarOrdenParaComprobante(ordenId);
 
         if (!orden) {
             return { ok: false, error: "Orden de salida no encontrada" };
@@ -452,5 +466,53 @@ export async function descargarComprobanteSalidaAction(
             ok: false,
             error: error instanceof Error ? error.message : "Error al generar comprobante PDF"
         };
+    }
+}
+
+export async function reenviarComprobanteSalidaAction(ordenId: string, correo: string): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeOperarSalida(user.rol)) {
+            return { ok: false, message: "No tienes permiso para enviar comprobantes." };
+        }
+
+        const parsed = reenvioComprobanteSchema.safeParse({ ordenId, correo });
+        if (!parsed.success) {
+            return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+        }
+
+        const orden = await prisma.ordenSalida.findUnique({
+            where: { id: parsed.data.ordenId },
+            select: { id: true, centroId: true, bodegaId: true, correoDestino: true }
+        });
+        if (!orden) {
+            return { ok: false, message: "Orden de salida no encontrada." };
+        }
+        await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId);
+
+        if (orden.correoDestino !== parsed.data.correo) {
+            await prisma.ordenSalida.update({
+                where: { id: orden.id },
+                data: { correoDestino: parsed.data.correo }
+            });
+        }
+
+        const envio = await enviarComprobanteSalida({
+            ordenId: orden.id,
+            usuarioId: user.id,
+            para: parsed.data.correo,
+            reenvio: true
+        });
+        revalidatePath("/orden-salida");
+
+        if (envio.ok) {
+            return { ok: true, message: `Comprobante enviado a ${parsed.data.correo}.` };
+        }
+        if (envio.omitido) {
+            return { ok: false, message: "El envío de correos no está configurado en este entorno." };
+        }
+        return { ok: false, message: `No se pudo enviar el comprobante: ${envio.error}` };
+    } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : "No se pudo enviar el comprobante." };
     }
 }
