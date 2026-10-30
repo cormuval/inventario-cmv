@@ -9,7 +9,7 @@
 
 ## 1. Problema
 
-El inventario de los centros de salud se opera hoy en AppSheet, sobre MySQL 8.0 en el VPS `46.202.151.191` (base `inventario`). El sistema nuevo ya está desplegado en https://inventario.cmvalparaiso.cl (base `inventario_cmv` en server-das), pero solo tiene roles y administradores. Hay que traspasar los datos sin modificar la base AppSheet, que sigue en uso hasta el corte.
+El inventario de los centros de salud se opera hoy en AppSheet, sobre MySQL 8.0 en el VPS de AppSheet (base `inventario`). El sistema nuevo ya está desplegado en https://inventario.cmvalparaiso.cl (base `inventario_cmv` en server-das), pero solo tiene roles y administradores. Hay que traspasar los datos sin modificar la base AppSheet, que sigue en uso hasta el corte.
 
 ## 2. Objetivo
 

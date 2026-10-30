@@ -82,7 +82,7 @@ pm2 restart inventario-cmv
 
 ## 6. Migración de datos desde AppSheet (pendiente)
 
-La base de producción actual (AppSheet) está en el VPS `46.202.151.191` y **no se modifica**. La migración se hará al final, tras validar el deploy:
+La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. La migración se hará al final, tras validar el deploy:
 
 1. Comparar el esquema de la base AppSheet con `prisma/schema.prisma` (las tablas y columnas ya usan los nombres de AppSheet: `Centro`, `Bodega`, `Encargados_Bodegas`, `ID_User`, …).
 2. Script `migracion:appsheet` (mismo patrón que *gestión de la demanda*): lee el VPS con un usuario de solo lectura, simula sin `--ejecutar`, genera reporte e inserta por clave primaria original (`INSERT IGNORE`).
