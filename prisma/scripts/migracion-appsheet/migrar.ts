@@ -178,10 +178,14 @@ async function main(): Promise<void> {
         console.log(`Destino: ${baseDestino} · modo: ${opciones.ejecutar ? "EJECUTAR" : "simulación"}${opciones.vaciar ? " · vaciar" : ""}`);
         const datos = await leerOrigen(origen);
         await verificarDestino(destino);
-        if (opciones.vaciar !== null) await vaciarDestino(destino);
 
-        const usuariosDestino = await destino.usuario.findMany({ select: { id: true, email: true } });
+        // Con --vaciar se borran los usuarios fuera del centro técnico: no pueden ser destino de reasignaciones.
+        const usuariosDestino = await destino.usuario.findMany({
+            where: opciones.vaciar !== null ? { centroId: CENTRO_ADMINISTRACION_ID } : undefined,
+            select: { id: true, email: true }
+        });
         const migracion = transformarTodo(datos, { usuariosDestino, ahora: new Date() });
+        if (opciones.vaciar !== null) await vaciarDestino(destino);
 
         let insertados: Record<Tabla, number> | null = null;
         let diferencias: Diferencia[] | null = null;

@@ -111,9 +111,10 @@ npm run migracion:appsheet -- --ejecutar --vaciar=inventario
 ssh informesdiarios
 cd /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv
 M=/var/www/inventario-aps/migracion
+R=$M/reporte-$(date +%F-%H%M)
 mysqldump --no-tablespaces inventario_cmv > $M/respaldo-$(date +%F-%H%M).sql   # credenciales en ~/.my.cnf
-npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$M/reporte-$(date +%F-%H%M)
-npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$M/reporte-$(date +%F-%H%M) --ejecutar --vaciar=inventario_cmv
+npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R
+npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R --ejecutar --vaciar=inventario_cmv
 ```
 
 Pasos:
