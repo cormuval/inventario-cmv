@@ -81,6 +81,8 @@ Cada regla devuelve la fila transformada (con advertencias opcionales) o un rech
   - El rol R04 pasa a R02, con advertencia.
   - El rol `dac3497d` (ADMIN ASEO) se rechaza (`rol_no_migrado`).
   - Si el email (normalizado a minúsculas y sin espacios) **ya existe en el destino** (por ejemplo, un admin del seed), se conserva la fila del destino. El ID de AppSheet se registra en un mapa de reasignación hacia el ID del destino.
+    - Esta regla se evalúa **primero**, antes que las de rol y centro: en AppSheet, `rvergara@` y `dsantibanez@` están en "Centro Prueba", y `dsantibanez@` tiene el rol ADMIN ASEO.
+    - Solo cuentan los usuarios del destino cuyo ID no viene de AppSheet. Así, un usuario cargado en una ejecución anterior no se reasigna a sí mismo y la simulación es determinista.
   - Si el email está **duplicado en el origen**, se conserva el ID con más órdenes (entradas más salidas) y el otro se reasigna a él, con advertencia.
   - Si el email no es del dominio `@cmvalparaiso.cl`, se migra con advertencia (no podrá iniciar sesión).
   - `Telefono` se convierte a texto; `0` o nulo pasan a `null`.
@@ -91,6 +93,10 @@ Cada regla devuelve la fila transformada (con advertencias opcionales) o un rech
 
 - `ID_User` se resuelve con el mapa de reasignación. Si no existe, se usa el usuario técnico, con advertencia `usuario_inexistente`.
 - **Orden de entrada o de salida** con bodega inexistente, o cuyo centro no coincide con el de la bodega: se rechaza.
+- **Excepción: salidas "A Otros Centros"** (371). AppSheet guarda en `ID_Centro` el **centro de destino**.
+  - `centroId` toma el centro de la bodega de origen, que define el alcance.
+  - `destino` queda como `"{Destino} — {nombre del centro de destino}"`, recortado a 255 caracteres.
+  - Se registra la advertencia `centro_destino`.
 - **Detalle sin su orden** (o cuya orden fue rechazada): se rechaza.
 - **Detalle con producto inexistente** o cantidad nula o ≤ 0: se rechaza.
 - **Lote vacío o nulo:** queda `"SIN LOTE"`, con advertencia.
@@ -103,6 +109,7 @@ Cada regla devuelve la fila transformada (con advertencias opcionales) o un rech
 - La tabla `Stock` es la fuente de verdad.
 - Se migran todas las filas, incluidas las de saldo 0, porque conservan el `StockMinimo`.
 - Lote vacío y caducidad nula siguen las reglas de 5.2.
+- `Cantidad_Disponible` nula (3 filas) pasa a 0, con advertencia.
 - Las filas con la misma clave `(producto, bodega, lote, caducidad)`, ya normalizada, se **fusionan**:
   - se suman `Cantidad_Disponible`;
   - se toma el `StockMinimo` mayor;
