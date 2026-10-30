@@ -15,6 +15,7 @@
         "db:migrate:deploy": "prisma migrate deploy",
         "db:seed": "tsx prisma/seed.ts",
         "db:seed:test-caducado": "tsx prisma/seed-test-caducado.ts",
+        "migracion:appsheet": "tsx prisma/scripts/migracion-appsheet/migrar.ts",
         "db:studio": "prisma studio",
         "services:up": "docker compose up -d",
         "services:down": "docker compose down"
