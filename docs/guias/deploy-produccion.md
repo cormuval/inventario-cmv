@@ -80,13 +80,57 @@ pm2 restart inventario-cmv
 
 ---
 
-## 6. Migración de datos desde AppSheet (pendiente)
+## 6. Migración de datos desde AppSheet
 
-La base de producción actual (AppSheet) está en el VPS `46.202.151.191` y **no se modifica**. La migración se hará al final, tras validar el deploy:
+La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. Se lee con el usuario `inventario_lectura` (`SELECT, SHOW VIEW` sobre `inventario.*`), restringido a las IPs de server-das y del equipo del responsable. Diseño: `docs/superpowers/specs/2026-10-29-migracion-appsheet-design.md`.
 
-1. Comparar el esquema de la base AppSheet con `prisma/schema.prisma` (las tablas y columnas ya usan los nombres de AppSheet: `Centro`, `Bodega`, `Encargados_Bodegas`, `ID_User`, …).
-2. Script `migracion:appsheet` (mismo patrón que *gestión de la demanda*): lee el VPS con un usuario de solo lectura, simula sin `--ejecutar`, genera reporte e inserta por clave primaria original (`INSERT IGNORE`).
-3. Ensayo en una base `inventario_ensayo` y validación de stock por bodega y lote.
-4. Corte: AppSheet en solo lectura → migración final → apertura del sistema nuevo.
+```bash
+# .env.migracion (no se versiona):
+# ORIGEN_DATABASE_URL="mysql://inventario_lectura:<password>@<host VPS>:3306/inventario"
+npm run migracion:appsheet                                   # simulación: solo reporte
+npm run migracion:appsheet -- --ejecutar --vaciar=<base>     # vacía lo migrado y carga
+```
 
-Los administradores creados por el seed quedan en el centro técnico `Administracion DAS`; tras migrar los centros reales se reasignan desde *Mantenedores*.
+- **Destino:** `DATABASE_URL` de `.env`, o `DESTINO_DATABASE_URL` si existe.
+- **Reporte:** `migracion-appsheet-<fecha>/`, o la ruta de `--salida`. Contiene `resumen.json`, `rechazos-*.csv`, `advertencias-*.csv`, `reasignaciones.json` y `validacion.json`. El script termina con error si la validación encuentra diferencias.
+- **`--vaciar`:** conserva los roles, el centro `Administracion DAS` y sus usuarios. **No reasignar a los administradores del seed a centros reales antes del corte**, porque `--vaciar` los borraría.
+
+### 6.1 Ensayo local
+
+```bash
+SEED_DEMO=false npm run db:seed        # crea el centro técnico si la base local no lo tiene
+npm run migracion:appsheet
+npm run migracion:appsheet -- --ejecutar --vaciar=inventario
+```
+
+### 6.2 Ensayo y corte en producción (server-das)
+
+`actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en `/var/www/inventario-aps/migracion/`.
+
+Antes de empezar, confirmar en GitHub Actions que "Deploy Produccion" no está en ejecución y **no hacer merge a `main` durante la migración**: un deploy limpia el directorio del runner y reescribe `.env`.
+
+```bash
+ssh informesdiarios
+cd /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv
+M=/var/www/inventario-aps/migracion
+F=$(date +%F-%H%M)
+R=$M/reporte-$F
+B=$M/respaldo-$F.sql
+# Ensayo (solo reporte):
+npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R-simulacion
+# Carga: el respaldo condiciona el vaciado (credenciales de mysqldump en ~/.my.cnf)
+mysqldump --no-tablespaces inventario_cmv > "$B" && test -s "$B" && \
+    npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R-carga --ejecutar --vaciar=inventario_cmv
+```
+
+Si la carga falla: repetir el último comando (`--ejecutar --vaciar=inventario_cmv`; el vaciado deja la base lista para reintentar) o restaurar el respaldo con `mysql inventario_cmv < "$B"`.
+
+Pasos:
+1. **Ensayo:** se ejecuta y se revisa https://inventario.cmvalparaiso.cl. La URL no se difunde hasta el corte, porque los usuarios migrados quedan activos.
+2. **Corte:**
+   - AppSheet pasa a solo lectura;
+   - respaldo;
+   - `--ejecutar --vaciar=inventario_cmv`;
+   - se revisa `validacion.json`;
+   - apertura a los usuarios.
+3. **Después del corte:** reasignar desde *Mantenedores* a los administradores del centro técnico `Administracion DAS`.
