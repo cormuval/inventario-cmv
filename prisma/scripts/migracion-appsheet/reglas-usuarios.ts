@@ -99,21 +99,25 @@ export function transformarUsuarios(filas: UsuarioOrigen[], contexto: ContextoUs
         const ordenados = [...grupo].sort(
             (a, b) => (contexto.ordenesPorUsuario.get(b.id) ?? 0) - (contexto.ordenesPorUsuario.get(a.id) ?? 0) || a.id.localeCompare(b.id)
         );
-        const [principal, ...resto] = ordenados;
-        for (const duplicado of resto) {
-            reasignaciones.set(duplicado.id, principal.id);
-            tabla.advertencias.push(rechazo("Usuario", duplicado.id, "email_duplicado", `Email repetido: se reasigna a ${principal.id}`));
-        }
-        const resultado = transformarUsuario(principal, contexto);
-        if (resultado.ok) {
+        // Se prueba cada candidato en orden; el primero aceptado gana y los no probados se reasignan a él.
+        for (let indice = 0; indice < ordenados.length; indice++) {
+            const candidato = ordenados[indice];
+            const resultado = transformarUsuario(candidato, contexto);
+            if (!resultado.ok) {
+                tabla.rechazos.push(resultado.rechazo);
+                continue;
+            }
             tabla.aceptados.push(resultado.data);
             tabla.advertencias.push(...resultado.advertencias);
-        } else {
-            tabla.rechazos.push(resultado.rechazo);
+            for (const pendiente of ordenados.slice(indice + 1)) {
+                reasignaciones.set(pendiente.id, candidato.id);
+                tabla.advertencias.push(rechazo("Usuario", pendiente.id, "email_duplicado", `Email repetido: se reasigna a ${candidato.id}`));
+            }
+            break;
         }
     }
 
-    tabla.aceptados.push(USUARIO_TECNICO);
+    tabla.aceptados.push({ ...USUARIO_TECNICO });
     return { tabla, reasignaciones };
 }
 

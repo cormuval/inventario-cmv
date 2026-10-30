@@ -106,6 +106,20 @@ describe("reglas de usuarios", () => {
         expect(r.tabla.advertencias.map((a) => [a.clave, a.regla])).toContainEqual(["d4", "email_duplicado"]);
     });
 
+    it("email duplicado: si el ganador es rechazado, gana el siguiente candidato sin reasignaciones", () => {
+        const r = transformarUsuarios(
+            [
+                usuario({ ID_User: "d4", Email: "ccastillos@cmvalparaiso.cl" }),
+                usuario({ ID_User: "1f", Email: "CCastillos@cmvalparaiso.cl", Rol: "dac3497d" })
+            ],
+            contexto({ ordenesPorUsuario: new Map([["d4", 2], ["1f", 9]]) })
+        );
+        expect(r.tabla.aceptados.map((u) => u.id)).toEqual(["d4", "migracion-appsheet"]);
+        expect(r.tabla.rechazos.map((x) => [x.clave, x.regla])).toEqual([["1f", "rol_no_migrado"]]);
+        expect(r.reasignaciones.has("1f")).toBe(false);
+        expect(r.reasignaciones.has("d4")).toBe(false);
+    });
+
     it("centro de prueba o inexistente se rechaza; bodega de otro centro queda null", () => {
         const r = transformarUsuarios(
             [
