@@ -47,6 +47,12 @@ describe("reglas de stock", () => {
         expect(r.advertencias.map((a) => [a.clave, a.regla, a.detalle])).toEqual([["s2", "stock_fusionado", "Fusionado en s1"]]);
     });
 
+    it("fusiona lotes que difieren solo por acento o mayúsculas", () => {
+        const r = transformarStock([stock({ Lote: "Lóte1" }), stock({ ID_Stock: "s2", Lote: "lote1", Cantidad_Disponible: 4 })], CONTEXTO_STOCK);
+        expect(r.aceptados.map((x) => [x.id, x.cantidadDisponible])).toEqual([["s1", 9]]);
+        expect(r.advertencias.map((a) => [a.clave, a.regla])).toEqual([["s2", "stock_fusionado"]]);
+    });
+
     it("rechaza bodega de prueba, bodega y producto inexistentes; cantidad nula pasa a 0", () => {
         const r = transformarStock(
             [

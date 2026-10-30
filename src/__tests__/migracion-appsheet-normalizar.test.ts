@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 // migracion
 import {
     booleano,
+    claveComparable,
     claveUnica,
     email,
     entero,
@@ -88,5 +89,10 @@ describe("normalizar", () => {
         expect(ok.lote).toBe("L-1");
         expect(ok.fechaCaducidad).toEqual(new Date(Date.UTC(2027, 0, 31)));
         expect(ok.advertencias).toEqual([]);
+    });
+
+    it("claveComparable ignora mayúsculas y acentos como utf8mb4_unicode_ci", () => {
+        expect(claveComparable("Lóte A")).toBe(claveComparable("lote a"));
+        expect(claveComparable("Cajá")).toBe("caja");
     });
 });

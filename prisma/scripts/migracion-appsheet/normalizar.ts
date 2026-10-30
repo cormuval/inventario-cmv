@@ -46,6 +46,11 @@ export function recortar(valor: string, maximo = 255): string {
     return valor.length > maximo ? valor.slice(0, maximo) : valor;
 }
 
+// MySQL (utf8mb4_unicode_ci) compara sin distinguir mayúsculas ni acentos: las claves de deduplicación deben hacer lo mismo.
+export function claveComparable(valor: string): string {
+    return valor.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
 export function claveFecha(valor: Date): string {
     return valor.toISOString().slice(0, 10);
 }

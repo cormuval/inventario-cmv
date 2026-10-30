@@ -107,15 +107,23 @@ npm run migracion:appsheet -- --ejecutar --vaciar=inventario
 
 `actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en `/var/www/inventario-aps/migracion/`.
 
+Antes de empezar, confirmar en GitHub Actions que "Deploy Produccion" no está en ejecución y **no hacer merge a `main` durante la migración**: un deploy limpia el directorio del runner y reescribe `.env`.
+
 ```bash
 ssh informesdiarios
 cd /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv
 M=/var/www/inventario-aps/migracion
-R=$M/reporte-$(date +%F-%H%M)
-mysqldump --no-tablespaces inventario_cmv > $M/respaldo-$(date +%F-%H%M).sql   # credenciales en ~/.my.cnf
-npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R
-npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R --ejecutar --vaciar=inventario_cmv
+F=$(date +%F-%H%M)
+R=$M/reporte-$F
+B=$M/respaldo-$F.sql
+# Ensayo (solo reporte):
+npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R-simulacion
+# Carga: el respaldo condiciona el vaciado (credenciales de mysqldump en ~/.my.cnf)
+mysqldump --no-tablespaces inventario_cmv > "$B" && test -s "$B" && \
+    npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$R-carga --ejecutar --vaciar=inventario_cmv
 ```
+
+Si la carga falla: repetir el último comando (`--ejecutar --vaciar=inventario_cmv`; el vaciado deja la base lista para reintentar) o restaurar el respaldo con `mysql inventario_cmv < "$B"`.
 
 Pasos:
 1. **Ensayo:** se ejecuta y se revisa https://inventario.cmvalparaiso.cl. La URL no se difunde hasta el corte, porque los usuarios migrados quedan activos.

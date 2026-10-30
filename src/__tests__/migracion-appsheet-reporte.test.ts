@@ -80,6 +80,14 @@ describe("opciones", () => {
         });
     });
 
+    it("leerOpciones rechaza argumentos mal formados", () => {
+        expect(() => leerOpciones(["--ejecutar", "--vaciar", "inventario_cmv"], "M")).toThrow(/--vaciar/);
+        expect(() => leerOpciones(["--vaciar"], "M")).toThrow(/--vaciar/);
+        expect(() => leerOpciones(["--vaciar="], "M")).toThrow(/--vaciar=/);
+        expect(() => leerOpciones(["--ejecutar=true"], "M")).toThrow(/--ejecutar=true/);
+        expect(() => leerOpciones(["--foo"], "M")).toThrow(/--foo/);
+    });
+
     it("nombreBase extrae la base de la URL", () => {
         expect(nombreBase("mysql://u:p@localhost:3306/inventario_cmv?connection_limit=1")).toBe("inventario_cmv");
     });
@@ -90,5 +98,10 @@ describe("opciones", () => {
         expect(() => validarOpciones({ ...base, ejecutar: false }, "inventario_cmv")).toThrow(/--vaciar exige --ejecutar/);
         expect(() => validarOpciones({ ...base, vaciar: "otra" }, "inventario_cmv")).toThrow(/inventario_cmv/);
         expect(() => validarOpciones({ ...base, vaciar: null, ejecutar: false }, "inventario_cmv")).not.toThrow();
+    });
+
+    it("validarOpciones rechaza una base de destino vacía", () => {
+        const base = { ejecutar: true, vaciar: null, salida: "x", origenEnv: ".env.migracion" };
+        expect(() => validarOpciones(base, "")).toThrow(/base de destino/);
     });
 });

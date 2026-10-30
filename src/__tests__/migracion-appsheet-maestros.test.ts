@@ -43,6 +43,28 @@ describe("reglas de maestros", () => {
         ]);
     });
 
+    it("unidades: rechaza descripción que difiere solo por acento", () => {
+        const r = transformarUnidades([
+            { ID_Unidad: "u1", Descripcion: "Cajá" },
+            { ID_Unidad: "u2", Descripcion: "caja" }
+        ]);
+        expect(r.aceptados.map((x) => x.id)).toEqual(["u1"]);
+        expect(r.rechazos.map((x) => [x.clave, x.regla])).toEqual([["u2", "descripcion_duplicada"]]);
+    });
+
+    it("productos: rechaza ids menores o iguales a cero", () => {
+        const r = transformarProductos([
+            { ID_Product: 0, Linea: "Aseo", Descripcion: "Cero" },
+            { ID_Product: -3, Linea: "Aseo", Descripcion: "Negativo" },
+            { ID_Product: 5, Linea: "Aseo", Descripcion: "Bueno" }
+        ]);
+        expect(r.aceptados.map((x) => x.id)).toEqual([5]);
+        expect(r.rechazos.map((x) => [x.clave, x.regla])).toEqual([
+            ["0", "clave_invalida"],
+            ["-3", "clave_invalida"]
+        ]);
+    });
+
     it("unidades: rechaza descripción repetida sin distinguir mayúsculas", () => {
         const r = transformarUnidades([
             { ID_Unidad: "u1", Descripcion: "Caja" },

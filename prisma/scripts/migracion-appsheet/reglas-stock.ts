@@ -1,7 +1,7 @@
 // Reglas de stock (spec, sección 5.3): la tabla Stock de AppSheet es la fuente de verdad.
 
 // migracion
-import { claveFecha, claveUnica, entero, fecha, normalizarLoteCaducidad, nuevaTabla, rechazo, texto } from "./normalizar";
+import { claveComparable, claveFecha, claveUnica, entero, fecha, normalizarLoteCaducidad, nuevaTabla, rechazo, texto } from "./normalizar";
 import type { StockDestino, StockOrigen, TablaTransformada } from "./tipos";
 
 export interface ContextoStock {
@@ -52,8 +52,8 @@ export function transformarStock(filas: StockOrigen[], contexto: ContextoStock):
             fechaCaducidad: loteCaducidad.fechaCaducidad
         };
 
-        // stock_lote_unico: MySQL compara el lote sin distinguir mayúsculas.
-        const clave = `${productoId}|${bodegaId}|${loteCaducidad.lote.toLowerCase()}|${claveFecha(loteCaducidad.fechaCaducidad)}`;
+        // stock_lote_unico: MySQL compara el lote sin distinguir mayúsculas ni acentos.
+        const clave = `${productoId}|${bodegaId}|${claveComparable(loteCaducidad.lote)}|${claveFecha(loteCaducidad.fechaCaducidad)}`;
         const principal = porClave.get(clave);
         if (principal === undefined) {
             porClave.set(clave, filaDestino);

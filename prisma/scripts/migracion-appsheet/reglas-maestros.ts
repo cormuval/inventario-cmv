@@ -1,7 +1,7 @@
 // Reglas de maestros: Centro, Bodega, Unidad y Producto (spec, sección 5.1).
 
 // migracion
-import { claveUnica, entero, estado, nuevaTabla, rechazo, recortar, texto } from "./normalizar";
+import { claveComparable, claveUnica, entero, estado, nuevaTabla, rechazo, recortar, texto } from "./normalizar";
 import {
     CENTRO_PRUEBA_ID,
     type BodegaDestino,
@@ -72,8 +72,8 @@ export function transformarUnidades(filas: UnidadOrigen[]): TablaTransformada<Un
             resultado.rechazos.push(rechazo("Unidad", id, "campo_requerido", "Descripción vacía"));
             continue;
         }
-        // Descripcion es única en el destino y MySQL compara sin distinguir mayúsculas.
-        const claveDescripcion = descripcion.toLowerCase();
+        // Descripcion es única en el destino y MySQL compara sin distinguir mayúsculas ni acentos.
+        const claveDescripcion = claveComparable(descripcion);
         if (descripciones.has(claveDescripcion)) {
             resultado.rechazos.push(rechazo("Unidad", id, "descripcion_duplicada", `Descripción "${descripcion}" repetida`));
             continue;
@@ -90,6 +90,10 @@ export function transformarProductos(filas: ProductoOrigen[]): TablaTransformada
     for (const fila of filas) {
         const id = entero(fila.ID_Product);
         if (claveUnica("Producto", id, vistos, resultado) === null || id === null) continue;
+        if (id <= 0) {
+            resultado.rechazos.push(rechazo("Producto", String(id), "clave_invalida", "ID de producto menor o igual a cero"));
+            continue;
+        }
         const linea = texto(fila.Linea);
         const descripcion = texto(fila.Descripcion);
         if (linea === null || descripcion === null) {
