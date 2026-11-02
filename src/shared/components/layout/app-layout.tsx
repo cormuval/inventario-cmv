@@ -21,11 +21,7 @@ export async function AppLayout({ children }: { children: ReactNode }): Promise<
 
     const profile = await obtenerLayoutUserProfile(user.id);
 
-    return (
-        <AppSidebarShell profile={profile}>
-            {children}
-        </AppSidebarShell>
-    );
+    return <AppSidebarShell profile={profile}>{children}</AppSidebarShell>;
 }
 
 async function obtenerLayoutUserProfile(userId: string): Promise<LayoutUserProfile> {
@@ -35,6 +31,7 @@ async function obtenerLayoutUserProfile(userId: string): Promise<LayoutUserProfi
             nombre: true,
             apPaterno: true,
             email: true,
+            rolId: true,
             rol: { select: { descripcion: true } },
             centro: { select: { nombre: true } },
             bodega: { select: { id: true, nombre: true, centro: { select: { nombre: true } } } },
@@ -66,6 +63,7 @@ async function obtenerLayoutUserProfile(userId: string): Promise<LayoutUserProfi
         nombreCompleto: [usuario.nombre, usuario.apPaterno].filter(Boolean).join(" "),
         email: usuario.email,
         rol: usuario.rol.descripcion,
+        rolId: usuario.rolId,
         centro: usuario.centro.nombre,
         bodegas: [...bodegas.values()]
     };

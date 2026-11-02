@@ -18,7 +18,8 @@ describe("Acceso en Barra Lateral a Auditoría", () => {
                 profile={{
                     nombreCompleto: "Admin Central",
                     email: "admin@cmvalparaiso.cl",
-                    rol: "R01",
+                    rol: "Administrador",
+                    rolId: "R01",
                     centro: "CESFAM Centro",
                     bodegas: ["Bodega 1"]
                 }}
@@ -35,7 +36,8 @@ describe("Acceso en Barra Lateral a Auditoría", () => {
                 profile={{
                     nombreCompleto: "Operador Bodega",
                     email: "operador@cmvalparaiso.cl",
-                    rol: "R07",
+                    rol: "Operador Salida",
+                    rolId: "R07",
                     centro: "CESFAM Centro",
                     bodegas: ["Bodega 1"]
                 }}

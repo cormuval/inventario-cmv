@@ -3,18 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    Archive,
-    Boxes,
     Building2,
-    ClipboardList,
-    FileBarChart,
     HeartPulse,
-    History,
-    Package,
     PanelLeftClose,
     PanelLeftOpen,
     ShieldCheck,
-    SlidersHorizontal,
     Warehouse
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -26,10 +19,8 @@ import { cerrarSesion } from "@/modules/auth/actions/auth.action";
 
 // components
 import { BotonCerrarSesion } from "@/modules/auth/components/boton-cerrar-sesion";
+import { aplanarMenu, construirMenu, esRutaActiva, type EnlaceMenu } from "@/shared/components/layout/menu";
 import { Button } from "@/shared/components/ui/button";
-
-// config
-import { ROL_ADMINISTRADOR } from "@/config/auth";
 
 // utils
 import { cn } from "@/shared/utils/cn";
@@ -38,6 +29,7 @@ export interface LayoutUserProfile {
     nombreCompleto: string;
     email: string;
     rol: string;
+    rolId: string;
     centro: string;
     bodegas: string[];
 }
@@ -49,30 +41,13 @@ interface AppSidebarShellProps {
 
 const STORAGE_KEY = "inventario-aps-sidebar-collapsed";
 
-const baseNavItems = [
-    { href: "/", label: "Resumen", icon: Boxes },
-    { href: "/stock", label: "Stock", icon: Archive },
-    { href: "/productos", label: "Productos", icon: Package },
-    { href: "/orden-entrada", label: "Orden entrada", icon: ClipboardList },
-    { href: "/orden-salida", label: "Orden salida", icon: ClipboardList },
-    { href: "/reporte", label: "Reporte", icon: FileBarChart },
-    { href: "/mantenedores", label: "Mantenedores", icon: SlidersHorizontal }
-] as const;
-
 export function AppSidebarShell({ children, profile }: AppSidebarShellProps): React.ReactElement {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mounted, setMounted] = useState(false);
 
-    const navItems = useMemo(() => {
-        if (profile.rol === ROL_ADMINISTRADOR) {
-            return [
-                ...baseNavItems,
-                { href: "/auditoria", label: "Auditoría", icon: History }
-            ];
-        }
-        return baseNavItems;
-    }, [profile.rol]);
+    const menu = useMemo(() => construirMenu(profile.rolId), [profile.rolId]);
+    const enlacesMoviles = useMemo(() => aplanarMenu(menu).slice(1, 5), [menu]);
 
     useEffect(() => {
         setMounted(true);
@@ -98,43 +73,51 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
                 )}
             >
                 <div className={cn("border-b border-teal-100 px-4 py-4", isCollapsed && "px-3")}>
-                    <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-teal-600 text-white shadow-sm">
-                            <HeartPulse className="h-5 w-5" />
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white shadow-sm shadow-teal-900/20">
+                            <HeartPulse className="h-6 w-6" />
                         </div>
                         {!isCollapsed && (
                             <div className="min-w-0">
-                                <p className="text-xs font-medium uppercase text-teal-700">Inventario APS</p>
-                                <h1 className="truncate text-lg font-semibold text-slate-950">Valparaiso</h1>
+                                <h1 className="truncate text-base font-bold tracking-tight text-slate-950">
+                                    Inventario CMV
+                                </h1>
+                                <p className="truncate text-xs font-medium text-teal-700">Atencion Primaria de Salud</p>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex flex-1 flex-col justify-between overflow-y-auto">
                     <nav className={cn("space-y-1 p-3", isCollapsed && "px-2")}>
-                        {navItems.map((item) => {
-                            const active = pathname === item.href;
-
-                            return (
-                                <Link
+                        {menu.map((item) =>
+                            item.tipo === "enlace" ? (
+                                <EnlaceLateral
                                     key={item.href}
-                                    href={item.href}
-                                    title={isCollapsed ? item.label : undefined}
-                                    aria-label={item.label}
-                                    className={cn(
-                                        "flex h-10 items-center rounded-md text-sm font-medium transition-colors",
-                                        isCollapsed ? "justify-center px-2" : "gap-3 px-3",
-                                        active
-                                            ? "bg-teal-600 text-white shadow-sm shadow-teal-900/10"
-                                            : "text-slate-600 hover:bg-teal-50 hover:text-teal-800"
+                                    item={item}
+                                    activo={esRutaActiva(pathname, item.href)}
+                                    colapsado={isCollapsed}
+                                />
+                            ) : (
+                                <div key={item.label} role="group" aria-label={item.label} className="space-y-1">
+                                    {!isCollapsed && (
+                                        <p className="flex items-center gap-3 px-3 pt-3 text-xs font-semibold uppercase text-slate-500">
+                                            <item.icon className="h-4 w-4 shrink-0" />
+                                            {item.label}
+                                        </p>
                                     )}
-                                >
-                                    <item.icon className="h-4 w-4 shrink-0" />
-                                    {!isCollapsed && <span className="truncate">{item.label}</span>}
-                                </Link>
-                            );
-                        })}
+                                    {item.items.map((subItem) => (
+                                        <EnlaceLateral
+                                            key={subItem.href}
+                                            item={subItem}
+                                            activo={esRutaActiva(pathname, subItem.href)}
+                                            colapsado={isCollapsed}
+                                            sangria
+                                        />
+                                    ))}
+                                </div>
+                            )
+                        )}
                     </nav>
 
                     <div className={cn("mt-auto border-t border-teal-100 p-3", isCollapsed && "px-2")}>
@@ -169,7 +152,7 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex gap-2 lg:hidden">
-                                {navItems.slice(1, 5).map((item) => (
+                                {enlacesMoviles.map((item) => (
                                     <Link
                                         key={item.href}
                                         href={item.href}
@@ -188,6 +171,38 @@ export function AppSidebarShell({ children, profile }: AppSidebarShellProps): Re
                 <main className="mx-auto max-w-7xl px-4 py-6 lg:px-8">{children}</main>
             </div>
         </div>
+    );
+}
+
+function EnlaceLateral({
+    item,
+    activo,
+    colapsado,
+    sangria = false
+}: {
+    item: EnlaceMenu;
+    activo: boolean;
+    colapsado: boolean;
+    sangria?: boolean;
+}): React.ReactElement {
+    return (
+        <Link
+            href={item.href}
+            title={colapsado ? item.label : undefined}
+            aria-label={item.label}
+            aria-current={activo ? "page" : undefined}
+            className={cn(
+                "flex h-10 items-center rounded-md text-sm font-medium transition-colors",
+                colapsado ? "justify-center px-2" : "gap-3 px-3",
+                sangria && !colapsado && "pl-9",
+                activo
+                    ? "bg-teal-600 text-white shadow-sm shadow-teal-900/10"
+                    : "text-slate-600 hover:bg-teal-50 hover:text-teal-800"
+            )}
+        >
+            <item.icon className="h-4 w-4 shrink-0" />
+            {!colapsado && <span className="truncate">{item.label}</span>}
+        </Link>
     );
 }
 

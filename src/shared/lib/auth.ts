@@ -1,5 +1,5 @@
 // config
-import { ROL_ADMINISTRADOR } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROLES_OPERAN_ENTRADA, ROLES_OPERAN_SALIDA } from "@/config/auth";
 
 // lib
 import { auth } from "@/auth";
@@ -77,9 +77,9 @@ export function puedeAdministrar(rol: string): boolean {
 }
 
 export function puedeOperarEntrada(rol: string): boolean {
-    return [ROL_ADMINISTRADOR, "R03", "R06", "R07"].includes(rol);
+    return (ROLES_OPERAN_ENTRADA as readonly string[]).includes(rol);
 }
 
 export function puedeOperarSalida(rol: string): boolean {
-    return [ROL_ADMINISTRADOR, "R03", "R07"].includes(rol);
+    return (ROLES_OPERAN_SALIDA as readonly string[]).includes(rol);
 }
