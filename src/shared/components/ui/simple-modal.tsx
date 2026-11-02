@@ -12,15 +12,21 @@ interface SimpleModalProps {
     triggerLabel: string;
     triggerClassName?: string;
     children: React.ReactNode;
+    onOpenChange?: (abierto: boolean) => void;
 }
 
-export function SimpleModal({ title, triggerLabel, triggerClassName, children }: SimpleModalProps): React.ReactElement {
+export function SimpleModal({ title, triggerLabel, triggerClassName, children, onOpenChange }: SimpleModalProps): React.ReactElement {
     const [open, setOpen] = useState(false);
     const titleId = useId();
 
+    function cambiarApertura(abierto: boolean): void {
+        setOpen(abierto);
+        onOpenChange?.(abierto);
+    }
+
     return (
         <>
-            <Button type="button" variant="outline" size="sm" className={triggerClassName} onClick={() => setOpen(true)}>
+            <Button type="button" variant="outline" size="sm" className={triggerClassName} onClick={() => cambiarApertura(true)}>
                 {triggerLabel}
             </Button>
             {open ? (
@@ -35,7 +41,7 @@ export function SimpleModal({ title, triggerLabel, triggerClassName, children }:
                             <h3 id={titleId} className="text-base font-semibold">
                                 {title}
                             </h3>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)} aria-label="Cerrar modal">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => cambiarApertura(false)} aria-label="Cerrar modal">
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>

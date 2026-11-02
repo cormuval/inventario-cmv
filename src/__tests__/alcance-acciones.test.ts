@@ -5,13 +5,14 @@ import * as authLib from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
 // actions
-import { actualizarDetalleEntrada, eliminarDetalleEntrada, listarOrdenesEntrada } from "@/modules/orden-entrada/actions/orden-entrada.action";
+import { actualizarDetalleEntrada, eliminarDetalleEntrada } from "@/modules/orden-entrada/actions/orden-entrada.action";
+import { listarRegistrosEntrada } from "@/modules/orden-entrada/actions/registros-entrada.action";
 import {
     actualizarDetalleSalida,
     crearOrdenSalida,
-    eliminarDetalleSalida,
-    listarOrdenesSalida
+    eliminarDetalleSalida
 } from "@/modules/orden-salida/actions/orden-salida.action";
+import { listarRegistrosSalida } from "@/modules/orden-salida/actions/registros-salida.action";
 import { listarReporteConsumoMensual } from "@/modules/reporte/actions/reporte.action";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -35,10 +36,10 @@ vi.mock("@/shared/lib/prisma", () => ({
         centro: { findMany: vi.fn(), findFirst: vi.fn() },
         bodega: { findMany: vi.fn(), findFirst: vi.fn() },
         encargadosBodega: { findMany: vi.fn() },
-        ordenEntrada: { findMany: vi.fn() },
-        ordenEntradaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
-        ordenSalida: { findMany: vi.fn() },
-        ordenSalidaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
+        ordenEntrada: { findMany: vi.fn(), count: vi.fn() },
+        ordenEntradaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn(), groupBy: vi.fn() },
+        ordenSalida: { findMany: vi.fn(), count: vi.fn() },
+        ordenSalidaDetalle: { findMany: vi.fn(), findUniqueOrThrow: vi.fn(), groupBy: vi.fn() },
         producto: { findMany: vi.fn() },
         stock: { findMany: vi.fn() }
     }
@@ -48,6 +49,7 @@ const MENSAJE_SIN_PERMISO = "No tienes permiso para operar en el centro o bodega
 
 const centroBaron = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
 const bodegaFarmacia = { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", estado: true };
+const FILTROS_REGISTROS = { desde: "2026-10-01", hasta: "2026-10-30", pagina: 1, avisos: [] };
 
 // Operador de salida asignado solo a "Bodega Farmacia" del CESFAM Barón.
 function sesionOperadorFarmacia(): void {
@@ -228,22 +230,24 @@ describe("alcance en acciones de inventario", () => {
     describe("CA-2 / CA-3 / CA-5: historiales y reporte acotados a las bodegas asignadas", () => {
         const filtroOperador = { centroId: { in: ["centro-1"] }, bodegaId: { in: ["b1"] } };
 
-        it("CA-2: listarOrdenesSalida filtra por las bodegas del funcionario", async () => {
+        it("CA-2: listarRegistrosSalida filtra por las bodegas del funcionario", async () => {
             sesionOperadorFarmacia();
+            vi.mocked(prisma.ordenSalida.count).mockResolvedValue(0);
             vi.mocked(prisma.ordenSalida.findMany).mockResolvedValue([]);
 
-            await listarOrdenesSalida();
+            await listarRegistrosSalida(FILTROS_REGISTROS);
 
-            expect(prisma.ordenSalida.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: filtroOperador }));
+            expect(vi.mocked(prisma.ordenSalida.count).mock.calls[0][0]?.where).toMatchObject(filtroOperador);
         });
 
-        it("CA-3: listarOrdenesEntrada filtra por bodega (no por usuario) para dar continuidad de turno", async () => {
+        it("CA-3: listarRegistrosEntrada filtra por bodega (no por usuario) para dar continuidad de turno", async () => {
             sesionOperadorFarmacia();
+            vi.mocked(prisma.ordenEntrada.count).mockResolvedValue(0);
             vi.mocked(prisma.ordenEntrada.findMany).mockResolvedValue([]);
 
-            await listarOrdenesEntrada();
+            await listarRegistrosEntrada(FILTROS_REGISTROS);
 
-            const where = vi.mocked(prisma.ordenEntrada.findMany).mock.calls[0][0]?.where;
+            const where = vi.mocked(prisma.ordenEntrada.count).mock.calls[0][0]?.where;
             expect(where).toMatchObject(filtroOperador);
             expect(where).not.toHaveProperty("usuarioId");
         });
@@ -264,11 +268,11 @@ describe("alcance en acciones de inventario", () => {
             sesionOperadorFarmacia();
             vi.mocked(prisma.bodega.findFirst).mockResolvedValue(null);
 
-            expect(await listarOrdenesSalida()).toEqual([]);
-            expect(await listarOrdenesEntrada()).toEqual([]);
+            expect((await listarRegistrosSalida(FILTROS_REGISTROS)).filas).toEqual([]);
+            expect((await listarRegistrosEntrada(FILTROS_REGISTROS)).filas).toEqual([]);
             expect(await listarReporteConsumoMensual(2026)).toEqual([]);
-            expect(prisma.ordenSalida.findMany).not.toHaveBeenCalled();
-            expect(prisma.ordenEntrada.findMany).not.toHaveBeenCalled();
+            expect(prisma.ordenSalida.count).not.toHaveBeenCalled();
+            expect(prisma.ordenEntrada.count).not.toHaveBeenCalled();
             expect(prisma.ordenSalidaDetalle.findMany).not.toHaveBeenCalled();
         });
     });
@@ -276,22 +280,26 @@ describe("alcance en acciones de inventario", () => {
     describe("CA-6: vista panorámica del Administrador", () => {
         it("no filtra historiales ni reporte por centro o bodega (incluye bodegas desactivadas)", async () => {
             sesionAdministrador();
+            vi.mocked(prisma.ordenSalida.count).mockResolvedValue(0);
+            vi.mocked(prisma.ordenEntrada.count).mockResolvedValue(0);
             vi.mocked(prisma.ordenSalida.findMany).mockResolvedValue([]);
             vi.mocked(prisma.ordenEntrada.findMany).mockResolvedValue([]);
             vi.mocked(prisma.ordenSalidaDetalle.findMany).mockResolvedValue([]);
             vi.mocked(prisma.stock.findMany).mockResolvedValue([]);
 
-            await listarOrdenesSalida();
-            await listarOrdenesEntrada();
+            await listarRegistrosSalida(FILTROS_REGISTROS);
+            await listarRegistrosEntrada(FILTROS_REGISTROS);
             await listarReporteConsumoMensual(2026);
 
-            expect(vi.mocked(prisma.ordenSalida.findMany).mock.calls[0][0]?.where).toEqual({});
-            const whereEntradas = vi.mocked(prisma.ordenEntrada.findMany).mock.calls[0][0]?.where;
+            const whereSalidas = vi.mocked(prisma.ordenSalida.count).mock.calls[0][0]?.where;
+            expect(whereSalidas).not.toHaveProperty("bodegaId");
+            expect(whereSalidas).not.toHaveProperty("centroId");
+            const whereEntradas = vi.mocked(prisma.ordenEntrada.count).mock.calls[0][0]?.where;
             expect(whereEntradas).not.toHaveProperty("bodegaId");
             expect(whereEntradas).not.toHaveProperty("centroId");
-            const whereSalidas = vi.mocked(prisma.ordenSalidaDetalle.findMany).mock.calls[0][0]?.where;
-            expect(whereSalidas?.ordenSalida).not.toHaveProperty("bodegaId");
-            expect(whereSalidas?.ordenSalida).not.toHaveProperty("centroId");
+            const whereReporte = vi.mocked(prisma.ordenSalidaDetalle.findMany).mock.calls[0][0]?.where;
+            expect(whereReporte?.ordenSalida).not.toHaveProperty("bodegaId");
+            expect(whereReporte?.ordenSalida).not.toHaveProperty("centroId");
             expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
         });
     });

@@ -6,7 +6,6 @@ import type { PrismaClient } from "@prisma/client";
 // lib
 import { requireSessionUser, puedeOperarEntrada } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
-import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
 import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -28,33 +27,7 @@ interface DetalleEntradaForm {
     lote: string;
 }
 
-export async function listarOrdenesEntrada() {
-    const filtroAlcance = crearFiltroMovimientosAlcance(await obtenerAlcanceInventario());
 
-    if (!filtroAlcance) {
-        return [];
-    }
-
-    const desde = new Date();
-    desde.setHours(0, 0, 0, 0);
-    desde.setDate(desde.getDate() - 90);
-
-    return prisma.ordenEntrada.findMany({
-        where: {
-            ...filtroAlcance,
-            fecha: { gte: desde }
-        },
-        include: {
-            usuario: true,
-            centro: true,
-            bodega: true,
-            detalles: {
-                include: { producto: true }
-            }
-        },
-        orderBy: { fecha: "desc" }
-    });
-}
 
 export async function crearOrdenEntrada(prevState: ActionState, formData: FormData): Promise<ActionState> {
     try {
@@ -124,7 +97,7 @@ export async function crearOrdenEntrada(prevState: ActionState, formData: FormDa
 
         revalidatePath("/");
         revalidatePath("/stock");
-        revalidatePath("/orden-entrada");
+        revalidatePath("/entradas/registros");
         return { ok: true, message: "Orden de entrada registrada." };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la entrada." };
@@ -183,7 +156,7 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
             entidadId: detalleId
         });
         revalidatePath("/stock");
-        revalidatePath("/orden-entrada");
+        revalidatePath("/entradas/registros");
         return { ok: true, message: "Detalle de entrada actualizado." };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo actualizar el detalle." };
@@ -223,7 +196,7 @@ export async function eliminarDetalleEntrada(detalleId: string): Promise<ActionS
             entidadId: detalleId
         });
         revalidatePath("/stock");
-        revalidatePath("/orden-entrada");
+        revalidatePath("/entradas/registros");
         return { ok: true, message: "Detalle de entrada eliminado." };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo eliminar el detalle." };

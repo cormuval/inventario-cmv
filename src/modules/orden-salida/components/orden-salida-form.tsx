@@ -238,7 +238,7 @@ export function OrdenSalidaForm({
             )}
             <div className="flex items-center gap-3 md:col-span-3">
                 <FormSubmit label="Registrar salida" />
-                <ActionMessage state={state} />
+                <ActionMessage state={state} enlaceExito={{ href: "/salidas/registros", etiqueta: "Ver registros de salida" }} />
             </div>
         </form>
     );

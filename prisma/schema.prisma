@@ -107,6 +107,7 @@ model OrdenEntrada {
     @@index([usuarioId])
     @@index([centroId])
     @@index([bodegaId])
+    @@index([fecha])
     @@map("OrdenEntrada")
 }
 
@@ -150,6 +151,7 @@ model OrdenSalida {
     @@index([bodegaId])
     @@index([bodegaDestinoId])
     @@index([centroId])
+    @@index([fecha])
     @@map("OrdenSalida")
 }
 
@@ -165,6 +167,7 @@ model OrdenSalidaDetalle {
 
     @@index([productoId])
     @@index([ordenSalidaId])
+    @@index([productoId, ordenSalidaId])
     @@map("OrdenSalidaDetalle")
 }
 

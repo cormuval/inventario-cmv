@@ -14,6 +14,11 @@ export interface FiltroStockAlcance {
     bodega?: { centroId: { in: string[] } };
 }
 
+export interface FiltroMovimientosSeleccion {
+    centroId?: string | { in: string[] };
+    bodegaId?: string | { in: string[] };
+}
+
 /**
  * Filtro Prisma para historiales (ordenes de entrada/salida) segun el alcance del usuario.
  * El historial no se acota a centros/bodegas activos: una bodega desactivada conserva sus movimientos.
@@ -43,6 +48,29 @@ export function crearFiltroMovimientosAlcance(alcance: InventarioAlcance): Filtr
         centroId: { in: alcance.centroIds },
         bodegaId: { in: alcance.bodegaIds }
     };
+}
+
+/**
+ * Filtro de historiales con el alcance del usuario más la selección de los filtros de pantalla.
+ * La bodega elegida ya viene validada contra el alcance (`normalizarSeleccion`).
+ * El centro solo se aplica cuando el rol puede elegirlo (R01); para el resto es su centro fijo.
+ */
+export function crearFiltroMovimientosSeleccion(alcance: InventarioAlcance): FiltroMovimientosSeleccion | null {
+    const filtro = crearFiltroMovimientosAlcance(alcance);
+
+    if (!filtro) {
+        return null;
+    }
+
+    if (alcance.bodegaId) {
+        return { ...filtro, bodegaId: alcance.bodegaId };
+    }
+
+    if (alcance.puedeFiltrarCentro && alcance.centroId) {
+        return { ...filtro, centroId: alcance.centroId };
+    }
+
+    return filtro;
 }
 
 /**

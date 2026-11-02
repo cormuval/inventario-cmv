@@ -17,6 +17,7 @@ describe("Estandarización de Mantenedores en Interfaz", () => {
         nombreCompleto: "Administrador Central",
         email: "admin@cmvalparaiso.cl",
         rol: "Administrador Central",
+        rolId: "R01",
         centro: "Dirección de Salud",
         bodegas: ["Bodega Farmacia Central"]
     };

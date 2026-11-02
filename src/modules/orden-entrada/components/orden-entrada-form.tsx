@@ -150,7 +150,7 @@ export function OrdenEntradaForm({
             </div>
             <div className="flex items-center gap-3 md:col-span-3">
                 <FormSubmit label="Registrar entrada" />
-                <ActionMessage state={state} />
+                <ActionMessage state={state} enlaceExito={{ href: "/entradas/registros", etiqueta: "Ver registros de entrada" }} />
             </div>
         </form>
     );
