@@ -79,3 +79,4 @@ describe("AppSidebarShell", () => {
         expect(screen.getAllByRole("link", { name: "Registros de salida" })[0]).toHaveClass("bg-teal-600");
     });
 });
+

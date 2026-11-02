@@ -58,3 +58,4 @@ export function Paginacion({ ruta, parametros, paginacion }: PaginacionProps): R
         </nav>
     );
 }
+

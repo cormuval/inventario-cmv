@@ -116,3 +116,4 @@ export function parametrosDeFiltros(filtros: FiltrosRegistros): Record<string, V
         bodegaId: filtros.bodegaId
     };
 }
+

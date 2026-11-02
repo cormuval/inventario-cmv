@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 // components
+import { ActionMessage } from "@/shared/components/ui/action-message";
 import { InventarioFiltros } from "@/shared/components/inventario/inventario-filtros";
 import { Paginacion } from "@/shared/components/inventario/paginacion";
 
@@ -55,5 +56,16 @@ describe("InventarioFiltros con rango de fechas", () => {
 
         expect(screen.getByLabelText("Desde")).toHaveValue("2026-10-01");
         expect(screen.getByLabelText("Hasta")).toHaveValue("2026-10-30");
+    });
+});
+
+describe("ActionMessage", () => {
+    it("ofrece el enlace a los registros solo cuando la acción terminó bien", () => {
+        const enlace = { href: "/salidas/registros", etiqueta: "Ver registros de salida" };
+        const { rerender } = render(<ActionMessage state={{ ok: true, message: "Orden de salida registrada." }} enlaceExito={enlace} />);
+        expect(screen.getByRole("link", { name: "Ver registros de salida" })).toHaveAttribute("href", "/salidas/registros");
+
+        rerender(<ActionMessage state={{ ok: false, message: "Stock insuficiente." }} enlaceExito={enlace} />);
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
 });

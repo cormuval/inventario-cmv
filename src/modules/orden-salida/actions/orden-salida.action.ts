@@ -6,7 +6,7 @@ import type { PrismaClient } from "@prisma/client";
 // lib
 import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
-import { crearFiltroMovimientosAlcance } from "@/shared/lib/inventario-alcance-filtros";
+
 import { AuditLogger } from "@/shared/lib/logger";
 import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
@@ -31,26 +31,7 @@ interface DetalleSalidaForm {
     fechaCaducidad: Date;
 }
 
-export async function listarOrdenesSalida() {
-    const filtroAlcance = crearFiltroMovimientosAlcance(await obtenerAlcanceInventario());
 
-    if (!filtroAlcance) {
-        return [];
-    }
-
-    return prisma.ordenSalida.findMany({
-        where: filtroAlcance,
-        include: {
-            usuario: true,
-            centro: true,
-            bodega: true,
-            detalles: {
-                include: { producto: true }
-            }
-        },
-        orderBy: { fecha: "desc" }
-    });
-}
 
 function respuestaSalidaRegistrada(id: string, envio: ResultadoCorreo | null, para?: string): ActionState {
     if (envio?.ok) {
@@ -181,7 +162,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
 
         revalidatePath("/");
         revalidatePath("/stock");
-        revalidatePath("/orden-salida");
+        revalidatePath("/salidas/registros");
         revalidatePath("/reporte");
         return respuestaSalidaRegistrada(orden.id, envio, parsed.correoDestino);
     } catch (error) {
@@ -275,7 +256,7 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
             }
         });
         revalidatePath("/stock");
-        revalidatePath("/orden-salida");
+        revalidatePath("/salidas/registros");
         revalidatePath("/reporte");
         return { ok: true, message: "Detalle de salida actualizado." };
     } catch (error) {
@@ -344,7 +325,7 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
             }
         });
         revalidatePath("/stock");
-        revalidatePath("/orden-salida");
+        revalidatePath("/salidas/registros");
         revalidatePath("/reporte");
         return { ok: true, message: "Detalle de salida eliminado." };
     } catch (error) {
@@ -503,7 +484,7 @@ export async function reenviarComprobanteSalidaAction(ordenId: string, correo: s
             para: parsed.data.correo,
             reenvio: true
         });
-        revalidatePath("/orden-salida");
+        revalidatePath("/salidas/registros");
 
         if (envio.ok) {
             return { ok: true, message: `Comprobante enviado a ${parsed.data.correo}.` };

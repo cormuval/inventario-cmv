@@ -46,3 +46,4 @@ export function crearHrefConParametros(ruta: string, parametros: Record<string, 
     const texto = busqueda.toString();
     return texto.length > 0 ? `${ruta}?${texto}` : ruta;
 }
+

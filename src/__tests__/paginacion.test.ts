@@ -50,3 +50,4 @@ describe("crearHrefConParametros", () => {
         expect(crearHrefConParametros("/stock", {})).toBe("/stock");
     });
 });
+
