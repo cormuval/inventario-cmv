@@ -13,14 +13,13 @@ import { Table, Td, Th } from "@/shared/components/ui/table";
 // utils
 import { esLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { formatDate, formatNumber } from "@/shared/utils/format";
+import { crearHrefConParametros, type ValorParametro } from "@/shared/utils/paginacion";
 
 interface StockTableProps {
     stocks: StockConsolidadoVista[];
     sort: StockSortKey;
     direction: SortDirection;
-    centroId: string | null;
-    bodegaId: string | null;
-    busqueda: string;
+    parametros: Record<string, ValorParametro>;
 }
 
 const columnas: Array<{ key: StockSortKey; label: string }> = [
@@ -33,7 +32,7 @@ const columnas: Array<{ key: StockSortKey; label: string }> = [
     { key: "alerta", label: "Alerta" }
 ];
 
-export function StockTable({ stocks, sort, direction, centroId, bodegaId, busqueda }: StockTableProps): React.ReactElement {
+export function StockTable({ stocks, sort, direction, parametros }: StockTableProps): React.ReactElement {
     return (
         <Table>
             <thead>
@@ -44,9 +43,7 @@ export function StockTable({ stocks, sort, direction, centroId, bodegaId, busque
                                 columna: columna.key,
                                 sort,
                                 direction,
-                                centroId,
-                                bodegaId,
-                                busqueda
+                                parametros
                             })}>
                                 {columna.label}
                                 {sort === columna.key ? (direction === "asc" ? "^" : "v") : null}
@@ -61,7 +58,12 @@ export function StockTable({ stocks, sort, direction, centroId, bodegaId, busque
                     <tr key={stock.id}>
                         <Td>{stock.centroNombre}</Td>
                         <Td>{stock.bodegaNombre}</Td>
-                        <Td>{stock.productoDescripcion} #{stock.productoId}</Td>
+                        <Td>
+                            <div className="space-y-0.5">
+                                <p className="font-medium">{stock.productoDescripcion}</p>
+                                <p className="text-xs text-muted-foreground">ID: {stock.productoId}</p>
+                            </div>
+                        </Td>
                         <Td>{stock.linea}</Td>
                         <Td>{formatNumber(stock.cantidadDisponible)}</Td>
                         <Td>{formatNumber(stock.stockMinimo)}</Td>
@@ -69,34 +71,39 @@ export function StockTable({ stocks, sort, direction, centroId, bodegaId, busque
                             <Badge tone={alertaTone(stock.alerta)}>{alertaLabel(stock.alerta)}</Badge>
                         </Td>
                         <Td>
-                            <SimpleModal
-                                title={`Lotes de ${stock.productoDescripcion}`}
-                                triggerLabel={`Lote (${stock.lotes.length})`}
-                                triggerClassName="min-w-20 whitespace-nowrap px-2"
-                            >
+                            <SimpleModal title={`Lotes: ${stock.productoDescripcion}`} triggerLabel={`Ver lotes (${stock.lotes.length})`}>
                                 <Table>
                                     <thead>
                                         <tr>
                                             <Th>Lote</Th>
-                                            <Th>Disponible</Th>
                                             <Th>Caducidad</Th>
+                                            <Th>Disponible</Th>
+                                            <Th>Estado</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {stock.lotes.map((lote) => (
-                                            <tr key={lote.id}>
-                                                <Td>{lote.lote}</Td>
-                                                <Td>{formatNumber(lote.cantidadDisponible)}</Td>
-                                                <Td>
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{formatDate(lote.fechaCaducidad)}</span>
-                                                        {esLoteCaducado(lote.fechaCaducidad) ? (
-                                                            <Badge tone="danger">Vencido</Badge>
-                                                        ) : null}
-                                                    </div>
+                                        {stock.lotes.map((lote) => {
+                                            const caducado = esLoteCaducado(lote.fechaCaducidad);
+                                            return (
+                                                <tr key={lote.id}>
+                                                    <Td>{lote.lote}</Td>
+                                                    <Td>{formatDate(lote.fechaCaducidad)}</Td>
+                                                    <Td>{formatNumber(lote.cantidadDisponible)}</Td>
+                                                    <Td>
+                                                        <Badge tone={caducado ? "danger" : "success"}>
+                                                            {caducado ? "Caducado" : "Vigente"}
+                                                        </Badge>
+                                                    </Td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {stock.lotes.length === 0 ? (
+                                            <tr>
+                                                <Td colSpan={4} className="text-muted-foreground">
+                                                    Sin detalle de lotes.
                                                 </Td>
                                             </tr>
-                                        ))}
+                                        ) : null}
                                     </tbody>
                                 </Table>
                             </SimpleModal>
@@ -106,7 +113,7 @@ export function StockTable({ stocks, sort, direction, centroId, bodegaId, busque
                 {stocks.length === 0 ? (
                     <tr>
                         <Td colSpan={8} className="text-muted-foreground">
-                            No hay existencias para los filtros seleccionados.
+                            No hay stock disponible para los filtros seleccionados.
                         </Td>
                     </tr>
                 ) : null}
@@ -119,26 +126,12 @@ function crearSortHref(input: {
     columna: StockSortKey;
     sort: StockSortKey;
     direction: SortDirection;
-    centroId: string | null;
-    bodegaId: string | null;
-    busqueda: string;
+    parametros: Record<string, ValorParametro>;
 }): string {
-    const params = new URLSearchParams();
     const direction = input.sort === input.columna && input.direction === "asc" ? "desc" : "asc";
 
-    if (input.centroId) {
-        params.set("centroId", input.centroId);
-    }
-    if (input.bodegaId) {
-        params.set("bodegaId", input.bodegaId);
-    }
-    if (input.busqueda.length > 0) {
-        params.set("q", input.busqueda);
-    }
-    params.set("sort", input.columna);
-    params.set("direction", direction);
-
-    return `/stock?${params.toString()}`;
+    // Cambiar el orden vuelve a la página 1 (no se incluye `pagina`)
+    return crearHrefConParametros("/stock", { ...input.parametros, sort: input.columna, direction });
 }
 
 function alertaTone(alerta: string): "success" | "warning" | "danger" | "muted" {

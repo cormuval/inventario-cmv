@@ -4,14 +4,13 @@
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 import { prisma } from "@/shared/lib/prisma";
 
+// types
+import type { StockAlerta } from "@/modules/stock/utils/movimientos";
+
 // utils
-import {
-    calcularStockMinimo,
-    evaluarAlertaStock,
-    filtrarExistenciasVisibles,
-    obtenerDiasRestantesCaducidad,
-    type StockAlerta
-} from "@/modules/stock/utils/movimientos";
+import { construirConsultaStock, construirConteoStock, mapearStockConsolidado, type FilaStockSql } from "@/modules/stock/utils/stock-consulta";
+import { fechaHoyChile } from "@/shared/utils/filtros-registros";
+import { calcularPaginacion, type Paginacion } from "@/shared/utils/paginacion";
 
 export type StockSortKey = "centro" | "bodega" | "producto" | "linea" | "disponible" | "minimo" | "alerta";
 export type SortDirection = "asc" | "desc";
@@ -20,8 +19,12 @@ export interface ListarStockInput {
     centroId?: string;
     bodegaId?: string;
     busqueda?: string;
+    linea?: string;
+    bajoMinimo?: boolean;
+    porCaducar?: boolean;
     sort?: StockSortKey;
     direction?: SortDirection;
+    pagina?: number;
 }
 
 export interface StockLoteVista {
@@ -54,8 +57,13 @@ export interface ListarStockResult {
     bodegaId: string | null;
     puedeFiltrarCentro: boolean;
     busqueda: string;
+    linea: string;
+    lineas: string[];
+    bajoMinimo: boolean;
+    porCaducar: boolean;
     sort: StockSortKey;
     direction: SortDirection;
+    paginacion: Paginacion;
     stocks: StockConsolidadoVista[];
 }
 
@@ -80,178 +88,54 @@ export async function listarStock() {
 export async function listarStockConsolidado(input: ListarStockInput = {}): Promise<ListarStockResult> {
     const alcance = await obtenerAlcanceInventario({ centroId: input.centroId, bodegaId: input.bodegaId });
     const busqueda = input.busqueda?.trim() ?? "";
+    const linea = input.linea?.trim() ?? "";
     const sort = input.sort ?? "producto";
     const direction = input.direction ?? "asc";
-
-    if (alcance.bodegaIds.length === 0 || alcance.centroIds.length === 0) {
-        return {
-            centros: alcance.centros,
-            bodegas: alcance.bodegas,
-            centroId: alcance.centroId,
-            bodegaId: alcance.bodegaId,
-            puedeFiltrarCentro: alcance.puedeFiltrarCentro,
-            busqueda,
-            sort,
-            direction,
-            stocks: []
-        };
-    }
-
-    const productoIdBusqueda = /^\d+$/.test(busqueda) ? Number(busqueda) : null;
-    const lotes = await prisma.stock.findMany({
-        where: {
-            bodegaId: { in: alcance.bodegaIds },
-            bodega: { centroId: { in: alcance.centroIds } },
-            ...(busqueda.length > 0 ? {
-                OR: [
-                    { producto: { descripcion: { contains: busqueda } } },
-                    ...(productoIdBusqueda ? [{ productoId: productoIdBusqueda }] : [])
-                ]
-            } : {})
-        },
-        include: {
-            producto: true,
-            bodega: {
-                include: {
-                    centro: true
-                }
-            }
-        }
-    });
-    const stocks = ordenarStockConsolidado(consolidarLotes(filtrarExistenciasVisibles(lotes)), sort, direction);
-
-    return {
+    const bajoMinimo = input.bajoMinimo ?? false;
+    const porCaducar = input.porCaducar ?? false;
+    const lineas = (await prisma.producto.findMany({
+        distinct: ["linea"],
+        select: { linea: true },
+        orderBy: { linea: "asc" }
+    })).map((producto) => producto.linea);
+    const base = {
         centros: alcance.centros,
         bodegas: alcance.bodegas,
         centroId: alcance.centroId,
         bodegaId: alcance.bodegaId,
         puedeFiltrarCentro: alcance.puedeFiltrarCentro,
         busqueda,
+        linea,
+        lineas,
+        bajoMinimo,
+        porCaducar,
+        sort,
+        direction
+    };
+
+    if (alcance.bodegaIds.length === 0 || alcance.centroIds.length === 0) {
+        return { ...base, stocks: [], paginacion: calcularPaginacion(1, 0) };
+    }
+
+    const filtros = {
+        bodegaIds: alcance.bodegaIds,
+        busqueda,
+        linea: linea || undefined,
+        bajoMinimo,
+        porCaducar,
         sort,
         direction,
-        stocks
+        hoy: fechaHoyChile()
     };
-}
+    const [conteo] = await prisma.$queryRaw<Array<{ total: bigint | number }>>(construirConteoStock(filtros));
+    const paginacion = calcularPaginacion(input.pagina ?? 1, Number(conteo?.total ?? 0));
+    const filas = await prisma.$queryRaw<FilaStockSql[]>(construirConsultaStock(filtros, paginacion));
+    const lotes = filas.length > 0
+        ? await prisma.stock.findMany({
+              where: { OR: filas.map((fila) => ({ productoId: Number(fila.productoId), bodegaId: fila.bodegaId })) },
+              select: { id: true, productoId: true, bodegaId: true, lote: true, fechaCaducidad: true, cantidadDisponible: true }
+          })
+        : [];
 
-type StockLotePrisma = Awaited<ReturnType<typeof prisma.stock.findMany>>[number] & {
-    producto: {
-        id: number;
-        descripcion: string;
-        linea: string;
-    };
-    bodega: {
-        id: string;
-        nombre: string;
-        centroId: string;
-        centro: {
-            id: string;
-            nombre: string;
-        };
-    };
-};
-
-function consolidarLotes(lotes: StockLotePrisma[]): StockConsolidadoVista[] {
-    const agrupados = new Map<string, StockConsolidadoVista>();
-
-    for (const lote of lotes) {
-        const key = `${lote.bodegaId}:${lote.productoId}`;
-        const actual = agrupados.get(key);
-        if (!actual) {
-            agrupados.set(key, {
-                id: key,
-                centroId: lote.bodega.centro.id,
-                centroNombre: lote.bodega.centro.nombre,
-                bodegaId: lote.bodega.id,
-                bodegaNombre: lote.bodega.nombre,
-                productoId: lote.producto.id,
-                productoDescripcion: lote.producto.descripcion,
-                linea: lote.producto.linea,
-                cantidadDisponible: lote.cantidadDisponible,
-                stockMinimo: calcularStockMinimo(lote.cantidadDisponible),
-                alerta: "ok",
-                diasCaducidadMinimos: obtenerDiasRestantesCaducidad(lote.fechaCaducidad),
-                lotes: [crearLoteVista(lote)]
-            });
-            continue;
-        }
-
-        actual.cantidadDisponible += lote.cantidadDisponible;
-        actual.stockMinimo = calcularStockMinimo(actual.cantidadDisponible);
-        actual.diasCaducidadMinimos = Math.min(
-            actual.diasCaducidadMinimos ?? Number.MAX_SAFE_INTEGER,
-            obtenerDiasRestantesCaducidad(lote.fechaCaducidad)
-        );
-        actual.lotes.push(crearLoteVista(lote));
-    }
-
-    return [...agrupados.values()].map((stock) => ({
-        ...stock,
-        alerta: evaluarAlertaStock({
-            cantidadDisponible: stock.cantidadDisponible,
-            stockMinimo: stock.stockMinimo,
-            fechaCaducidad: obtenerFechaCaducidadMasProxima(stock.lotes)
-        }),
-        lotes: stock.lotes.sort((a, b) => a.fechaCaducidad.getTime() - b.fechaCaducidad.getTime())
-    }));
-}
-
-function crearLoteVista(lote: StockLotePrisma): StockLoteVista {
-    return {
-        id: lote.id,
-        lote: lote.lote,
-        fechaCaducidad: lote.fechaCaducidad,
-        cantidadDisponible: lote.cantidadDisponible
-    };
-}
-
-function obtenerFechaCaducidadMasProxima(lotes: StockLoteVista[]): Date {
-    return lotes.reduce((menor, lote) => lote.fechaCaducidad < menor ? lote.fechaCaducidad : menor, lotes[0]?.fechaCaducidad ?? new Date());
-}
-
-function ordenarStockConsolidado(stocks: StockConsolidadoVista[], sort: StockSortKey, direction: SortDirection): StockConsolidadoVista[] {
-    const multiplier = direction === "asc" ? 1 : -1;
-    const alertaPeso: Record<StockAlerta, number> = {
-        sin_stock: 0,
-        caducado: 1,
-        stock_minimo: 2,
-        caducidad_proxima: 3,
-        ok: 4
-    };
-
-    return [...stocks].sort((a, b) => {
-        const resultado = compararStock(a, b, sort, alertaPeso);
-        if (resultado !== 0) {
-            return resultado * multiplier;
-        }
-
-        return a.productoDescripcion.localeCompare(b.productoDescripcion, "es") || a.bodegaNombre.localeCompare(b.bodegaNombre, "es");
-    });
-}
-
-function compararStock(
-    a: StockConsolidadoVista,
-    b: StockConsolidadoVista,
-    sort: StockSortKey,
-    alertaPeso: Record<StockAlerta, number>
-): number {
-    if (sort === "disponible") {
-        return a.cantidadDisponible - b.cantidadDisponible;
-    }
-    if (sort === "minimo") {
-        return a.stockMinimo - b.stockMinimo;
-    }
-    if (sort === "alerta") {
-        return alertaPeso[a.alerta] - alertaPeso[b.alerta];
-    }
-    if (sort === "centro") {
-        return a.centroNombre.localeCompare(b.centroNombre, "es");
-    }
-    if (sort === "bodega") {
-        return a.bodegaNombre.localeCompare(b.bodegaNombre, "es");
-    }
-    if (sort === "linea") {
-        return a.linea.localeCompare(b.linea, "es");
-    }
-
-    return a.productoDescripcion.localeCompare(b.productoDescripcion, "es");
+    return { ...base, paginacion, stocks: mapearStockConsolidado(filas, lotes) };
 }

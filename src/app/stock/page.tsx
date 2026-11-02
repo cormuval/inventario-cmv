@@ -4,26 +4,43 @@ import type * as React from "react";
 import { listarStockConsolidado, type SortDirection, type StockSortKey } from "@/modules/stock/actions/stock.action";
 
 // components
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { InventarioFiltros } from "@/shared/components/inventario/inventario-filtros";
-import { AppLayout } from "@/shared/components/layout/app-layout";
 import { StockTable } from "@/modules/stock/components/stock-table";
+import { InventarioFiltros } from "@/shared/components/inventario/inventario-filtros";
+import { Paginacion } from "@/shared/components/inventario/paginacion";
+import { AppLayout } from "@/shared/components/layout/app-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Select } from "@/shared/components/ui/select";
+
+// utils
+import { leerPagina, obtenerParametro, type ParametrosUrl } from "@/shared/utils/filtros-registros";
 
 export const dynamic = "force-dynamic";
 
 interface StockPageProps {
-    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+    searchParams?: Promise<ParametrosUrl>;
 }
 
 export default async function StockPage({ searchParams }: StockPageProps): Promise<React.ReactElement> {
     const params = await searchParams;
     const data = await listarStockConsolidado({
-        centroId: obtenerParam(params, "centroId"),
-        bodegaId: obtenerParam(params, "bodegaId"),
-        busqueda: obtenerParam(params, "q"),
-        sort: obtenerSort(obtenerParam(params, "sort")),
-        direction: obtenerDirection(obtenerParam(params, "direction"))
+        centroId: obtenerParametro(params, "centroId"),
+        bodegaId: obtenerParametro(params, "bodegaId"),
+        busqueda: obtenerParametro(params, "q"),
+        linea: obtenerParametro(params, "linea"),
+        bajoMinimo: obtenerParametro(params, "bajoMinimo") === "1",
+        porCaducar: obtenerParametro(params, "porCaducar") === "1",
+        sort: obtenerSort(obtenerParametro(params, "sort")),
+        direction: obtenerDirection(obtenerParametro(params, "direction")),
+        pagina: leerPagina(obtenerParametro(params, "pagina"))
     });
+    const parametros = {
+        centroId: data.centroId,
+        bodegaId: data.bodegaId,
+        q: data.busqueda,
+        linea: data.linea,
+        bajoMinimo: data.bajoMinimo ? "1" : undefined,
+        porCaducar: data.porCaducar ? "1" : undefined
+    };
 
     return (
         <AppLayout>
@@ -46,7 +63,29 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
                             puedeFiltrarCentro={data.puedeFiltrarCentro}
                             busqueda={data.busqueda}
                             mostrarBusqueda
-                        />
+                        >
+                            <label className="space-y-1 text-sm">
+                                <span>Línea</span>
+                                <Select name="linea" defaultValue={data.linea}>
+                                    <option value="">Todas las líneas</option>
+                                    {data.lineas.map((linea) => (
+                                        <option key={linea} value={linea}>
+                                            {linea}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </label>
+                            <div className="flex flex-col justify-end gap-2 text-sm">
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" name="bajoMinimo" value="1" defaultChecked={data.bajoMinimo} />
+                                    Bajo stock mínimo
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" name="porCaducar" value="1" defaultChecked={data.porCaducar} />
+                                    Por caducar (30 días)
+                                </label>
+                            </div>
+                        </InventarioFiltros>
                     </CardContent>
                 </Card>
                 <Card>
@@ -58,9 +97,12 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
                             stocks={data.stocks}
                             sort={data.sort}
                             direction={data.direction}
-                            centroId={data.centroId}
-                            bodegaId={data.bodegaId}
-                            busqueda={data.busqueda}
+                            parametros={parametros}
+                        />
+                        <Paginacion
+                            ruta="/stock"
+                            parametros={{ ...parametros, sort: data.sort, direction: data.direction }}
+                            paginacion={data.paginacion}
                         />
                     </CardContent>
                 </Card>
@@ -69,14 +111,9 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
     );
 }
 
-function obtenerParam(params: Record<string, string | string[] | undefined> | undefined, key: string): string | undefined {
-    const value = params?.[key];
-    return Array.isArray(value) ? value[0] : value;
-}
-
 function obtenerSort(value: string | undefined): StockSortKey | undefined {
     const permitidos: StockSortKey[] = ["centro", "bodega", "producto", "linea", "disponible", "minimo", "alerta"];
-    return permitidos.includes(value as StockSortKey) ? value as StockSortKey : undefined;
+    return permitidos.includes(value as StockSortKey) ? (value as StockSortKey) : undefined;
 }
 
 function obtenerDirection(value: string | undefined): SortDirection | undefined {
