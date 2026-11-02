@@ -31,6 +31,7 @@ describe("construirMenu", () => {
             "/entradas/registros",
             "/salidas/nueva",
             "/salidas/registros",
+            "/salidas/por-producto",
             "/reporte",
             "/mantenedores",
             "/auditoria"
@@ -43,6 +44,11 @@ describe("construirMenu", () => {
         expect(hrefs("R02")).not.toContain("/auditoria");
         expect(hrefs("R06")).toContain("/entradas/nueva");
         expect(hrefs("R06")).not.toContain("/salidas/nueva");
+    });
+
+    it("muestra 'Salidas por producto' a todos los roles", () => {
+        expect(hrefs("R02")).toContain("/salidas/por-producto");
+        expect(hrefs("R06")).toContain("/salidas/por-producto");
     });
 });
 
@@ -79,4 +85,3 @@ describe("AppSidebarShell", () => {
         expect(screen.getAllByRole("link", { name: "Registros de salida" })[0]).toHaveClass("bg-teal-600");
     });
 });
-

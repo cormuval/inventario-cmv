@@ -9,6 +9,7 @@ import {
     Package,
     PackageMinus,
     PackagePlus,
+    PackageSearch,
     SlidersHorizontal,
     type LucideIcon
 } from "lucide-react";
@@ -49,7 +50,8 @@ export function construirMenu(rolId?: string): ItemMenu[] {
     ];
     const salida: EnlaceMenu[] = [
         ...(incluyeRol(ROLES_OPERAN_SALIDA, rol) ? [enlace("/salidas/nueva", "Nueva salida", PackageMinus)] : []),
-        enlace("/salidas/registros", "Registros de salida", ListOrdered)
+        enlace("/salidas/registros", "Registros de salida", ListOrdered),
+        enlace("/salidas/por-producto", "Salidas por producto", PackageSearch)
     ];
 
     return [

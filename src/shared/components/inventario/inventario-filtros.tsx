@@ -21,6 +21,7 @@ interface InventarioFiltrosProps {
     mostrarRangoFechas?: boolean;
     desde?: string;
     hasta?: string;
+    children?: React.ReactNode;
 }
 
 export function InventarioFiltros({
@@ -34,7 +35,8 @@ export function InventarioFiltros({
     mostrarBusqueda = false,
     mostrarRangoFechas = false,
     desde = "",
-    hasta = ""
+    hasta = "",
+    children
 }: InventarioFiltrosProps): React.ReactElement {
     const [centroSeleccionado, setCentroSeleccionado] = useState(centroId ?? "todos");
     const [bodegaSeleccionada, setBodegaSeleccionada] = useState(bodegaId ?? "todos");
@@ -102,6 +104,7 @@ export function InventarioFiltros({
                     <Input name="q" defaultValue={busqueda} placeholder="Nombre o ID" />
                 </label>
             ) : null}
+            {children}
             <div className="flex items-end gap-2">
                 <Button type="submit">Filtrar</Button>
                 <Button type="button" variant="outline" onClick={() => window.location.assign(action)}>
