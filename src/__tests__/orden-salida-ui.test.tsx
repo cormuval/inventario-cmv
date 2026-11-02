@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 import { BotonDescargarComprobante } from "@/modules/orden-salida/components/boton-descargar-comprobante";
 import { OrdenSalidaForm } from "@/modules/orden-salida/components/orden-salida-form";
 
+vi.mock("@/modules/orden-salida/actions/lotes-disponibles.action", () => ({
+    listarLotesDisponibles: vi.fn().mockResolvedValue({ ok: true, message: "", lotes: [] })
+}));
+
 vi.mock("@/modules/orden-salida/actions/orden-salida.action", () => ({
     descargarComprobanteSalidaAction: vi.fn(),
     crearOrdenSalida: vi.fn()
