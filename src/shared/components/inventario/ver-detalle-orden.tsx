@@ -4,6 +4,7 @@ import type * as React from "react";
 import { useState } from "react";
 
 // actions
+import { obtenerDetalleOrdenEntrada } from "@/modules/orden-entrada/actions/registros-entrada.action";
 import { obtenerDetalleOrdenSalida } from "@/modules/orden-salida/actions/registros-salida.action";
 
 // components
@@ -16,10 +17,10 @@ import type { DetalleOrdenResultado } from "@/shared/types/registros";
 // utils
 import { formatDate, formatNumber } from "@/shared/utils/format";
 
-// La Task 7 amplía a "entrada" | "salida".
-type TipoOrden = "salida";
+type TipoOrden = "entrada" | "salida";
 
 const CARGADORES: Record<TipoOrden, (ordenId: string) => Promise<DetalleOrdenResultado>> = {
+    entrada: obtenerDetalleOrdenEntrada,
     salida: obtenerDetalleOrdenSalida
 };
 
@@ -65,4 +66,3 @@ export function VerDetalleOrden({ ordenId, tipo }: { ordenId: string; tipo: Tipo
         </SimpleModal>
     );
 }
-
