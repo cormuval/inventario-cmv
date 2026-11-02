@@ -1,115 +1,147 @@
 "use server";
 
 // lib
+import { obtenerAlcanceInventario, type InventarioAlcance } from "@/shared/lib/inventario-alcance";
+import { crearFiltroMovimientosSeleccion } from "@/shared/lib/inventario-alcance-filtros";
+import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
-import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
-import { crearFiltroMovimientosAlcance, crearFiltroStockAlcance } from "@/shared/lib/inventario-alcance-filtros";
 
-export interface ReporteConsumoMensual {
-    centro: string;
-    bodega: string;
-    productoId: number;
-    descripcion: string;
-    linea: string;
-    stockActual: number;
-    meses: Record<string, number>;
-    consumoAnual: number;
+// utils
+import { construirArbol, type NodoCentro } from "@/modules/reporte/utils/arbol";
+import { construirExcelReporte, nombreArchivoReporte } from "@/modules/reporte/utils/excel-reporte";
+import { columnasDelPeriodo, leerFiltrosReporte, rangoDelPeriodo, type ColumnaMes, type FiltrosReporte } from "@/modules/reporte/utils/periodo";
+import {
+    armarFilasReporte,
+    construirClavesReporte,
+    construirConsumoReporte,
+    construirConteoReporte,
+    type ConsultaReporte,
+    type FilaClaveReporte,
+    type FilaConsumoReporte,
+    type FilaReporte
+} from "@/modules/reporte/utils/reporte-consulta";
+import { fechaHoyChile } from "@/shared/utils/filtros-registros";
+import { calcularPaginacion, type Paginacion } from "@/shared/utils/paginacion";
+
+export interface ResultadoReporte {
+    filas: FilaReporte[];
+    columnas: ColumnaMes[];
+    paginacion: Paginacion;
+    arbol: NodoCentro[];
+    centroId: string | null;
+    bodegaId: string | null;
+    puedeFiltrarCentro: boolean;
+    nodoNombre: string;
 }
 
-const meses = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre"
-] as const;
+export interface ResultadoExportacion {
+    ok: boolean;
+    message: string;
+    base64?: string;
+    nombreArchivo?: string;
+}
 
-export async function listarReporteConsumoMensual(anio = new Date().getFullYear()): Promise<ReporteConsumoMensual[]> {
-    const alcance = await obtenerAlcanceInventario();
-    const filtroMovimientos = crearFiltroMovimientosAlcance(alcance);
-    const filtroStock = crearFiltroStockAlcance(alcance);
+interface ContextoReporte {
+    alcance: InventarioAlcance;
+    arbol: NodoCentro[];
+    columnas: ColumnaMes[];
+    consulta: ConsultaReporte | null;
+    nodoNombre: string;
+}
 
-    if (!filtroMovimientos || !filtroStock) {
-        return [];
+function nombreDelNodo(alcance: InventarioAlcance): string {
+    if (alcance.bodegaId) {
+        return alcance.bodegas.find((bodega) => bodega.id === alcance.bodegaId)?.nombre ?? "bodega";
     }
+    if (alcance.puedeFiltrarCentro && alcance.centroId) {
+        return alcance.centros.find((centro) => centro.id === alcance.centroId)?.nombre ?? "centro";
+    }
+    return "todo";
+}
 
-    const [salidas, stocks] = await Promise.all([
-        prisma.ordenSalidaDetalle.findMany({
-            where: {
-                ordenSalida: {
-                    ...filtroMovimientos,
-                    tipoSalida: { not: "A otra bodega" },
-                    fecha: {
-                        gte: new Date(`${anio}-01-01T00:00:00.000Z`),
-                        lt: new Date(`${anio + 1}-01-01T00:00:00.000Z`)
-                    }
-                }
-            },
-            include: {
-                producto: true,
-                ordenSalida: {
-                    include: {
-                        bodega: {
-                            include: { centro: true }
-                        }
-                    }
-                }
-            }
-        }),
-        prisma.stock.findMany({
-            where: filtroStock,
-            include: {
-                producto: true,
-                bodega: {
-                    include: { centro: true }
-                }
-            }
-        })
+async function prepararReporte(filtros: FiltrosReporte): Promise<ContextoReporte> {
+    // El árbol se arma con el alcance completo; la consulta, con el nodo elegido.
+    const [alcanceCompleto, alcance] = await Promise.all([
+        obtenerAlcanceInventario(),
+        obtenerAlcanceInventario({ centroId: filtros.centroId, bodegaId: filtros.bodegaId })
     ]);
+    const filtroMovimientos = crearFiltroMovimientosSeleccion(alcance);
+    const rango = rangoDelPeriodo(filtros.mesDesde, filtros.mesHasta);
 
-    const reporte = new Map<string, ReporteConsumoMensual>();
-
-    for (const stock of stocks) {
-        const key = crearKey(stock.bodega.centro.nombre, stock.bodega.nombre, stock.productoId);
-        const existente = reporte.get(key) ?? crearFila(stock.bodega.centro.nombre, stock.bodega.nombre, stock.productoId, stock.producto.descripcion, stock.producto.linea);
-        existente.stockActual += stock.cantidadDisponible;
-        reporte.set(key, existente);
-    }
-
-    for (const salida of salidas) {
-        const centro = salida.ordenSalida.bodega.centro.nombre;
-        const bodega = salida.ordenSalida.bodega.nombre;
-        const key = crearKey(centro, bodega, salida.productoId);
-        const fila = reporte.get(key) ?? crearFila(centro, bodega, salida.productoId, salida.producto.descripcion, salida.producto.linea);
-        const mes = meses[salida.ordenSalida.fecha.getMonth()];
-        fila.meses[mes] += salida.cantidad;
-        fila.consumoAnual += salida.cantidad;
-        reporte.set(key, fila);
-    }
-
-    return [...reporte.values()].sort((a, b) => `${a.centro}${a.bodega}${a.descripcion}`.localeCompare(`${b.centro}${b.bodega}${b.descripcion}`));
-}
-
-function crearFila(centro: string, bodega: string, productoId: number, descripcion: string, linea: string): ReporteConsumoMensual {
     return {
-        centro,
-        bodega,
-        productoId,
-        descripcion,
-        linea,
-        stockActual: 0,
-        meses: Object.fromEntries(meses.map((mes) => [mes, 0])),
-        consumoAnual: 0
+        alcance,
+        arbol: construirArbol(alcanceCompleto.centros, alcanceCompleto.bodegas),
+        columnas: columnasDelPeriodo(filtros.mesDesde, filtros.mesHasta),
+        nodoNombre: nombreDelNodo(alcance),
+        consulta: filtroMovimientos
+            ? {
+                  filtroMovimientos,
+                  bodegaIdsStock: alcance.bodegaIds,
+                  gte: rango.gte,
+                  lt: rango.lt,
+                  busqueda: filtros.busqueda
+              }
+            : null
     };
 }
 
-function crearKey(centro: string, bodega: string, productoId: number): string {
-    return `${centro}::${bodega}::${productoId}`;
+async function cargarFilas(consulta: ConsultaReporte, columnas: ColumnaMes[], pagina: { skip: number; tamano: number } | null): Promise<FilaReporte[]> {
+    const claves = await prisma.$queryRaw<FilaClaveReporte[]>(construirClavesReporte(consulta, pagina));
+
+    if (claves.length === 0) {
+        return [];
+    }
+
+    const pares = pagina ? claves.map((clave) => ({ productoId: Number(clave.productoId), bodegaId: clave.bodegaId })) : null;
+    const consumos = await prisma.$queryRaw<FilaConsumoReporte[]>(construirConsumoReporte(consulta, pares));
+    return armarFilasReporte(claves, consumos, columnas);
+}
+
+export async function consultarReporte(filtros: FiltrosReporte): Promise<ResultadoReporte> {
+    const contexto = await prepararReporte(filtros);
+    const base = {
+        columnas: contexto.columnas,
+        arbol: contexto.arbol,
+        centroId: contexto.alcance.centroId,
+        bodegaId: contexto.alcance.bodegaId,
+        puedeFiltrarCentro: contexto.alcance.puedeFiltrarCentro,
+        nodoNombre: contexto.nodoNombre
+    };
+
+    if (!contexto.consulta) {
+        return { ...base, filas: [], paginacion: calcularPaginacion(1, 0) };
+    }
+
+    const [conteo] = await prisma.$queryRaw<Array<{ total: bigint | number }>>(construirConteoReporte(contexto.consulta));
+    const paginacion = calcularPaginacion(filtros.pagina, Number(conteo?.total ?? 0));
+    const filas = await cargarFilas(contexto.consulta, contexto.columnas, paginacion);
+
+    return { ...base, filas, paginacion };
+}
+
+export async function exportarReporteExcelAction(parametros: Record<string, string>): Promise<ResultadoExportacion> {
+    try {
+        const filtros = leerFiltrosReporte(parametros, fechaHoyChile());
+        const contexto = await prepararReporte(filtros);
+        const filas = contexto.consulta ? await cargarFilas(contexto.consulta, contexto.columnas, null) : [];
+        const buffer = await construirExcelReporte(filas, contexto.columnas);
+
+        await AuditLogger.log({
+            usuarioId: contexto.alcance.usuario.id,
+            centroId: contexto.alcance.centroId,
+            bodegaId: contexto.alcance.bodegaId,
+            accion: "exportar",
+            entidad: "Reporte",
+            detalle: { mesDesde: filtros.mesDesde, mesHasta: filtros.mesHasta, busqueda: filtros.busqueda, filas: filas.length }
+        });
+
+        return {
+            ok: true,
+            message: "",
+            base64: buffer.toString("base64"),
+            nombreArchivo: nombreArchivoReporte(contexto.nodoNombre, filtros.mesDesde, filtros.mesHasta)
+        };
+    } catch {
+        return { ok: false, message: "No fue posible generar el Excel del reporte." };
+    }
 }
