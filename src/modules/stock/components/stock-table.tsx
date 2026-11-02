@@ -71,7 +71,11 @@ export function StockTable({ stocks, sort, direction, parametros }: StockTablePr
                             <Badge tone={alertaTone(stock.alerta)}>{alertaLabel(stock.alerta)}</Badge>
                         </Td>
                         <Td>
-                            <SimpleModal title={`Lotes: ${stock.productoDescripcion}`} triggerLabel={`Ver lotes (${stock.lotes.length})`}>
+                            <SimpleModal
+                                title={`Lotes: ${stock.productoDescripcion}`}
+                                triggerLabel={`Ver lotes (${stock.lotes.length})`}
+                                triggerClassName="min-w-20 whitespace-nowrap px-2"
+                            >
                                 <Table>
                                     <thead>
                                         <tr>

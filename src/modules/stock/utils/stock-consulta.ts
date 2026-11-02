@@ -6,6 +6,7 @@ import type { SortDirection, StockConsolidadoVista, StockSortKey } from "@/modul
 // utils
 import {
     DIAS_ALERTA_CADUCIDAD,
+    PORCENTAJE_STOCK_MINIMO,
     calcularStockMinimo,
     evaluarAlertaStock,
     filtrarExistenciasVisibles,
@@ -47,8 +48,8 @@ export interface LoteStockSql {
     cantidadDisponible: number;
 }
 
-/** Mínimo por producto × bodega. Ver "Decisión pendiente" en el plan de la fase 2. */
-const EXPR_MINIMO = Prisma.sql`CEIL(g.cantidad * 0.1)`;
+/** Mínimo por producto × bodega: misma regla que `calcularStockMinimo`. */
+const EXPR_MINIMO = Prisma.sql`CEIL(g.cantidad * ${PORCENTAJE_STOCK_MINIMO} / 100)`;
 
 export function patronLike(texto: string): string {
     return `%${texto.replace(/[\\%_]/g, (caracter) => `\\${caracter}`)}%`;
@@ -58,15 +59,16 @@ export function patronLike(texto: string): string {
  * Agrupa lotes por producto × bodega con la regla de `filtrarExistenciasVisibles`:
  * suma y caducidad mínima solo de lotes con existencia; si no hay ninguno, el grupo
  * se muestra únicamente cuando tiene un solo lote (fila en 0).
+ * `caducidadProxima` es el primer lote con existencia que aún no vence, sin contar la fecha centinela.
  */
-function agrupado(bodegaIds: string[]): Prisma.Sql {
+function agrupado(bodegaIds: string[], hoy: string): Prisma.Sql {
     return Prisma.sql`
         SELECT
             s.ID_Product AS productoId,
             s.ID_Bodega AS bodegaId,
             CAST(SUM(CASE WHEN s.Cantidad_Disponible > 0 THEN s.Cantidad_Disponible ELSE 0 END) AS SIGNED) AS cantidad,
             COALESCE(MIN(CASE WHEN s.Cantidad_Disponible > 0 THEN s.Fecha_Caducidad END), MIN(s.Fecha_Caducidad)) AS caducidadMinima,
-            MIN(CASE WHEN s.Cantidad_Disponible > 0 AND s.Fecha_Caducidad <> ${FECHA_SIN_CADUCIDAD} THEN s.Fecha_Caducidad END) AS caducidadReal,
+            MIN(CASE WHEN s.Cantidad_Disponible > 0 AND s.Fecha_Caducidad <> ${FECHA_SIN_CADUCIDAD} AND s.Fecha_Caducidad > ${hoy} THEN s.Fecha_Caducidad END) AS caducidadProxima,
             SUM(s.Cantidad_Disponible > 0) AS lotesConExistencia,
             COUNT(*) AS lotes
         FROM Stock s
@@ -93,7 +95,7 @@ function condiciones(filtros: FiltrosConsultaStock): Prisma.Sql {
         partes.push(Prisma.sql`g.cantidad > 0 AND g.cantidad <= ${EXPR_MINIMO}`);
     }
     if (filtros.porCaducar) {
-        partes.push(Prisma.sql`DATEDIFF(g.caducidadReal, ${filtros.hoy}) BETWEEN 1 AND ${DIAS_POR_CADUCAR}`);
+        partes.push(Prisma.sql`DATEDIFF(g.caducidadProxima, ${filtros.hoy}) BETWEEN 1 AND ${DIAS_POR_CADUCAR}`);
     }
 
     return Prisma.join(partes, " AND ");
@@ -131,7 +133,7 @@ function columnaOrden(sort: StockSortKey, hoy: string): Prisma.Sql {
 
 function desdeConJoins(filtros: FiltrosConsultaStock): Prisma.Sql {
     return Prisma.sql`
-        FROM (${agrupado(filtros.bodegaIds)}) g
+        FROM (${agrupado(filtros.bodegaIds, filtros.hoy)}) g
         JOIN Producto p ON p.ID_Product = g.productoId
         JOIN Bodega b ON b.ID_Bodega = g.bodegaId
         JOIN Centro c ON c.ID_Centro = b.ID_Centro

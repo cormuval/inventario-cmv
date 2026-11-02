@@ -56,9 +56,17 @@ describe("construirConsultaStock", () => {
         const texto = sqlPlano(consulta);
 
         expect(texto).toContain("p.Linea = ?");
-        expect(texto).toContain("g.cantidad > 0 AND g.cantidad <= CEIL(g.cantidad * 0.1)");
-        expect(texto).toContain("DATEDIFF(g.caducidadReal, ?) BETWEEN 1 AND ?");
-        expect(consulta.values).toEqual(expect.arrayContaining(["DENTAL", "2026-10-30", 30, "2099-12-31"]));
+        expect(texto).toContain("g.cantidad > 0 AND g.cantidad <= CEIL(g.cantidad * ? / 100)");
+        expect(texto).toContain("DATEDIFF(g.caducidadProxima, ?) BETWEEN 1 AND ?");
+        expect(consulta.values).toEqual(expect.arrayContaining(["DENTAL", "2026-10-30", 30, "2099-12-31", 20]));
+    });
+
+    it("por caducar no considera lotes ya vencidos al buscar la caducidad próxima", () => {
+        const texto = sqlPlano(construirConsultaStock({ ...BASE, porCaducar: true }, { skip: 0, tamano: 50 }));
+
+        expect(texto).toContain(
+            "MIN(CASE WHEN s.Cantidad_Disponible > 0 AND s.Fecha_Caducidad <> ? AND s.Fecha_Caducidad > ? THEN s.Fecha_Caducidad END) AS caducidadProxima"
+        );
     });
 
     it("ordena por alerta con el mismo peso que la vista", () => {
@@ -104,7 +112,7 @@ describe("mapearStockConsolidado", () => {
         expect(fila).toMatchObject({
             id: "b1:7",
             cantidadDisponible: 30,
-            stockMinimo: 3,
+            stockMinimo: 6,
             alerta: "caducidad_proxima",
             diasCaducidadMinimos: 16
         });

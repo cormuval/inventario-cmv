@@ -39,6 +39,7 @@ export function OrdenSalidaForm({
     stocks,
     centroId = null,
     bodegaId: bodegaIdProp = null,
+    errorLotes,
     puedeFiltrarCentro = false
 }: {
     centros: Centro[];
@@ -47,6 +48,7 @@ export function OrdenSalidaForm({
     stocks: StockDisponible[];
     centroId?: string | null;
     bodegaId?: string | null;
+    errorLotes?: string;
     puedeFiltrarCentro?: boolean;
 }): React.ReactElement {
     const [state, formAction] = useActionState(crearOrdenSalida, initialActionState);
@@ -58,6 +60,12 @@ export function OrdenSalidaForm({
     const [recargas, setRecargas] = useState(0);
 
     useEffect(() => {
+        if (errorLotes) {
+            toast.error(errorLotes);
+        }
+    }, [errorLotes]);
+
+    useEffect(() => {
         if (state.ok) {
             setRecargas((actual) => actual + 1);
         }
@@ -65,10 +73,12 @@ export function OrdenSalidaForm({
 
     useEffect(() => {
         if (!bodegaId) {
+            setCargandoLotes(false);
             setLotes([]);
             return;
         }
         if (recargas === 0 && bodegaId === bodegaIdProp) {
+            setCargandoLotes(false);
             setLotes(stocks);
             return;
         }
@@ -84,6 +94,12 @@ export function OrdenSalidaForm({
                     toast.error(resultado.message);
                 }
                 setLotes(resultado.lotes);
+            })
+            .catch(() => {
+                if (vigente) {
+                    toast.error("No fue posible cargar los lotes de la bodega.");
+                    setLotes([]);
+                }
             })
             .finally(() => {
                 if (vigente) {

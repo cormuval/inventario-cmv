@@ -1,7 +1,7 @@
 import type * as React from "react";
 
 // actions
-import { listarLotesDisponibles } from "@/modules/orden-salida/actions/lotes-disponibles.action";
+import { listarLotesDisponibles, type LotesDisponiblesResultado } from "@/modules/orden-salida/actions/lotes-disponibles.action";
 
 // components
 import { OrdenSalidaForm } from "@/modules/orden-salida/components/orden-salida-form";
@@ -16,6 +16,8 @@ import { prisma } from "@/shared/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const SIN_LOTES: LotesDisponiblesResultado = { ok: true, message: "", lotes: [] };
+
 export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
     const puedeRegistrar = puedeOperarSalida(alcance.usuario.rol);
@@ -24,7 +26,7 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
     const bodegaInicial = alcance.bodegaId ?? alcance.bodegas.find((bodega) => bodega.centroId === centroInicial)?.id ?? null;
     const [lotesIniciales, bodegasDestino] = puedeRegistrar
         ? await Promise.all([
-              bodegaInicial ? listarLotesDisponibles(bodegaInicial).then((resultado) => resultado.lotes) : Promise.resolve([]),
+              bodegaInicial ? listarLotesDisponibles(bodegaInicial) : Promise.resolve(SIN_LOTES),
               centrosDisponiblesIds.length > 0
                   ? prisma.bodega.findMany({
                         where: { centroId: { in: centrosDisponiblesIds }, estado: true },
@@ -32,7 +34,7 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
                     })
                   : Promise.resolve([])
           ])
-        : [[], []];
+        : [SIN_LOTES, []];
 
     return (
         <AppLayout>
@@ -51,7 +53,8 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
                                 centros={alcance.centros}
                                 bodegas={alcance.bodegas}
                                 bodegasDestino={bodegasDestino}
-                                stocks={lotesIniciales}
+                                stocks={lotesIniciales.lotes}
+                                errorLotes={lotesIniciales.ok ? undefined : lotesIniciales.message}
                                 centroId={centroInicial}
                                 bodegaId={bodegaInicial}
                                 puedeFiltrarCentro={alcance.puedeFiltrarCentro}
@@ -69,4 +72,3 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
         </AppLayout>
     );
 }
-

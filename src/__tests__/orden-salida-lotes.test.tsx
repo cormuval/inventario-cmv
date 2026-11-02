@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // actions
@@ -44,5 +45,33 @@ describe("OrdenSalidaForm — lotes por bodega", () => {
         fireEvent.change(screen.getByLabelText(/^Bodega/), { target: { value: "b2" } });
 
         await waitFor(() => expect(listarLotesDisponibles).toHaveBeenCalledWith("b2"));
+    });
+
+    it("avisa cuando la carga de lotes falla por un error de red", async () => {
+        vi.mocked(listarLotesDisponibles).mockRejectedValue(new Error("503"));
+        render(<OrdenSalidaForm centros={[centro]} bodegas={bodegas} stocks={[]} centroId="c1" bodegaId="b1" puedeFiltrarCentro />);
+
+        fireEvent.change(screen.getByLabelText(/^Bodega/), { target: { value: "b2" } });
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No fue posible cargar los lotes de la bodega."));
+        expect(screen.queryByText("Cargando lotes de la bodega…")).toBeNull();
+    });
+
+    it("quita el aviso de carga al volver a la bodega inicial antes de que termine", async () => {
+        vi.mocked(listarLotesDisponibles).mockReturnValue(new Promise(() => undefined));
+        render(<OrdenSalidaForm centros={[centro]} bodegas={bodegas} stocks={[]} centroId="c1" bodegaId="b1" puedeFiltrarCentro />);
+
+        fireEvent.change(screen.getByLabelText(/^Bodega/), { target: { value: "b2" } });
+        expect(await screen.findByText("Cargando lotes de la bodega…")).toBeTruthy();
+
+        fireEvent.change(screen.getByLabelText(/^Bodega/), { target: { value: "b1" } });
+
+        await waitFor(() => expect(screen.queryByText("Cargando lotes de la bodega…")).toBeNull());
+    });
+
+    it("muestra el error de la carga inicial de lotes", async () => {
+        render(<OrdenSalidaForm centros={[centro]} bodegas={bodegas} stocks={[]} centroId="c1" bodegaId="b1" errorLotes="No fue posible cargar los lotes de la bodega." puedeFiltrarCentro />);
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No fue posible cargar los lotes de la bodega."));
     });
 });

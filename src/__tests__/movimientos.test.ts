@@ -73,17 +73,21 @@ describe("movimientos de stock", () => {
             { productoId: 1, bodegaId: "b1", cantidadDisponible: 20, stockMinimo: 8 },
             { productoId: 1, bodegaId: "b2", cantidadDisponible: 7, stockMinimo: 3 }
         ])).toEqual([
-            { productoId: 1, bodegaId: "b1", cantidadDisponible: 30, stockMinimo: 3 },
-            { productoId: 1, bodegaId: "b2", cantidadDisponible: 7, stockMinimo: 1 }
+            { productoId: 1, bodegaId: "b1", cantidadDisponible: 30, stockMinimo: 6 },
+            { productoId: 1, bodegaId: "b2", cantidadDisponible: 7, stockMinimo: 2 }
         ]);
     });
 
-    it("calcula stock minimo como 10 por ciento redondeado hacia arriba", () => {
+    it("calcula stock minimo como 20 por ciento redondeado hacia arriba", () => {
         expect(calcularStockMinimo(0)).toBe(0);
         expect(calcularStockMinimo(1)).toBe(1);
-        expect(calcularStockMinimo(10)).toBe(1);
-        expect(calcularStockMinimo(11)).toBe(2);
-        expect(calcularStockMinimo(30)).toBe(3);
+        expect(calcularStockMinimo(5)).toBe(1);
+        expect(calcularStockMinimo(6)).toBe(2);
+        expect(calcularStockMinimo(10)).toBe(2);
+        expect(calcularStockMinimo(11)).toBe(3);
+        expect(calcularStockMinimo(30)).toBe(6);
+        // 15 * 0.2 da 3.0000000000000004 en coma flotante: el mínimo debe seguir siendo 3, igual que en SQL
+        expect(calcularStockMinimo(15)).toBe(3);
     });
 
     it("omite lotes en cero si el producto tiene otros lotes con existencia", () => {
