@@ -7,7 +7,8 @@ export const ENTIDADES_AUDITORIA = [
     { value: "Usuario", label: "Usuario" },
     { value: "Centro", label: "Centro de salud" },
     { value: "Bodega", label: "Bodega" },
-    { value: "Unidad", label: "Unidad" }
+    { value: "Unidad", label: "Unidad" },
+    { value: "Reporte", label: "Reporte de consumo" }
 ] as const;
 
 export type EntidadAuditoriaValor = (typeof ENTIDADES_AUDITORIA)[number]["value"];

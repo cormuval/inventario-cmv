@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+    // exceljs usa módulos de Node (stream, zlib): se carga tal cual en el servidor.
+    serverExternalPackages: ["exceljs"],
     experimental: {
         serverActions: {
             bodySizeLimit: "2mb"
