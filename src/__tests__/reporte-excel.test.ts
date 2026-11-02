@@ -26,7 +26,7 @@ describe("construirExcelReporte", () => {
         );
 
         const libro = new ExcelJS.Workbook();
-        await libro.xlsx.load(buffer);
+        await libro.xlsx.load(buffer as never);
         const hoja = libro.getWorksheet("Consumo");
 
         expect(hoja?.getRow(1).values).toEqual([
