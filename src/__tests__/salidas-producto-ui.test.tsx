@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // actions
@@ -12,6 +13,7 @@ const push = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/modules/orden-salida/actions/salidas-producto.action", () => ({ buscarProductosAction: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 describe("BuscadorProducto", () => {
     beforeEach(() => {
@@ -37,6 +39,35 @@ describe("BuscadorProducto", () => {
 
         await new Promise((resolver) => setTimeout(resolver, 400));
         expect(buscarProductosAction).not.toHaveBeenCalled();
+    });
+});
+
+describe("BuscadorProducto: estados de la búsqueda", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("quita 'Buscando…' al borrar el texto con una búsqueda en curso", async () => {
+        vi.mocked(buscarProductosAction).mockReturnValue(new Promise(() => undefined));
+
+        render(<BuscadorProducto productoActual={null} parametros={{}} />);
+        const campo = screen.getByLabelText("Buscar producto");
+        fireEvent.change(campo, { target: { value: "guan" } });
+        await screen.findByText("Buscando…");
+
+        fireEvent.change(campo, { target: { value: "g" } });
+
+        await waitFor(() => expect(screen.queryByText("Buscando…")).toBeNull());
+    });
+
+    it("avisa si la búsqueda falla", async () => {
+        vi.mocked(buscarProductosAction).mockRejectedValue(new Error("503"));
+
+        render(<BuscadorProducto productoActual={null} parametros={{}} />);
+        fireEvent.change(screen.getByLabelText("Buscar producto"), { target: { value: "guan" } });
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No fue posible buscar productos."));
+        expect(screen.queryByText("Buscando…")).toBeNull();
     });
 });
 

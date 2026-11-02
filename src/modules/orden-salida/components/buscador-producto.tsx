@@ -3,6 +3,7 @@
 import type * as React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 // actions
 import { buscarProductosAction, type ProductoBuscado } from "@/modules/orden-salida/actions/salidas-producto.action";
@@ -31,6 +32,7 @@ export function BuscadorProducto({ productoActual, parametros }: BuscadorProduct
         const termino = texto.trim();
 
         if (termino.length < 2 && !/^\d+$/.test(termino)) {
+            setBuscando(false);
             setOpciones([]);
             return;
         }
@@ -42,6 +44,12 @@ export function BuscadorProducto({ productoActual, parametros }: BuscadorProduct
                 .then((resultado) => {
                     if (vigente) {
                         setOpciones(resultado);
+                    }
+                })
+                .catch(() => {
+                    if (vigente) {
+                        toast.error("No fue posible buscar productos.");
+                        setOpciones([]);
                     }
                 })
                 .finally(() => {

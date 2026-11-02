@@ -4,6 +4,9 @@ import { Prisma } from "@prisma/client";
 import type { FiltroMovimientosSeleccion } from "@/shared/lib/inventario-alcance-filtros";
 import { condicionMovimientosSql } from "@/shared/lib/inventario-alcance-sql";
 
+/** Mayor valor de `Producto.ID_Product`, columna `Int` de MySQL. */
+const ID_PRODUCTO_MAXIMO = 2147483647;
+
 export interface ConsultaSalidasProducto {
     productoId: number;
     filtroMovimientos: FiltroMovimientosSeleccion;
@@ -57,6 +60,10 @@ export function mapearTotales(filas: FilaTotalSql[]): TotalAgrupado[] {
 }
 
 export function leerProductoId(valor: string | undefined): number | undefined {
+    if (valor === undefined || !/^\d+$/.test(valor)) {
+        return undefined;
+    }
+
     const numero = Number(valor);
-    return valor !== undefined && Number.isInteger(numero) && numero > 0 ? numero : undefined;
+    return numero > 0 && numero <= ID_PRODUCTO_MAXIMO ? numero : undefined;
 }

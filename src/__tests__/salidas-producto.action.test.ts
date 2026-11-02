@@ -63,6 +63,23 @@ describe("buscarProductosAction", () => {
     });
 });
 
+describe("buscarProductosAction con códigos largos", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        sesionAdministrador();
+    });
+
+    it("no compara por código un número que no cabe en la columna", async () => {
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([] as never);
+
+        await buscarProductosAction("99999999999999999999");
+
+        expect(prisma.producto.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { OR: [{ descripcion: { contains: "99999999999999999999" } }] }
+        }));
+    });
+});
+
 describe("consultarSalidasProducto", () => {
     beforeEach(() => {
         vi.clearAllMocks();

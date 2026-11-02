@@ -55,7 +55,7 @@ export default async function SalidasPorProductoPage({ searchParams }: SalidasPo
                         ))}
                         {resultado.producto ? (
                             <InventarioFiltros
-                                action="/salidas/por-producto"
+                                action={`/salidas/por-producto?productoId=${resultado.producto.id}`}
                                 centros={resultado.centros}
                                 bodegas={resultado.bodegas}
                                 centroId={resultado.centroId}

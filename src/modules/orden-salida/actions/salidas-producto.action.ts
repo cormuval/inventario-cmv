@@ -12,6 +12,7 @@ import { prisma } from "@/shared/lib/prisma";
 import {
     construirTotalesPorBodega,
     construirTotalesPorTipo,
+    leerProductoId,
     mapearTotales,
     type FilaTotalSql,
     type TotalAgrupado
@@ -57,6 +58,7 @@ export async function buscarProductosAction(texto: string): Promise<ProductoBusc
     await requireSessionUser();
     const termino = texto.trim();
     const esCodigo = /^\d+$/.test(termino);
+    const codigo = leerProductoId(termino);
 
     if (termino.length < 2 && !esCodigo) {
         return [];
@@ -66,7 +68,7 @@ export async function buscarProductosAction(texto: string): Promise<ProductoBusc
         where: {
             OR: [
                 { descripcion: { contains: termino } },
-                ...(esCodigo ? [{ id: Number(termino) }] : [])
+                ...(codigo ? [{ id: codigo }] : [])
             ]
         },
         select: { id: true, descripcion: true, linea: true },

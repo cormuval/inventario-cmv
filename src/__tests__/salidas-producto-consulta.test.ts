@@ -48,4 +48,13 @@ describe("leerProductoId", () => {
         expect(leerProductoId("abc")).toBeUndefined();
         expect(leerProductoId(undefined)).toBeUndefined();
     });
+
+    it("rechaza notaciones numéricas y valores fuera del rango de la columna", () => {
+        expect(leerProductoId("1e2")).toBeUndefined();
+        expect(leerProductoId("7.0")).toBeUndefined();
+        expect(leerProductoId("1e30")).toBeUndefined();
+        expect(leerProductoId("99999999999999999999")).toBeUndefined();
+        expect(leerProductoId("2147483647")).toBe(2147483647);
+        expect(leerProductoId("2147483648")).toBeUndefined();
+    });
 });
