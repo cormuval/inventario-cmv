@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // actions
 import { exportarReporteExcelAction } from "@/modules/reporte/actions/reporte.action";
@@ -63,6 +64,22 @@ describe("ReporteTabla", () => {
 });
 
 describe("BotonExportarReporte", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("avisa y reactiva el botón si la exportación falla por un error de red", async () => {
+        vi.mocked(exportarReporteExcelAction).mockRejectedValue(new Error("503"));
+
+        render(<BotonExportarReporte parametros={{ mesDesde: "2026-01", mesHasta: "2026-12" }} />);
+        const boton = screen.getByRole("button", { name: /exportar excel/i });
+        fireEvent.click(boton);
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No fue posible generar el Excel del reporte."));
+        await waitFor(() => expect(boton).toBeEnabled());
+        expect(descargarArchivoBase64).not.toHaveBeenCalled();
+    });
+
     it("descarga el archivo devuelto por la action", async () => {
         vi.mocked(exportarReporteExcelAction).mockResolvedValue({ ok: true, message: "", base64: "QUJD", nombreArchivo: "r.xlsx" });
 

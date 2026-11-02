@@ -31,6 +31,8 @@ export function BotonExportarReporte({ parametros }: { parametros: Record<string
 
             descargarArchivoBase64(resultado.base64, resultado.nombreArchivo, MIME_XLSX);
             toast.success("Reporte exportado.");
+        } catch {
+            toast.error("No fue posible generar el Excel del reporte.");
         } finally {
             setExportando(false);
         }
