@@ -447,6 +447,8 @@ git commit -m "perf(salidas): el formulario carga solo los lotes de la bodega el
   - `construirConsultaStock(filtros: FiltrosConsultaStock, pagina: { skip: number; tamano: number }): Prisma.Sql`
   - `mapearStockConsolidado(filas: FilaStockSql[], lotes: LoteStockSql[], hoy?: Date): StockConsolidadoVista[]`
 
+> **Decisión tomada (2026-11-02):** el mínimo pasa a ser el **20 %** de la cantidad, con la constante `PORCENTAJE_STOCK_MINIMO` en `movimientos.ts`. La columna `StockMinimo` de AppSheet sigue sin usarse para la alerta ni para el filtro. La nota siguiente queda como antecedente.
+>
 > **Decisión pendiente (no bloquea):** la columna "Mínimo" y la alerta `stock_minimo` usan hoy `calcularStockMinimo` (10 % de la cantidad), no la columna `StockMinimo` de la tabla, que sí viene poblada desde AppSheet. Con esa regla el filtro "Bajo stock mínimo" solo encuentra productos con 1 unidad. Este plan conserva la regla actual (coherente con la columna y la alerta que ya se muestran) y la concentra en la constante `EXPR_MINIMO`. Si el equipo decide usar `StockMinimo` de AppSheet, se cambia `EXPR_MINIMO` por `g.minimo` (agregando `MAX(s.StockMinimo) AS minimo` al agrupado) y `calcularStockMinimo` en el mapeo, con sus pruebas.
 
 - [ ] **Step 1: Escribir las pruebas**

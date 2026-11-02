@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useActionState, useEffect, useMemo, useState } from "react";
-import type { Bodega, Centro, Stock } from "@prisma/client";
+import type { Bodega, Centro } from "@prisma/client";
+import { toast } from "sonner";
 
 // actions
+import { listarLotesDisponibles } from "@/modules/orden-salida/actions/lotes-disponibles.action";
 import { crearOrdenSalida } from "@/modules/orden-salida/actions/orden-salida.action";
 
 // components
@@ -27,14 +29,8 @@ import { initialActionState } from "@/shared/types/action-state";
 // utils
 import { toDateInputValue } from "@/shared/utils/format";
 
-interface StockDisponible extends Stock {
-    producto: {
-        descripcion: string;
-    };
-    bodega: {
-        nombre: string;
-    };
-}
+// types
+import type { StockDisponible } from "@/modules/orden-salida/types/stock-disponible";
 
 export function OrdenSalidaForm({
     centros,
@@ -43,6 +39,7 @@ export function OrdenSalidaForm({
     stocks,
     centroId = null,
     bodegaId: bodegaIdProp = null,
+    errorLotes,
     puedeFiltrarCentro = false
 }: {
     centros: Centro[];
@@ -51,13 +48,69 @@ export function OrdenSalidaForm({
     stocks: StockDisponible[];
     centroId?: string | null;
     bodegaId?: string | null;
+    errorLotes?: string;
     puedeFiltrarCentro?: boolean;
 }): React.ReactElement {
     const [state, formAction] = useActionState(crearOrdenSalida, initialActionState);
     const [centroSeleccionado, setCentroSeleccionado] = useState(centroId ?? centros[0]?.id ?? "");
     const bodegasFiltradas = bodegas.filter((bodega) => bodega.centroId === centroSeleccionado);
-    const primerStock = stocks.find((s) => s.bodegaId === (bodegaIdProp ?? bodegasFiltradas[0]?.id));
-    const [bodegaId, setBodegaId] = useState(bodegaIdProp ?? primerStock?.bodegaId ?? bodegasFiltradas[0]?.id ?? "");
+    const [bodegaId, setBodegaId] = useState(bodegaIdProp ?? bodegasFiltradas[0]?.id ?? "");
+    const [lotes, setLotes] = useState<StockDisponible[]>(stocks);
+    const [cargandoLotes, setCargandoLotes] = useState(false);
+    const [recargas, setRecargas] = useState(0);
+
+    useEffect(() => {
+        if (errorLotes) {
+            toast.error(errorLotes);
+        }
+    }, [errorLotes]);
+
+    useEffect(() => {
+        if (state.ok) {
+            setRecargas((actual) => actual + 1);
+        }
+    }, [state]);
+
+    useEffect(() => {
+        if (!bodegaId) {
+            setCargandoLotes(false);
+            setLotes([]);
+            return;
+        }
+        if (recargas === 0 && bodegaId === bodegaIdProp) {
+            setCargandoLotes(false);
+            setLotes(stocks);
+            return;
+        }
+
+        let vigente = true;
+        setCargandoLotes(true);
+        listarLotesDisponibles(bodegaId)
+            .then((resultado) => {
+                if (!vigente) {
+                    return;
+                }
+                if (!resultado.ok) {
+                    toast.error(resultado.message);
+                }
+                setLotes(resultado.lotes);
+            })
+            .catch(() => {
+                if (vigente) {
+                    toast.error("No fue posible cargar los lotes de la bodega.");
+                    setLotes([]);
+                }
+            })
+            .finally(() => {
+                if (vigente) {
+                    setCargandoLotes(false);
+                }
+            });
+
+        return () => {
+            vigente = false;
+        };
+    }, [bodegaId, bodegaIdProp, recargas, stocks]);
     const [tipoSalida, setTipoSalida] = useState("Consumo Interno");
     const esMerma = tipoSalida.trim().toLowerCase() === "merma";
     const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
@@ -214,7 +267,10 @@ export function OrdenSalidaForm({
             </label>
             <div className="border-t pt-3 md:col-span-3">
                 <p className="mb-3 text-sm font-medium">Detalle</p>
-                <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={stocks} tipoSalida={tipoSalida} />
+                {cargandoLotes ? (
+                    <p className="text-sm text-muted-foreground">Cargando lotes de la bodega…</p>
+                ) : null}
+                <OrdenSalidaDetallesField bodegaId={bodegaId} stocks={lotes} tipoSalida={tipoSalida} />
             </div>
             {state.ok && state.id && (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 md:col-span-3">
