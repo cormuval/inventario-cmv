@@ -18,6 +18,9 @@ interface InventarioFiltrosProps {
     puedeFiltrarCentro: boolean;
     busqueda?: string;
     mostrarBusqueda?: boolean;
+    mostrarRangoFechas?: boolean;
+    desde?: string;
+    hasta?: string;
 }
 
 export function InventarioFiltros({
@@ -28,7 +31,10 @@ export function InventarioFiltros({
     bodegaId,
     puedeFiltrarCentro,
     busqueda = "",
-    mostrarBusqueda = false
+    mostrarBusqueda = false,
+    mostrarRangoFechas = false,
+    desde = "",
+    hasta = ""
 }: InventarioFiltrosProps): React.ReactElement {
     const [centroSeleccionado, setCentroSeleccionado] = useState(centroId ?? "todos");
     const [bodegaSeleccionada, setBodegaSeleccionada] = useState(bodegaId ?? "todos");
@@ -48,7 +54,7 @@ export function InventarioFiltros({
     const centroFijo = centros.length === 1 ? centros[0] : null;
 
     return (
-        <form action={action} className="grid gap-3 md:grid-cols-4">
+        <form action={action} className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             <label className="space-y-1 text-sm">
                 <span>Centro</span>
                 {puedeFiltrarCentro ? (
@@ -78,6 +84,18 @@ export function InventarioFiltros({
                     ))}
                 </Select>
             </label>
+            {mostrarRangoFechas ? (
+                <>
+                    <label className="space-y-1 text-sm">
+                        <span>Desde</span>
+                        <Input type="date" name="desde" defaultValue={desde} aria-label="Desde" />
+                    </label>
+                    <label className="space-y-1 text-sm">
+                        <span>Hasta</span>
+                        <Input type="date" name="hasta" defaultValue={hasta} aria-label="Hasta" />
+                    </label>
+                </>
+            ) : null}
             {mostrarBusqueda ? (
                 <label className="space-y-1 text-sm md:col-span-1">
                     <span>Buscar producto</span>
