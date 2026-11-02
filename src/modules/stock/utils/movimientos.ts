@@ -12,6 +12,7 @@ export interface StockAlertaInput {
 
 export type StockAlerta = "sin_stock" | "caducado" | "stock_minimo" | "caducidad_proxima" | "ok";
 export const DIAS_ALERTA_CADUCIDAD = [90, 60, 30, 15, 10, 5, 4, 3, 2, 1] as const;
+export const PORCENTAJE_STOCK_MINIMO = 20;
 
 export function sumarEntrada(input: StockMovimiento): number {
     validarCantidadPositiva(input.cantidadMovimiento);
@@ -128,7 +129,8 @@ export function calcularStockMinimo(cantidad: number): number {
         return 0;
     }
 
-    return Math.ceil(cantidad * 0.1);
+    // Se multiplica antes de dividir para evitar errores de coma flotante (15 * 0.2 = 3.0000000000000004)
+    return Math.ceil((cantidad * PORCENTAJE_STOCK_MINIMO) / 100);
 }
 
 export function filtrarExistenciasVisibles<T extends StockLoteFiltrable>(stocks: T[]): T[] {

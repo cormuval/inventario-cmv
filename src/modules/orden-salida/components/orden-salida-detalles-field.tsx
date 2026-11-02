@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import type { Stock } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 
 // components
@@ -13,14 +12,8 @@ import { Input } from "@/shared/components/ui/input";
 import { esLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { formatDate, toDateInputValue } from "@/shared/utils/format";
 
-interface StockDisponible extends Stock {
-    producto: {
-        descripcion: string;
-    };
-    bodega: {
-        nombre: string;
-    };
-}
+// types
+import type { StockDisponible } from "@/modules/orden-salida/types/stock-disponible";
 
 interface DetalleSalidaRow {
     id: number;

@@ -1,5 +1,8 @@
 import type * as React from "react";
 
+// actions
+import { listarLotesDisponibles, type LotesDisponiblesResultado } from "@/modules/orden-salida/actions/lotes-disponibles.action";
+
 // components
 import { OrdenSalidaForm } from "@/modules/orden-salida/components/orden-salida-form";
 import { SinPermisoRegistro } from "@/shared/components/inventario/sin-permiso-registro";
@@ -13,22 +16,17 @@ import { prisma } from "@/shared/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const SIN_LOTES: LotesDisponiblesResultado = { ok: true, message: "", lotes: [] };
+
 export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
     const puedeRegistrar = puedeOperarSalida(alcance.usuario.rol);
     const centrosDisponiblesIds = alcance.centros.map((centro) => centro.id);
-    const [stocks, bodegasDestino] = puedeRegistrar
+    const centroInicial = alcance.centroId ?? alcance.centros[0]?.id ?? null;
+    const bodegaInicial = alcance.bodegaId ?? alcance.bodegas.find((bodega) => bodega.centroId === centroInicial)?.id ?? null;
+    const [lotesIniciales, bodegasDestino] = puedeRegistrar
         ? await Promise.all([
-              alcance.bodegaIds.length > 0
-                  ? prisma.stock.findMany({
-                        where: { cantidadDisponible: { gt: 0 }, bodegaId: { in: alcance.bodegaIds } },
-                        include: {
-                            producto: { select: { descripcion: true } },
-                            bodega: { select: { nombre: true } }
-                        },
-                        orderBy: [{ producto: { descripcion: "asc" } }, { fechaCaducidad: "asc" }]
-                    })
-                  : Promise.resolve([]),
+              bodegaInicial ? listarLotesDisponibles(bodegaInicial) : Promise.resolve(SIN_LOTES),
               centrosDisponiblesIds.length > 0
                   ? prisma.bodega.findMany({
                         where: { centroId: { in: centrosDisponiblesIds }, estado: true },
@@ -36,7 +34,7 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
                     })
                   : Promise.resolve([])
           ])
-        : [[], []];
+        : [SIN_LOTES, []];
 
     return (
         <AppLayout>
@@ -55,9 +53,10 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
                                 centros={alcance.centros}
                                 bodegas={alcance.bodegas}
                                 bodegasDestino={bodegasDestino}
-                                stocks={stocks}
-                                centroId={alcance.centroId}
-                                bodegaId={alcance.bodegaId}
+                                stocks={lotesIniciales.lotes}
+                                errorLotes={lotesIniciales.ok ? undefined : lotesIniciales.message}
+                                centroId={centroInicial}
+                                bodegaId={bodegaInicial}
                                 puedeFiltrarCentro={alcance.puedeFiltrarCentro}
                             />
                         </CardContent>
