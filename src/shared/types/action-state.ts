@@ -3,6 +3,8 @@ export interface ActionState {
     message: string;
     id?: string;
     advertencia?: string;
+    ordenId?: string;
+    codigoRecepcion?: string;
 }
 
 export const initialActionState: ActionState = {

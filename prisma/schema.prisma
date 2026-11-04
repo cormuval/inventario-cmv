@@ -8,14 +8,15 @@ datasource db {
 }
 
 model Centro {
-    id         String             @id @default(cuid()) @map("ID_Centro") @db.VarChar(255)
-    nombre     String             @map("Nombre") @db.VarChar(255)
-    estado     Boolean            @default(true) @map("Estado")
-    bodegas    Bodega[]
-    usuarios   Usuario[]
-    entradas   OrdenEntrada[]
-    salidas    OrdenSalida[]
-    encargados EncargadosBodega[]
+    id             String             @id @default(cuid()) @map("ID_Centro") @db.VarChar(255)
+    nombre         String             @map("Nombre") @db.VarChar(255)
+    estado         Boolean            @default(true) @map("Estado")
+    bodegas        Bodega[]
+    usuarios       Usuario[]
+    entradas       OrdenEntrada[]
+    salidas        OrdenSalida[]      @relation("OrdenSalidaCentroOrigen")
+    salidasDestino OrdenSalida[]      @relation("OrdenSalidaCentroDestino")
+    encargados     EncargadosBodega[]
 
     @@map("Centro")
 }
@@ -60,8 +61,9 @@ model Usuario {
     rol        Rol                @relation(fields: [rolId], references: [id])
     bodega     Bodega?            @relation(fields: [bodegaId], references: [id])
     centro     Centro             @relation(fields: [centroId], references: [id])
-    entradas   OrdenEntrada[]
-    salidas    OrdenSalida[]
+    entradas             OrdenEntrada[]
+    salidas              OrdenSalida[]      @relation("OrdenSalidaUsuarioEmisor")
+    salidasRecepcionadas OrdenSalida[]      @relation("OrdenSalidaUsuarioReceptor")
     encargos   EncargadosBodega[] @relation("UsuarioEncargado")
     logs       Log[]
 
@@ -128,29 +130,42 @@ model OrdenEntradaDetalle {
 }
 
 model OrdenSalida {
-    id              String               @id @default(cuid()) @map("ID_OrdenSalida") @db.VarChar(255)
-    fecha           DateTime             @map("Fecha") @db.Date
-    usuarioId       String               @map("ID_User") @db.VarChar(255)
-    bodegaId        String               @map("ID_Bodega") @db.VarChar(255)
-    bodegaDestinoId String?              @map("ID_Bodega_Destino") @db.VarChar(255)
-    tipoSalida      String               @map("Tipo_Salida") @db.VarChar(255)
-    centroId        String               @map("ID_Centro") @db.VarChar(255)
-    destino         String               @map("Destino") @db.VarChar(255)
-    codigoSalida    String?              @map("Codigo_Salida") @db.VarChar(255)
-    enviarCorreo    Boolean              @default(false) @map("Enviar_Correo")
-    correoDestino   String?              @map("Correo_Destino") @db.VarChar(255)
-    fechaEnvioCorreo DateTime?           @map("Fecha_Envio_Correo")
-    errorEnvioCorreo String?             @map("Error_Envio_Correo") @db.VarChar(500)
-    usuario         Usuario              @relation(fields: [usuarioId], references: [id])
-    bodega          Bodega               @relation("OrdenSalidaBodegaOrigen", fields: [bodegaId], references: [id])
-    bodegaDestino   Bodega?              @relation("OrdenSalidaBodegaDestino", fields: [bodegaDestinoId], references: [id])
-    centro          Centro               @relation(fields: [centroId], references: [id])
-    detalles        OrdenSalidaDetalle[]
+    id                          String               @id @default(cuid()) @map("ID_OrdenSalida") @db.VarChar(255)
+    fecha                       DateTime             @map("Fecha") @db.Date
+    usuarioId                   String               @map("ID_User") @db.VarChar(255)
+    bodegaId                    String               @map("ID_Bodega") @db.VarChar(255)
+    bodegaDestinoId             String?              @map("ID_Bodega_Destino") @db.VarChar(255)
+    tipoSalida                  String               @map("Tipo_Salida") @db.VarChar(255)
+    centroId                    String               @map("ID_Centro") @db.VarChar(255)
+    centroDestinoId             String?              @map("ID_Centro_Destino") @db.VarChar(255)
+    destino                     String               @map("Destino") @db.VarChar(255)
+    codigoSalida                String?              @map("Codigo_Salida") @db.VarChar(255)
+    enviarCorreo                Boolean              @default(false) @map("Enviar_Correo")
+    correoDestino               String?              @map("Correo_Destino") @db.VarChar(255)
+    fechaEnvioCorreo            DateTime?            @map("Fecha_Envio_Correo")
+    errorEnvioCorreo            String?              @map("Error_Envio_Correo") @db.VarChar(500)
+    estadoPrestamo              String?              @map("Estado_Prestamo") @db.VarChar(50)
+    codigoRecepcion             String?              @unique @map("Codigo_Recepcion") @db.VarChar(10)
+    fechaLimiteRecepcion        DateTime?            @map("Fecha_Limite_Recepcion")
+    fechaRecepcion              DateTime?            @map("Fecha_Recepcion")
+    usuarioReceptorId           String?              @map("ID_Usuario_Receptor") @db.VarChar(255)
+    observacionRecepcion        String?              @map("Observacion_Recepcion") @db.VarChar(255)
+    advertenciaCaducidadAceptada Boolean              @default(false) @map("Advertencia_Caducidad_Aceptada")
+    usuario                     Usuario              @relation("OrdenSalidaUsuarioEmisor", fields: [usuarioId], references: [id])
+    usuarioReceptor             Usuario?             @relation("OrdenSalidaUsuarioReceptor", fields: [usuarioReceptorId], references: [id])
+    bodega                      Bodega               @relation("OrdenSalidaBodegaOrigen", fields: [bodegaId], references: [id])
+    bodegaDestino               Bodega?              @relation("OrdenSalidaBodegaDestino", fields: [bodegaDestinoId], references: [id])
+    centro                      Centro               @relation("OrdenSalidaCentroOrigen", fields: [centroId], references: [id])
+    centroDestino               Centro?              @relation("OrdenSalidaCentroDestino", fields: [centroDestinoId], references: [id])
+    detalles                    OrdenSalidaDetalle[]
 
     @@index([usuarioId])
+    @@index([usuarioReceptorId])
     @@index([bodegaId])
     @@index([bodegaDestinoId])
     @@index([centroId])
+    @@index([centroDestinoId])
+    @@index([estadoPrestamo])
     @@index([fecha])
     @@map("OrdenSalida")
 }
