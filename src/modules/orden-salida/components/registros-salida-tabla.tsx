@@ -4,9 +4,11 @@ import type * as React from "react";
 import type { RegistroSalidaFila } from "@/modules/orden-salida/actions/registros-salida.action";
 
 // components
+import { BotonAnularPrestamo } from "@/modules/orden-salida/components/boton-anular-prestamo";
 import { BotonDescargarComprobante } from "@/modules/orden-salida/components/boton-descargar-comprobante";
 import { BotonEnviarComprobante } from "@/modules/orden-salida/components/boton-enviar-comprobante";
 import { EstadoCorreoBadge } from "@/modules/orden-salida/components/estado-correo-badge";
+import { EstadoPrestamoBadge } from "@/modules/orden-salida/components/estado-prestamo-badge";
 import { VerDetalleOrden } from "@/shared/components/inventario/ver-detalle-orden";
 import { Table, Td, Th } from "@/shared/components/ui/table";
 
@@ -33,7 +35,17 @@ export function RegistrosSalidaTabla({ filas, puedeOperar }: { filas: RegistroSa
                 {filas.map((fila) => (
                     <tr key={fila.id}>
                         <Td>{formatDate(fila.fecha)}</Td>
-                        <Td>{fila.tipoSalida}</Td>
+                        <Td>
+                            <div>{fila.tipoSalida}</div>
+                            {fila.estadoPrestamo && (
+                                <div className="mt-1">
+                                    <EstadoPrestamoBadge
+                                        estado={fila.estadoPrestamo}
+                                        codigoRecepcion={fila.codigoRecepcion}
+                                    />
+                                </div>
+                            )}
+                        </Td>
                         <Td>{fila.destino}</Td>
                         <Td>{fila.bodegaNombre}</Td>
                         <Td>{fila.usuarioNombre}</Td>
@@ -51,6 +63,9 @@ export function RegistrosSalidaTabla({ filas, puedeOperar }: { filas: RegistroSa
                                 <VerDetalleOrden ordenId={fila.id} tipo="salida" />
                                 <BotonDescargarComprobante ordenId={fila.id} size="sm" />
                                 {puedeOperar ? <BotonEnviarComprobante ordenId={fila.id} correoInicial={fila.correoDestino} /> : null}
+                                {puedeOperar && fila.estadoPrestamo === "EN_TRANSITO" ? (
+                                    <BotonAnularPrestamo ordenId={fila.id} />
+                                ) : null}
                             </div>
                         </Td>
                     </tr>
