@@ -30,11 +30,11 @@ export default async function RecepcionPrestamosPage({
             <div className="space-y-6">
                 <div>
                     <Link
-                        href="/orden-entrada"
+                        href="/entradas/nueva"
                         className="inline-flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-900 font-medium mb-2 transition"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
-                        <span>Volver a Órdenes de Entrada</span>
+                        <span>Volver a Nueva entrada</span>
                     </Link>
                     <p className="text-sm text-muted-foreground">
                         Ingreso al stock de transferencias físicas en tránsito mediante código de validación

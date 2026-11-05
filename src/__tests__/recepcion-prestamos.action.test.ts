@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // lib
 import * as authLib from "@/shared/lib/auth";
+import { validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 import { prisma } from "@/shared/lib/prisma";
 
 // actions
@@ -119,6 +120,53 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
     });
 
     describe("confirmarRecepcionPrestamoAction", () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        function bodegaReceptoraActiva(): void {
+            vi.mocked(prisma.ordenSalida.findFirst).mockResolvedValue(mockOrdenEnTransito as never);
+            vi.mocked(prisma.bodega.findUnique).mockResolvedValue({
+                id: "bodega-pa-1",
+                nombre: "Farmacia Playa Ancha",
+                centroId: "centro-playa-ancha",
+                estado: true
+            } as never);
+        }
+
+        it("registra la entrada con la fecha de Chile aunque en UTC ya sea el día siguiente", async () => {
+            // 23:30 del 5 de noviembre en Chile (UTC-3) = 02:30 del 6 de noviembre en UTC
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(new Date("2026-11-06T02:30:00.000Z"));
+            bodegaReceptoraActiva();
+            const mockOrdenEntradaCreate = vi.fn().mockResolvedValue({ id: "ent-1" });
+            vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({
+                ordenSalida: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+                stock: { upsert: vi.fn().mockResolvedValue({}) },
+                ordenEntrada: { create: mockOrdenEntradaCreate }
+            } as never));
+
+            const res = await confirmarRecepcionPrestamoAction({ codigo: "K94J2Q8", bodegaDestinoId: "bodega-pa-1" });
+
+            expect(res.ok).toBe(true);
+            expect(mockOrdenEntradaCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ fecha: new Date("2026-11-05T00:00:00.000Z") })
+            }));
+        });
+
+        it("rechaza la recepción en una bodega fuera del alcance del usuario sin tocar el stock", async () => {
+            bodegaReceptoraActiva();
+            vi.mocked(validarCentroBodegaEnAlcance).mockRejectedValueOnce(
+                new Error("No tienes permiso para operar en el centro o bodega seleccionada.")
+            );
+
+            const res = await confirmarRecepcionPrestamoAction({ codigo: "K94J2Q8", bodegaDestinoId: "bodega-pa-1" });
+
+            expect(res).toEqual({ ok: false, message: "No tienes permiso para operar en el centro o bodega seleccionada." });
+            expect(validarCentroBodegaEnAlcance).toHaveBeenCalledWith("centro-playa-ancha", "bodega-pa-1");
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+
         it("ejecuta la recepción atómica incrementando stock y registrando OrdenEntrada", async () => {
             vi.mocked(prisma.ordenSalida.findFirst).mockResolvedValue(mockOrdenEnTransito as never);
             vi.mocked(prisma.bodega.findUnique).mockResolvedValue({

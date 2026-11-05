@@ -21,6 +21,7 @@ import {
 
 // utils
 import { normalizarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
+import { fechaHoyChile } from "@/shared/utils/filtros-registros";
 
 export interface DetallePrestamoResumen {
     id: string;
@@ -245,7 +246,8 @@ export async function confirmarRecepcionPrestamoAction(
             // 3. Registrar OrdenEntrada automática vinculada
             await tx.ordenEntrada.create({
                 data: {
-                    fecha: new Date(),
+                    // `Fecha` es @db.Date: se guarda el día de Chile, no el de UTC (después de las 21:00 ya es mañana en UTC)
+                    fecha: new Date(`${fechaHoyChile()}T00:00:00.000Z`),
                     usuarioId: user.id,
                     bodegaId: parsed.bodegaDestinoId,
                     centroId: orden.centroDestinoId as string,
@@ -283,8 +285,8 @@ export async function confirmarRecepcionPrestamoAction(
 
         revalidatePath("/");
         revalidatePath("/stock");
-        revalidatePath("/orden-entrada");
-        revalidatePath("/orden-salida");
+        revalidatePath("/entradas/registros");
+        revalidatePath("/salidas/registros");
         revalidatePath("/reporte");
 
         return {
