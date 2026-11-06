@@ -21,6 +21,8 @@ import type { ActionState } from "@/shared/types/action-state";
 import { validarSalidaLoteCaducado } from "@/modules/stock/utils/movimientos";
 import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
 import { cargarOrdenParaComprobante, enviarComprobanteSalida } from "@/modules/orden-salida/utils/envio-comprobante";
+import { generarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
+import { notificarPrestamoEnviado } from "@/modules/orden-salida/utils/notificar-prestamo";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -50,21 +52,34 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             return { ok: false, message: "No tienes permiso para registrar salidas." };
         }
 
+        const advertenciaAceptadaRaw = formData.get("advertenciaCaducidadAceptada");
+        const advertenciaAceptada =
+            advertenciaAceptadaRaw === "true" ||
+            advertenciaAceptadaRaw === "1" ||
+            advertenciaAceptadaRaw === "on";
+
         const parsed = crearOrdenSalidaSchema.parse({
             fecha: formData.get("fecha"),
             bodegaId: formData.get("bodegaId"),
             bodegaDestinoId: formData.get("bodegaDestinoId")?.toString()?.trim() || undefined,
             centroId: formData.get("centroId"),
+            centroDestinoId: formData.get("centroDestinoId")?.toString()?.trim() || undefined,
             tipoSalida: formData.get("tipoSalida"),
             destino: formData.get("destino"),
             codigoSalida: formData.get("codigoSalida")?.toString() || undefined,
             correoDestino: formData.get("correoDestino")?.toString() || undefined,
+            advertenciaCaducidadAceptada: advertenciaAceptada,
             detalles: leerDetallesSalida(formData)
         });
         await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
 
         const esTraspasoBodega = parsed.tipoSalida.trim().toLowerCase() === "a otra bodega";
+        const esAOtroCentro = parsed.tipoSalida.trim().toLowerCase() === "a otros centros";
         let bodegaDestinoId: string | null = null;
+        let centroDestinoId: string | null = null;
+        let codigoRecepcion: string | null = null;
+        let fechaLimiteRecepcion: Date | null = null;
+        let estadoPrestamo: string | null = null;
 
         if (esTraspasoBodega) {
             bodegaDestinoId = parsed.bodegaDestinoId ?? null;
@@ -83,51 +98,112 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             parsed.destino = bodegaDestino.nombre;
         }
 
-        const orden = await prisma.$transaction(async (tx) => {
-            const nuevaOrden = await tx.ordenSalida.create({
-                data: {
-                    fecha: parsed.fecha,
-                    usuarioId: user.id,
-                    bodegaId: parsed.bodegaId,
-                    bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : null,
-                    tipoSalida: parsed.tipoSalida,
-                    centroId: parsed.centroId,
-                    destino: parsed.destino,
-                    codigoSalida: parsed.codigoSalida || null,
-                    correoDestino: parsed.correoDestino || null
-                }
+        if (esAOtroCentro) {
+            centroDestinoId = parsed.centroDestinoId ?? null;
+            if (!centroDestinoId) {
+                return { ok: false, message: "Debe seleccionar el centro de destino para el traspaso." };
+            }
+            if (centroDestinoId === parsed.centroId) {
+                return { ok: false, message: "El centro destino no puede ser el mismo centro de origen." };
+            }
+            const centroDestino = await prisma.centro.findUnique({
+                where: { id: centroDestinoId }
             });
+            if (!centroDestino || !centroDestino.estado) {
+                return { ok: false, message: "El centro de destino seleccionado no existe o no está activo." };
+            }
+            parsed.destino = centroDestino.nombre;
 
-            for (const detalle of parsed.detalles) {
-                await descontarStock(tx, {
-                    productoId: detalle.productoId,
-                    bodegaId: parsed.bodegaId,
-                    cantidad: detalle.cantidad,
-                    lote: detalle.lote,
-                    fechaCaducidad: detalle.fechaCaducidad,
-                    tipoSalida: parsed.tipoSalida
+            if (parsed.bodegaDestinoId && parsed.bodegaDestinoId.trim() !== "") {
+                const bodegaDest = await prisma.bodega.findUnique({
+                    where: { id: parsed.bodegaDestinoId }
                 });
-
-                if (esTraspasoBodega && bodegaDestinoId) {
-                    await devolverStock(tx, {
-                        productoId: detalle.productoId,
-                        bodegaId: bodegaDestinoId,
-                        cantidad: detalle.cantidad,
-                        lote: detalle.lote,
-                        fechaCaducidad: detalle.fechaCaducidad
-                    });
+                if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
+                    return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
                 }
-
-                await tx.ordenSalidaDetalle.create({
-                    data: {
-                        ...detalle,
-                        ordenSalidaId: nuevaOrden.id
-                    }
-                });
+                bodegaDestinoId = bodegaDest.id;
             }
 
-            return nuevaOrden;
-        });
+            codigoRecepcion = generarCodigoRecepcion();
+            estadoPrestamo = "EN_TRANSITO";
+            // Plazo de 1 semana (7 días)
+            fechaLimiteRecepcion = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+
+        let orden: { id: string } | null = null;
+        let intentos = 0;
+        while (intentos < 3) {
+            try {
+                orden = await prisma.$transaction(async (tx) => {
+                    const nuevaOrden = await tx.ordenSalida.create({
+                        data: {
+                            fecha: parsed.fecha,
+                            usuarioId: user.id,
+                            bodegaId: parsed.bodegaId,
+                            bodegaDestinoId: esTraspasoBodega ? bodegaDestinoId : (esAOtroCentro ? bodegaDestinoId : (parsed.bodegaDestinoId ?? null)),
+                            tipoSalida: parsed.tipoSalida,
+                            centroId: parsed.centroId,
+                            centroDestinoId: esAOtroCentro ? centroDestinoId : null,
+                            destino: parsed.destino,
+                            codigoSalida: parsed.codigoSalida || null,
+                            correoDestino: parsed.correoDestino || null,
+                            codigoRecepcion: esAOtroCentro ? codigoRecepcion : null,
+                            estadoPrestamo: esAOtroCentro ? estadoPrestamo : null,
+                            fechaLimiteRecepcion: esAOtroCentro ? fechaLimiteRecepcion : null,
+                            advertenciaCaducidadAceptada: parsed.advertenciaCaducidadAceptada ?? false
+                        }
+                    });
+
+                    for (const detalle of parsed.detalles) {
+                        await descontarStock(tx, {
+                            productoId: detalle.productoId,
+                            bodegaId: parsed.bodegaId,
+                            cantidad: detalle.cantidad,
+                            lote: detalle.lote,
+                            fechaCaducidad: detalle.fechaCaducidad,
+                            tipoSalida: parsed.tipoSalida
+                        });
+
+                        if (esTraspasoBodega && bodegaDestinoId) {
+                            await devolverStock(tx, {
+                                productoId: detalle.productoId,
+                                bodegaId: bodegaDestinoId,
+                                cantidad: detalle.cantidad,
+                                lote: detalle.lote,
+                                fechaCaducidad: detalle.fechaCaducidad
+                            });
+                        }
+
+                        await tx.ordenSalidaDetalle.create({
+                            data: {
+                                ...detalle,
+                                ordenSalidaId: nuevaOrden.id
+                            }
+                        });
+                    }
+
+                    return nuevaOrden;
+                });
+                break;
+            } catch (err: unknown) {
+                const esErrorP2002 =
+                    typeof err === "object" &&
+                    err !== null &&
+                    "code" in err &&
+                    (err as { code: string }).code === "P2002";
+                if (esAOtroCentro && esErrorP2002) {
+                    intentos++;
+                    codigoRecepcion = generarCodigoRecepcion();
+                    if (intentos >= 3) throw err;
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        if (!orden) {
+            return { ok: false, message: "No se pudo registrar la orden de salida." };
+        }
 
         await AuditLogger.log({
             usuarioId: user.id,
@@ -141,9 +217,16 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
                 destino: parsed.destino,
                 bodegaOrigenId: parsed.bodegaId,
                 ...(esTraspasoBodega && bodegaDestinoId ? { bodegaDestinoId } : {}),
+                ...(esAOtroCentro && centroDestinoId ? { centroDestinoId, codigoRecepcion, estadoPrestamo } : {}),
                 detalles: parsed.detalles.length
             }
         });
+
+        if (esAOtroCentro && orden) {
+            // Fail-safe: notificación interna
+            // TODO correo: se conecta en el PR de integración Resend.
+            await notificarPrestamoEnviado(orden.id);
+        }
 
         // El envío del comprobante nunca debe revertir ni ocultar la salida ya registrada
         const envio = parsed.correoDestino
@@ -164,6 +247,17 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         revalidatePath("/stock");
         revalidatePath("/salidas/registros");
         revalidatePath("/reporte");
+
+        if (esAOtroCentro && codigoRecepcion) {
+            return {
+                ok: true,
+                message: `Préstamo intercentros registrado exitosamente. Código de recepción: ${codigoRecepcion}`,
+                id: orden.id,
+                ordenId: orden.id,
+                codigoRecepcion
+            };
+        }
+
         return respuestaSalidaRegistrada(orden.id, envio, parsed.correoDestino);
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo registrar la salida." };
@@ -189,6 +283,13 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
             include: { ordenSalida: true }
         });
         await validarCentroBodegaEnAlcance(previo.ordenSalida.centroId, previo.ordenSalida.bodegaId);
+
+        if (previo.ordenSalida.centroDestinoId) {
+            return {
+                ok: false,
+                message: "No se permite modificar ni eliminar el detalle de un préstamo intercentros."
+            };
+        }
 
         const esTraspaso = previo.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
         let bodegaDestinoId: string | null = null;
@@ -276,6 +377,13 @@ export async function eliminarDetalleSalida(detalleId: string): Promise<ActionSt
             include: { ordenSalida: true }
         });
         await validarCentroBodegaEnAlcance(detalle.ordenSalida.centroId, detalle.ordenSalida.bodegaId);
+
+        if (detalle.ordenSalida.centroDestinoId) {
+            return {
+                ok: false,
+                message: "No se permite modificar ni eliminar el detalle de un préstamo intercentros."
+            };
+        }
 
         const esTraspaso = detalle.ordenSalida.tipoSalida.trim().toLowerCase() === "a otra bodega";
         let bodegaDestinoId: string | null = null;
@@ -495,5 +603,98 @@ export async function reenviarComprobanteSalidaAction(ordenId: string, correo: s
         return { ok: false, message: `No se pudo enviar el comprobante: ${envio.error}` };
     } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "No se pudo enviar el comprobante." };
+    }
+}
+
+export async function anularPrestamoAction(ordenSalidaId: string, motivo: string): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeOperarSalida(user.rol)) {
+            return { ok: false, message: "No tienes permiso para anular préstamos." };
+        }
+
+        const motivoTrim = motivo?.trim();
+        if (!motivoTrim || motivoTrim.length < 5) {
+            return { ok: false, message: "Debe ingresar un motivo de anulación detallado (mínimo 5 caracteres)." };
+        }
+
+        const orden = await prisma.ordenSalida.findUnique({
+            where: { id: ordenSalidaId },
+            include: {
+                detalles: true
+            }
+        });
+
+        if (!orden) {
+            return { ok: false, message: "La orden de préstamo no existe." };
+        }
+
+        if (!orden.centroDestinoId || !orden.estadoPrestamo) {
+            return { ok: false, message: "La orden especificada no corresponde a un préstamo intercentros." };
+        }
+
+        await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId);
+
+        if (orden.estadoPrestamo !== "EN_TRANSITO") {
+            return { ok: false, message: "Solo se pueden anular préstamos que se encuentren en estado 'EN_TRANSITO'." };
+        }
+
+        await prisma.$transaction(async (tx) => {
+            const { count } = await tx.ordenSalida.updateMany({
+                where: {
+                    id: orden.id,
+                    estadoPrestamo: "EN_TRANSITO"
+                },
+                data: {
+                    estadoPrestamo: "ANULADO",
+                    observacionRecepcion: `Anulado: ${motivoTrim}`
+                }
+            });
+
+            if (count !== 1) {
+                throw new Error("PRESTAMO_YA_PROCESADO");
+            }
+
+            // Devolver stock a la bodega de origen por lote y caducidad
+            for (const d of orden.detalles) {
+                await devolverStock(tx, {
+                    productoId: d.productoId,
+                    bodegaId: orden.bodegaId,
+                    cantidad: d.cantidad,
+                    lote: d.lote,
+                    fechaCaducidad: d.fechaCaducidad
+                });
+            }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: orden.centroId,
+            bodegaId: orden.bodegaId,
+            accion: "anular",
+            entidad: "OrdenSalida",
+            entidadId: orden.id,
+            detalle: {
+                tipoSalida: orden.tipoSalida,
+                centroOrigenId: orden.centroId,
+                centroDestinoId: orden.centroDestinoId,
+                codigoRecepcion: orden.codigoRecepcion,
+                motivo: motivoTrim
+            }
+        });
+
+        revalidatePath("/stock");
+        revalidatePath("/salidas/registros");
+        revalidatePath("/reporte");
+
+        return { ok: true, message: "Préstamo anulado y stock restituido a la bodega de origen exitosamente." };
+    } catch (error) {
+        if (error instanceof Error && error.message === "PRESTAMO_YA_PROCESADO") {
+            return { ok: false, message: "El préstamo ya fue recibido o anulado." };
+        }
+        return {
+            ok: false,
+            message: error instanceof Error ? error.message : "Error al anular el préstamo."
+        };
     }
 }

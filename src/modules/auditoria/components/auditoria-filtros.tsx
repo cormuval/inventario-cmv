@@ -258,6 +258,8 @@ export function AuditoriaFiltros({
                         <option value="crear">Crear</option>
                         <option value="actualizar">Actualizar</option>
                         <option value="eliminar">Eliminar</option>
+                        <option value="anular">Anular</option>
+                        <option value="notificar">Notificar</option>
                         <option value="enviar_correo">Enviar correo</option>
                         <option value="migracion">Migración</option>
                         <option value="exportar">Exportación</option>

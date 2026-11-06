@@ -27,6 +27,9 @@ export interface RegistroSalidaFila {
     fechaEnvioCorreo: Date | null;
     errorEnvioCorreo: string | null;
     correoDestino: string | null;
+    centroDestinoId?: string | null;
+    estadoPrestamo?: string | null;
+    codigoRecepcion?: string | null;
 }
 
 export async function listarRegistrosSalida(filtros: FiltrosRegistros): Promise<ResultadoRegistros<RegistroSalidaFila>> {
@@ -59,6 +62,9 @@ export async function listarRegistrosSalida(filtros: FiltrosRegistros): Promise<
             fechaEnvioCorreo: true,
             errorEnvioCorreo: true,
             correoDestino: true,
+            centroDestinoId: true,
+            estadoPrestamo: true,
+            codigoRecepcion: true,
             bodega: { select: { nombre: true } },
             usuario: { select: { nombre: true, apPaterno: true } }
         },
@@ -92,6 +98,9 @@ export async function listarRegistrosSalida(filtros: FiltrosRegistros): Promise<
             fechaEnvioCorreo: orden.fechaEnvioCorreo,
             errorEnvioCorreo: orden.errorEnvioCorreo,
             correoDestino: orden.correoDestino,
+            centroDestinoId: orden.centroDestinoId,
+            estadoPrestamo: orden.estadoPrestamo,
+            codigoRecepcion: orden.codigoRecepcion,
             ...(resumen.get(orden.id) ?? { productos: 0, unidades: 0 })
         }))
     };

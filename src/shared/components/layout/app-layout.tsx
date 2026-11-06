@@ -12,6 +12,9 @@ import { AppSidebarShell, type LayoutUserProfile } from "@/shared/components/lay
 import { obtenerSessionUser } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
+// actions
+import { obtenerPrestamosEnTransitoCentroAction } from "@/modules/orden-entrada/actions/notificaciones-prestamos.action";
+
 export async function AppLayout({ children }: { children: ReactNode }): Promise<React.ReactElement> {
     const user = await obtenerSessionUser();
 
@@ -19,9 +22,12 @@ export async function AppLayout({ children }: { children: ReactNode }): Promise<
         redirect(RUTA_LOGIN);
     }
 
-    const profile = await obtenerLayoutUserProfile(user.id);
+    const [profile, notificaciones] = await Promise.all([
+        obtenerLayoutUserProfile(user.id),
+        obtenerPrestamosEnTransitoCentroAction()
+    ]);
 
-    return <AppSidebarShell profile={profile}>{children}</AppSidebarShell>;
+    return <AppSidebarShell profile={profile} notificaciones={notificaciones}>{children}</AppSidebarShell>;
 }
 
 async function obtenerLayoutUserProfile(userId: string): Promise<LayoutUserProfile> {
