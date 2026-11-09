@@ -9,6 +9,9 @@ export const ROL_ADMINISTRADOR = "R01";
 /** Rol de supervision acotado a un centro de salud (todas sus bodegas). */
 export const ROL_ENCARGADO_CENTRO = "R02";
 
+/** Rol de visualizacion global comunal de solo lectura para Drogueria Central. */
+export const ROL_VISUALIZADOR_DROGUERIA = "R08";
+
 export const ROLES_OPERAN_ENTRADA = ["R01", "R03", "R06", "R07"] as const;
 export const ROLES_OPERAN_SALIDA = ["R01", "R03", "R07"] as const;
 

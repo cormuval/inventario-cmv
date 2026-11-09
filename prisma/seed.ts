@@ -41,7 +41,8 @@ async function main(): Promise<void> {
         ["R02", "Encargado Centro"],
         ["R03", "Encargado Bodega"],
         ["R06", "Operador Entrada"],
-        ["R07", "Operador Salida"]
+        ["R07", "Operador Salida"],
+        ["R08", "Visualizador Global Droguería"]
     ] as const;
 
     for (const [id, descripcion] of roles) {

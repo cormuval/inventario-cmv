@@ -30,13 +30,15 @@ export default async function NuevaEntradaPage(): Promise<React.ReactElement> {
                         <p className="text-sm text-muted-foreground">Recepción de productos y aumento de stock</p>
                         <h2 className="text-2xl font-semibold">Nueva entrada</h2>
                     </div>
-                    <Link
-                        href="/orden-entrada/recepcion-prestamos"
-                        className="inline-flex items-center gap-2 rounded-lg border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-900 shadow-sm transition hover:bg-teal-100 self-start sm:self-auto"
-                    >
-                        <span>Recepcionar Préstamo Intercentros (Código)</span>
-                        <ArrowRight className="h-4 w-4 text-teal-700" />
-                    </Link>
+                    {puedeRegistrar ? (
+                        <Link
+                            href="/orden-entrada/recepcion-prestamos"
+                            className="inline-flex items-center gap-2 rounded-lg border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-900 shadow-sm transition hover:bg-teal-100 self-start sm:self-auto"
+                        >
+                            <span>Recepcionar Préstamo Intercentros (Código)</span>
+                            <ArrowRight className="h-4 w-4 text-teal-700" />
+                        </Link>
+                    ) : null}
                 </div>
                 {puedeRegistrar ? (
                     <Card>

@@ -30,25 +30,36 @@
 ## 2. Matriz de Roles y Reglas de Negocio
 
 ```
-                     ┌──────────────────────────────────────────────┐
-                     │          ADMINISTRADOR COMUNAL (DAS)         │
-                     │          (Rol R01) — Vista Panorámica        │
-                     └──────────────────────┬───────────────────────┘
-                                            │
-                     ┌──────────────────────┴───────────────────────┐
-                     │            ENCARGADO DE CENTRO               │
-                     │  (Rol R02) — Solo su CESFAM (todas sus bod.) │
-                     └──────────────────────┬───────────────────────┘
-                                            │
-                     ┌──────────────────────┴───────────────────────┐
-                     │     ENCARGADOS / OPERADORES DE BODEGA        │
-                     │ (Roles R03, R06, R07) — Solo bodegas asignadas│
-                     └──────────────────────────────────────────────┘
+                     ┌────────────────────────────────────────────────────────┐
+                     │              VISTA PANORÁMICA COMUNAL                  │
+                     │          (Todos los Centros y Todas las Bodegas)       │
+                     └───────────────────────────┬────────────────────────────┘
+                                                 │
+                     ┌───────────────────────────┴────────────────────────────┐
+                     │                                                        │
+        ┌────────────▼──────────────┐                          ┌──────────────▼─────────────┐
+        │   ADMINISTRADOR (R01)     │                          │  VISUALIZADOR DROGUERÍA    │
+        │      (DAS Comunal)        │                          │         (Rol R08)          │
+        ├───────────────────────────┤                          ├────────────────────────────┤
+        │ • Vista de todo           │                          │ • Vista de todo            │
+        │ • Entradas y Salidas      │                          │ • CERO mutaciones          │
+        │ • Mantenedores y Usuarios │                          │ • Sin acceso Mantenedores  │
+        └─────────────┬─────────────┘                          └────────────────────────────┘
+                      │
+┌─────────────────────┴───────────────────────────────────────────────────────┐
+│                                                                             │
+│                            ALCANCE LOCAL Y SEGREGADO                        │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • ENCARGADO DE CENTRO (Rol R02): Solo su CESFAM (todas sus bodegas)         │
+│ • ENCARGADOS / OPERADORES (Roles R03, R06, R07): Solo sus bodegas asignadas │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Rol | Código | Alcance de Centros | Alcance de Bodegas | Movimientos Visibles | Operaciones Permitidas |
 |---|---|---|---|---|---|
 | **Administrador Comunal** | `R01` | Todos los centros comunales (filtro libre) | Todas las bodegas comunales | Todo el historial comunal | Entradas, Salidas, Configuración, Auditoría |
+| **Visualizador Global Droguería** | `R08` | Todos los centros comunales (filtro libre) | Todas las bodegas comunales | Todo el historial comunal | Solo Lectura (sin mutaciones ni mantenedores) |
 | **Encargado Centro** | `R02` | Exclusivamente su `centroId` | Todas las bodegas de su centro | Todos los movimientos de su centro | Supervisión, consultas y reportes de su centro |
 | **Encargado Bodega** | `R03` | Exclusivamente su `centroId` | Bodegas asignadas (`EncargadosBodega` $\cup$ `Usuario.bodegaId`) | Movimientos de su(s) bodega(s) asignada(s) | Entradas y Salidas en su(s) bodega(s) |
 | **Operador Entrada** | `R06` | Exclusivamente su `centroId` | Bodegas asignadas | Movimientos de su(s) bodega(s) asignada(s) | Entradas en su(s) bodega(s) |
@@ -59,7 +70,7 @@
 ## 3. Especificación de Reglas de Negocio
 
 ### Regla R-01: Segregación Panorámica vs. Local
-- Solo el Administrador Comunal (`R01`) tiene selector para cambiar entre centros de salud.
+- El Administrador Comunal (`R01`) y el Visualizador Global Droguería (`R08`) disponen de selector para alternar entre centros de salud comunales (`puedeFiltrarCentro: true`). Para `R08`, esta vista panorámica es estrictamente de solo lectura (sin facultades de mutación ni mantenedores, ver `procedimiento-perfil-visualizacion-global.md`).
 - Para todos los demás roles (`R02`, `R03`, `R06`, `R07`), el `centroId` queda estrictamente bloqueado al centro de su perfil.
 - Para los roles de bodega (`R03`, `R06`, `R07`), el selector de bodegas solo despliega aquellas bodegas formalmente asignadas al funcionario.
 

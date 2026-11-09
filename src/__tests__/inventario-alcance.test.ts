@@ -62,6 +62,36 @@ describe("inventario-alcance", () => {
         expect(alcance.bodegas).toHaveLength(3);
     });
 
+    it("resuelve alcance panorámico para Visualizador Global Droguería (R08)", async () => {
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({
+            id: "user-drogueria",
+            nombre: "Visualizador",
+            apPaterno: "Droguería",
+            email: "drogueria@cmvalparaiso.cl",
+            rol: "R08",
+            centroId: "centro-drogueria",
+            bodegaId: null
+        });
+
+        vi.mocked(prisma.centro.findMany).mockResolvedValue([
+            { id: "centro-1", nombre: "CESFAM Barón", estado: true },
+            { id: "centro-2", nombre: "CESFAM Esperanza", estado: true }
+        ] as any);
+
+        vi.mocked(prisma.bodega.findMany).mockResolvedValue([
+            { id: "b1", nombre: "Bodega Farmacia Barón", centroId: "centro-1", estado: true },
+            { id: "b2", nombre: "Bodega Vacunatorio Barón", centroId: "centro-1", estado: true },
+            { id: "b3", nombre: "Bodega Farmacia Esperanza", centroId: "centro-2", estado: true }
+        ] as any);
+
+        const alcance = await obtenerAlcanceInventario();
+
+        expect(alcance.puedeFiltrarCentro).toBe(true);
+        expect(alcance.centros).toHaveLength(2);
+        expect(alcance.centroIds).toEqual(["centro-1", "centro-2"]);
+        expect(alcance.bodegas).toHaveLength(3);
+    });
+
     it("resuelve alcance exclusivo de centro para Encargado Centro (R02)", async () => {
         vi.mocked(authLib.requireSessionUser).mockResolvedValue({
             id: "user-encargado-centro",

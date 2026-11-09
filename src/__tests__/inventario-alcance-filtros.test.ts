@@ -27,13 +27,20 @@ function crearAlcance(rol: string, centroIds: string[], bodegaIds: string[]): In
         bodegaId: null,
         centroIds,
         bodegaIds,
-        puedeFiltrarCentro: rol === "R01"
+        puedeFiltrarCentro: rol === "R01" || rol === "R08"
     };
 }
 
 describe("inventario-alcance-filtros", () => {
     it("no restringe el historial ni el stock del Administrador (R01), incluidas bodegas inactivas", () => {
         const alcance = crearAlcance("R01", ["centro-1"], ["b1"]);
+
+        expect(crearFiltroMovimientosAlcance(alcance)).toEqual({});
+        expect(crearFiltroStockAlcance(alcance)).toEqual({});
+    });
+
+    it("no restringe el historial ni el stock del Visualizador Global Droguería (R08)", () => {
+        const alcance = crearAlcance("R08", ["centro-1"], ["b1"]);
 
         expect(crearFiltroMovimientosAlcance(alcance)).toEqual({});
         expect(crearFiltroStockAlcance(alcance)).toEqual({});

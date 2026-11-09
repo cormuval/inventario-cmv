@@ -3,7 +3,7 @@
 import type { Bodega, Centro } from "@prisma/client";
 
 // config
-import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO, ROL_VISUALIZADOR_DROGUERIA } from "@/config/auth";
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
@@ -30,7 +30,7 @@ const ROLES_BODEGAS_ASOCIADAS = ["R03", "R06", "R07"] as const;
 export async function obtenerAlcanceInventario(filtros: InventarioFiltrosInput = {}): Promise<InventarioAlcance> {
     const usuario = await requireSessionUser();
 
-    if (usuario.rol === ROL_ADMINISTRADOR) {
+    if (usuario.rol === ROL_ADMINISTRADOR || usuario.rol === ROL_VISUALIZADOR_DROGUERIA) {
         return obtenerAlcanceAdministrador(usuario, filtros);
     }
 
