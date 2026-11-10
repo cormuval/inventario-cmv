@@ -108,6 +108,9 @@ Para evitar confusión en los usuarios de Droguería y presentar una interfaz li
 4. **Módulo Mantenedores (`src/app/mantenedores/page.tsx`):**
    - En la barra lateral de navegación (`src/shared/components/layout/menu.ts`), el enlace `/mantenedores` se oculta si `rol !== ROL_ADMINISTRADOR`.
    - En la página `/mantenedores`, si un usuario que no es administrador ingresa por enlace directo, se redirige inmediatamente a la raíz (`/`) mediante `redirect("/")`.
+   - La Server Action `listarMantenedores()` exige una sesión válida y rol administrador antes de consultar datos, incluso si se invoca directamente.
+
+La descarga de PDF usa `validarLecturaComprobanteEnAlcance`: los roles globales `R01` y `R08` autenticados pueden descargar órdenes históricas aunque su centro o bodega esté desactivado. Los demás roles conservan su validación de alcance. Las mutaciones siguen usando la validación operativa de centros y bodegas activos.
 
 ### Regla R-04: Módulo de Stock y Reportes
 - En `/stock` (`src/app/stock/page.tsx`):

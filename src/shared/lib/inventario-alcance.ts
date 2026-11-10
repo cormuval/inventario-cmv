@@ -67,6 +67,17 @@ export async function validarCentroBodegaEnAlcance(centroId: string, bodegaId: s
     }
 }
 
+/** La lectura global de comprobantes conserva acceso a órdenes de recintos desactivados. */
+export async function validarLecturaComprobanteEnAlcance(centroId: string, bodegaId: string): Promise<void> {
+    const usuario = await requireSessionUser();
+
+    if (usuario.rol === ROL_ADMINISTRADOR || usuario.rol === ROL_VISUALIZADOR_DROGUERIA) {
+        return;
+    }
+
+    await validarCentroBodegaEnAlcance(centroId, bodegaId);
+}
+
 async function obtenerAlcanceAdministrador(usuario: SessionUser, filtros: InventarioFiltrosInput): Promise<InventarioAlcance> {
     const centros = await prisma.centro.findMany({ where: { estado: true }, orderBy: { nombre: "asc" } });
     const centroId = normalizarSeleccion(filtros.centroId, centros.map((centro) => centro.id));

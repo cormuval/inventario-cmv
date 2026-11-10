@@ -35,6 +35,7 @@ import {
     crearCentro,
     crearUnidad,
     crearUsuario,
+    listarMantenedores,
     toggleEstadoUsuario
 } from "@/modules/mantenedores/actions/mantenedores.action";
 import { listarStockConsolidado } from "@/modules/stock/actions/stock.action";
@@ -64,6 +65,7 @@ vi.mock("@/shared/lib/prisma", () => ({
         $transaction: vi.fn(),
         centro: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
         bodega: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+        rol: { findMany: vi.fn() },
         unidad: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
         usuario: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
         encargadosBodega: { findMany: vi.fn() },
@@ -339,5 +341,75 @@ describe("Perfil de Visualización Global Droguería (R08)", () => {
             expect(res.base64).toBeDefined();
             expect(res.filename).toBe("comprobante-salida-salida-100.pdf");
         });
+    });
+
+    it.each(["R08", "R01"])("descarga PDF histórico de centro y bodega inactivos para %s", async (rol) => {
+        const usuario = await authLib.requireSessionUser();
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({ ...usuario, rol });
+        vi.mocked(prisma.centro.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.bodega.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
+            id: "salida-historica", centroId: "centro-inactivo", bodegaId: "bodega-inactiva"
+        } as never);
+
+        const resultado = await descargarComprobanteSalidaAction("salida-historica");
+
+        expect(resultado.ok).toBe(true);
+        expect(resultado.base64).toBeDefined();
+    });
+
+    it("rechaza PDF sin sesión válida", async () => {
+        vi.mocked(authLib.requireSessionUser).mockRejectedValue(new Error("Sesion no valida."));
+        vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
+            id: "salida-historica", centroId: "centro-2", bodegaId: "b3"
+        } as never);
+
+        expect((await descargarComprobanteSalidaAction("salida-historica")).ok).toBe(false);
+    });
+
+    it("rechaza PDF de otra bodega para un operador", async () => {
+        const usuario = await authLib.requireSessionUser();
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({ ...usuario, rol: "R07", bodegaId: "b1" });
+        vi.mocked(prisma.centro.findFirst).mockResolvedValue(centrosMock[0] as never);
+        vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.bodega.findFirst).mockResolvedValue(bodegasMock[0] as never);
+        vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
+            id: "salida-ajena", centroId: "centro-2", bodegaId: "b3"
+        } as never);
+
+        expect((await descargarComprobanteSalidaAction("salida-ajena")).ok).toBe(false);
+    });
+
+    it.each(["R02", "R03", "R06", "R07", "R08"])("rechaza consulta directa de mantenedores para %s sin leer datos", async (rol) => {
+        const usuario = await authLib.requireSessionUser();
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({ ...usuario, rol });
+
+        await expect(listarMantenedores()).rejects.toThrow(/Solo administradores/);
+        expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+        expect(prisma.centro.findMany).not.toHaveBeenCalled();
+        expect(prisma.bodega.findMany).not.toHaveBeenCalled();
+        expect(prisma.unidad.findMany).not.toHaveBeenCalled();
+        expect(prisma.rol.findMany).not.toHaveBeenCalled();
+    });
+
+    it("rechaza consulta de mantenedores sin sesión", async () => {
+        vi.mocked(authLib.requireSessionUser).mockRejectedValue(new Error("Sesion no valida."));
+
+        await expect(listarMantenedores()).rejects.toThrow(/Sesion no valida/);
+        expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+    });
+
+    it("permite consultar mantenedores al administrador", async () => {
+        const usuario = await authLib.requireSessionUser();
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue({ ...usuario, rol: "R01" });
+        vi.mocked(prisma.usuario.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.rol.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.unidad.findMany).mockResolvedValue([]);
+
+        const resultado = await listarMantenedores();
+
+        expect(resultado.centros).toEqual(centrosMock);
+        expect(resultado.bodegas).toEqual(bodegasMock);
+        expect(resultado.usuarios).toEqual([]);
     });
 });

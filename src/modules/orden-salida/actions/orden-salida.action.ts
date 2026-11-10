@@ -5,7 +5,7 @@ import type { PrismaClient } from "@prisma/client";
 
 // lib
 import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
-import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance, validarLecturaComprobanteEnAlcance } from "@/shared/lib/inventario-alcance";
 
 import { AuditLogger } from "@/shared/lib/logger";
 import type { ResultadoCorreo } from "@/shared/lib/correo";
@@ -541,7 +541,7 @@ export async function descargarComprobanteSalidaAction(
             return { ok: false, error: "Orden de salida no encontrada" };
         }
 
-        await validarCentroBodegaEnAlcance(orden.centroId, orden.bodegaId);
+        await validarLecturaComprobanteEnAlcance(orden.centroId, orden.bodegaId);
 
         const pdfBuffer = await generarComprobanteSalidaPDF(orden);
 
