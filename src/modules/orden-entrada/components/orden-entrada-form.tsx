@@ -116,6 +116,7 @@ export function OrdenEntradaForm({
                 <span>Origen</span>
                 <Select name="origen" required value={origen} onChange={(event) => setOrigen(event.currentTarget.value)}>
                     <option value="Drogueria">Drogueria</option>
+                    <option value="Bodega Central">Bodega Central</option>
                     <option value="Desde Otros Centros">Desde Otros Centros</option>
                     <option value="Otros Servicios">Otros Servicios</option>
                 </Select>
