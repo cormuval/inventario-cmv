@@ -1,10 +1,11 @@
+import { redirect } from "next/navigation";
 import type * as React from "react";
 
 // actions
 import { listarMantenedores } from "@/modules/mantenedores/actions/mantenedores.action";
 
 // lib
-import { requireSessionUser } from "@/shared/lib/auth";
+import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
 
 // components
 import { BodegaForm, CentroForm, UnidadForm, UsuarioForm } from "@/modules/mantenedores/components/mantenedores-forms";
@@ -15,10 +16,13 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 export const dynamic = "force-dynamic";
 
 export default async function MantenedoresPage(): Promise<React.ReactElement> {
-    const [data, sessionUser] = await Promise.all([
-        listarMantenedores(),
-        requireSessionUser()
-    ]);
+    const sessionUser = await requireSessionUser();
+
+    if (!puedeAdministrar(sessionUser.rol)) {
+        redirect("/");
+    }
+
+    const data = await listarMantenedores();
 
     return (
         <AppLayout>

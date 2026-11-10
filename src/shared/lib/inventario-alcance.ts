@@ -3,7 +3,7 @@
 import type { Bodega, Centro } from "@prisma/client";
 
 // config
-import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO, ROL_VISUALIZADOR_DROGUERIA } from "@/config/auth";
 
 // lib
 import { prisma } from "@/shared/lib/prisma";
@@ -30,7 +30,7 @@ const ROLES_BODEGAS_ASOCIADAS = ["R03", "R06", "R07"] as const;
 export async function obtenerAlcanceInventario(filtros: InventarioFiltrosInput = {}): Promise<InventarioAlcance> {
     const usuario = await requireSessionUser();
 
-    if (usuario.rol === ROL_ADMINISTRADOR) {
+    if (usuario.rol === ROL_ADMINISTRADOR || usuario.rol === ROL_VISUALIZADOR_DROGUERIA) {
         return obtenerAlcanceAdministrador(usuario, filtros);
     }
 
@@ -65,6 +65,17 @@ export async function validarCentroBodegaEnAlcance(centroId: string, bodegaId: s
     if (!bodega || bodega.centroId !== centroId) {
         throw new Error("La bodega seleccionada no pertenece al centro indicado.");
     }
+}
+
+/** La lectura global de comprobantes conserva acceso a órdenes de recintos desactivados. */
+export async function validarLecturaComprobanteEnAlcance(centroId: string, bodegaId: string): Promise<void> {
+    const usuario = await requireSessionUser();
+
+    if (usuario.rol === ROL_ADMINISTRADOR || usuario.rol === ROL_VISUALIZADOR_DROGUERIA) {
+        return;
+    }
+
+    await validarCentroBodegaEnAlcance(centroId, bodegaId);
 }
 
 async function obtenerAlcanceAdministrador(usuario: SessionUser, filtros: InventarioFiltrosInput): Promise<InventarioAlcance> {

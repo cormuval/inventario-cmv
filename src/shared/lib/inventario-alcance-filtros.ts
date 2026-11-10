@@ -1,5 +1,5 @@
 // config
-import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROL_ENCARGADO_CENTRO, ROL_VISUALIZADOR_DROGUERIA } from "@/config/auth";
 
 // types
 import type { InventarioAlcance } from "@/shared/lib/inventario-alcance";
@@ -28,7 +28,7 @@ export interface FiltroMovimientosSeleccion {
  * Retorna `null` cuando el usuario no tiene alcance (no debe ver nada).
  */
 export function crearFiltroMovimientosAlcance(alcance: InventarioAlcance): FiltroMovimientosAlcance | null {
-    if (alcance.usuario.rol === ROL_ADMINISTRADOR) {
+    if (alcance.usuario.rol === ROL_ADMINISTRADOR || alcance.usuario.rol === ROL_VISUALIZADOR_DROGUERIA) {
         return {};
     }
 

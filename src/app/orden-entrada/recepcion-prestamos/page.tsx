@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type * as React from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -7,6 +8,7 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 import { RecepcionPrestamoView } from "@/modules/orden-entrada/components/recepcion-prestamo-view";
 
 // lib
+import { puedeOperarEntrada } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,11 @@ export default async function RecepcionPrestamosPage({
     searchParams
 }: RecepcionPrestamosPageProps): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
+
+    if (!puedeOperarEntrada(alcance.usuario.rol)) {
+        redirect("/entradas/registros");
+    }
+
     const resolvedParams = searchParams ? await searchParams : undefined;
     const codigoInicial = resolvedParams?.codigo ?? "";
 

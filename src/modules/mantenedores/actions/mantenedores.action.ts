@@ -25,6 +25,11 @@ import {
 import type { ActionState } from "@/shared/types/action-state";
 
 export async function listarMantenedores() {
+    const user = await requireSessionUser();
+    if (!puedeAdministrar(user.rol)) {
+        throw new Error("Solo administradores pueden acceder a los mantenedores.");
+    }
+
     const [centros, bodegas, roles, usuarios, unidades] = await Promise.all([
         prisma.centro.findMany({ orderBy: { nombre: "asc" } }),
         prisma.bodega.findMany({ include: { centro: true }, orderBy: { nombre: "asc" } }),

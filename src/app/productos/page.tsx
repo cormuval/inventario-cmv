@@ -3,6 +3,9 @@ import type * as React from "react";
 // actions
 import { listarProductos } from "@/modules/productos/actions/productos.action";
 
+// lib
+import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
+
 // components
 import { ProductoForm } from "@/modules/productos/components/producto-form";
 import { Badge } from "@/shared/components/ui/badge";
@@ -13,7 +16,11 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 export const dynamic = "force-dynamic";
 
 export default async function ProductosPage(): Promise<React.ReactElement> {
-    const productos = await listarProductos();
+    const [productos, sessionUser] = await Promise.all([
+        listarProductos(),
+        requireSessionUser()
+    ]);
+    const puedeCrear = puedeAdministrar(sessionUser.rol);
 
     return (
         <AppLayout>
@@ -22,14 +29,16 @@ export default async function ProductosPage(): Promise<React.ReactElement> {
                     <p className="text-sm text-muted-foreground">Catalogo base para movimientos</p>
                     <h2 className="text-2xl font-semibold">Productos</h2>
                 </div>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Nuevo producto</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ProductoForm />
-                    </CardContent>
-                </Card>
+                {puedeCrear ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Nuevo producto</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ProductoForm />
+                        </CardContent>
+                    </Card>
+                ) : null}
                 <Card>
                     <CardHeader>
                         <CardTitle>Productos registrados</CardTitle>

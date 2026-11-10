@@ -38,6 +38,22 @@ describe("Estandarización de Mantenedores en Interfaz", () => {
         expect(screen.queryByRole("link", { name: /^configuraciones$/i })).toBeNull();
     });
 
+    it("no renderiza 'Mantenedores' en la barra lateral para usuarios sin rol R01 (ej. R08 Droguería)", () => {
+        render(
+            <AppSidebarShell
+                profile={{
+                    ...mockProfile,
+                    rol: "Visualizador Global Droguería",
+                    rolId: "R08"
+                }}
+            >
+                <div>Contenido principal</div>
+            </AppSidebarShell>
+        );
+
+        expect(screen.queryByRole("link", { name: /mantenedores/i })).toBeNull();
+    });
+
     it("redirige permanentemente la ruta historica /configuraciones a /mantenedores", async () => {
         const redirects = await nextConfig.redirects?.();
 

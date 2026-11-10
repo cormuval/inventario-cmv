@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { descargarComprobanteSalidaAction } from "@/modules/orden-salida/actions/orden-salida.action";
 import { prisma } from "@/shared/lib/prisma";
-import { validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
+import { validarLecturaComprobanteEnAlcance } from "@/shared/lib/inventario-alcance";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/shared/lib/logger", () => ({ AuditLogger: { log: vi.fn() } }));
 
 vi.mock("@/shared/lib/inventario-alcance", () => ({
-    validarCentroBodegaEnAlcance: vi.fn()
+    validarCentroBodegaEnAlcance: vi.fn(),
+    validarLecturaComprobanteEnAlcance: vi.fn()
 }));
 
 vi.mock("@/shared/lib/prisma", () => ({
@@ -32,24 +33,24 @@ describe("descargarComprobanteSalidaAction", () => {
         expect(res.error).toMatch(/no encontrada/i);
     });
 
-    it("retorna error cuando validarCentroBodegaEnAlcance rechaza por falta de permisos de alcance", async () => {
+    it("retorna error cuando validarLecturaComprobanteEnAlcance rechaza por falta de permisos de alcance", async () => {
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
             id: "sal-ajena",
             bodegaId: "b-otra",
             centroId: "c-1"
         } as any);
-        vi.mocked(validarCentroBodegaEnAlcance).mockRejectedValue(
+        vi.mocked(validarLecturaComprobanteEnAlcance).mockRejectedValue(
             new Error("No tienes permiso para operar en el centro o bodega seleccionada.")
         );
 
         const res = await descargarComprobanteSalidaAction("sal-ajena");
         expect(res.ok).toBe(false);
         expect(res.error).toBe("No tienes permiso para operar en el centro o bodega seleccionada.");
-        expect(validarCentroBodegaEnAlcance).toHaveBeenCalledWith("c-1", "b-otra");
+        expect(validarLecturaComprobanteEnAlcance).toHaveBeenCalledWith("c-1", "b-otra");
     });
 
     it("permite la descarga cuando la orden existe y está en alcance, retornando base64 con nombre de archivo", async () => {
-        vi.mocked(validarCentroBodegaEnAlcance).mockResolvedValue(undefined);
+        vi.mocked(validarLecturaComprobanteEnAlcance).mockResolvedValue(undefined);
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue({
             id: "sal-valida",
             fecha: new Date(),
@@ -78,6 +79,6 @@ describe("descargarComprobanteSalidaAction", () => {
         expect(res.filename).toBe("comprobante-salida-sal-valida.pdf");
         expect(res.base64).toBeDefined();
         expect(typeof res.base64).toBe("string");
-        expect(validarCentroBodegaEnAlcance).toHaveBeenCalledWith("c-1", "b-1");
+        expect(validarLecturaComprobanteEnAlcance).toHaveBeenCalledWith("c-1", "b-1");
     });
 });

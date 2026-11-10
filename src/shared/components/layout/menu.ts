@@ -61,7 +61,7 @@ export function construirMenu(rolId?: string): ItemMenu[] {
         { tipo: "grupo", label: "Gestión de entrada", icon: ArrowDownToLine, items: entrada },
         { tipo: "grupo", label: "Gestión de salida", icon: ArrowUpFromLine, items: salida },
         enlace("/reporte", "Reporte", FileBarChart),
-        enlace("/mantenedores", "Mantenedores", SlidersHorizontal),
+        ...(rol === ROL_ADMINISTRADOR ? [enlace("/mantenedores", "Mantenedores", SlidersHorizontal)] : []),
         ...(rol === ROL_ADMINISTRADOR ? [enlace("/auditoria", "Auditoría", History)] : [])
     ];
 }
