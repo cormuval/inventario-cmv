@@ -63,6 +63,14 @@ export const crearOrdenSalidaSchema = z.object({
             });
         }
 
+        if (!data.bodegaDestinoId || data.bodegaDestinoId.trim() === "") {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Debe seleccionar la bodega destino del centro receptor.",
+                path: ["bodegaDestinoId"]
+            });
+        }
+
         // Advertencia consultiva sanitaria de 1 semana
         const tieneLoteProximo = data.detalles.some((d) => esLoteCaducidadProximaSieteDias(d.fechaCaducidad));
         if (tieneLoteProximo && !data.advertenciaCaducidadAceptada) {

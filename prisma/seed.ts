@@ -90,17 +90,34 @@ async function main(): Promise<void> {
         }
     });
 
-    await prisma.unidad.upsert({
-        where: { descripcion: "Caja" },
-        update: {},
-        create: { descripcion: "Caja" }
-    });
+    const unidadesBase = [
+        "Caja",
+        "Unidad",
+        "Box Médico / Consulta Médica",
+        "Urgencia / SAPU / SAR",
+        "Vacunatorio",
+        "Dental / Odontología",
+        "Toma de Muestras / Laboratorio",
+        "Sala de Curaciones",
+        "Sala ERA / IRA",
+        "Farmacia Despacho Paciente",
+        "Atención Domiciliaria",
+        "Kinesiología / Rehabilitación",
+        "Baja por caducidad en estantería",
+        "Rotura o deterioro de envase",
+        "Falla de cadena de frío",
+        "Retiro de mercado / Alerta sanitaria ISP",
+        "Contaminación o pérdida de esterilidad",
+        "Otra causal sanitaria"
+    ];
 
-    await prisma.unidad.upsert({
-        where: { descripcion: "Unidad" },
-        update: {},
-        create: { descripcion: "Unidad" }
-    });
+    for (const descripcion of unidadesBase) {
+        await prisma.unidad.upsert({
+            where: { descripcion },
+            update: {},
+            create: { descripcion }
+        });
+    }
 
     const guantes = await prisma.producto.upsert({
         where: { id: 1 },

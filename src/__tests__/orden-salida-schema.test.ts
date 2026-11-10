@@ -132,5 +132,51 @@ describe("crearOrdenSalidaSchema - validaciones sanitarias", () => {
             expect(result.success).toBe(true);
         }
     });
+
+    it("rechaza salida 'A Otros Centros' si falta bodegaDestinoId", () => {
+        const payload = {
+            fecha: hoy,
+            bodegaId: "bodega-1",
+            centroId: "centro-1",
+            tipoSalida: "A Otros Centros",
+            destino: "CESFAM Playa Ancha",
+            centroDestinoId: "centro-2",
+            detalles: [{
+                productoId: 1,
+                cantidad: 2,
+                lote: "LOT-1",
+                fechaCaducidad: manana
+            }]
+        };
+
+        const result = crearOrdenSalidaSchema.safeParse(payload);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            const hasBodegaMsg = result.error.issues.some((i) => /bodega destino/i.test(i.message));
+            expect(hasBodegaMsg).toBe(true);
+        }
+    });
+
+    it("permite salida 'A Otros Centros' con centroDestinoId y bodegaDestinoId válidos", () => {
+        const payload = {
+            fecha: hoy,
+            bodegaId: "bodega-1",
+            centroId: "centro-1",
+            tipoSalida: "A Otros Centros",
+            destino: "CESFAM Playa Ancha",
+            centroDestinoId: "centro-2",
+            bodegaDestinoId: "bodega-2",
+            advertenciaCaducidadAceptada: true,
+            detalles: [{
+                productoId: 1,
+                cantidad: 2,
+                lote: "LOT-1",
+                fechaCaducidad: manana
+            }]
+        };
+
+        const result = crearOrdenSalidaSchema.safeParse(payload);
+        expect(result.success).toBe(true);
+    });
 });
 

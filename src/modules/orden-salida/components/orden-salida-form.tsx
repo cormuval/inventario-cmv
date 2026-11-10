@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useActionState, useEffect, useMemo, useState } from "react";
-import type { Bodega, Centro } from "@prisma/client";
+import type { Bodega, Centro, Unidad } from "@prisma/client";
 import { toast } from "sonner";
 
 // actions
@@ -35,8 +35,10 @@ import type { StockDisponible } from "@/modules/orden-salida/types/stock-disponi
 
 export function OrdenSalidaForm({
     centros,
+    todosCentros = [],
     bodegas,
     bodegasDestino = [],
+    unidades = [],
     stocks,
     centroId = null,
     bodegaId: bodegaIdProp = null,
@@ -44,8 +46,10 @@ export function OrdenSalidaForm({
     puedeFiltrarCentro = false
 }: {
     centros: Centro[];
+    todosCentros?: Centro[];
     bodegas: Bodega[];
     bodegasDestino?: Bodega[];
+    unidades?: Unidad[];
     stocks: StockDisponible[];
     centroId?: string | null;
     bodegaId?: string | null;
@@ -123,11 +127,33 @@ export function OrdenSalidaForm({
     }, [bodegasDestino, bodegas, centroSeleccionado, bodegaId]);
     const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
 
+    const poolCentros = todosCentros && todosCentros.length > 0 ? todosCentros : centros;
     const otrosCentrosDisponibles = useMemo(
-        () => centros.filter((c) => c.id !== centroSeleccionado && c.estado !== false),
-        [centros, centroSeleccionado]
+        () => poolCentros.filter((c) => c.id !== centroSeleccionado && c.estado !== false),
+        [poolCentros, centroSeleccionado]
     );
     const [centroDestinoId, setCentroDestinoId] = useState(otrosCentrosDisponibles[0]?.id ?? "");
+
+    const bodegasOtrosCentrosDisponibles = useMemo(() => {
+        return bodegasDestino.filter((b) => b.centroId === centroDestinoId && b.estado);
+    }, [bodegasDestino, centroDestinoId]);
+    const [bodegaDestinoOtroCentroId, setBodegaDestinoOtroCentroId] = useState(
+        bodegasOtrosCentrosDisponibles[0]?.id ?? ""
+    );
+
+    const opcionesConsumo = useMemo(() => {
+        if (unidades && unidades.length > 0) {
+            return unidades.map((u) => u.descripcion);
+        }
+        return DESTINOS_CONSUMO_INTERNO;
+    }, [unidades]);
+
+    const opcionesMerma = useMemo(() => {
+        if (unidades && unidades.length > 0) {
+            return unidades.map((u) => u.descripcion);
+        }
+        return DESTINOS_MERMA;
+    }, [unidades]);
 
     useEffect(() => {
         if (!bodegasDestinoDisponibles.some((b) => b.id === bodegaDestinoId)) {
@@ -136,10 +162,19 @@ export function OrdenSalidaForm({
     }, [bodegasDestinoDisponibles, bodegaDestinoId]);
 
     useEffect(() => {
-        if (!otrosCentrosDisponibles.some((c) => c.id === centroDestinoId)) {
-            setCentroDestinoId(otrosCentrosDisponibles[0]?.id ?? "");
+        if (!bodegasOtrosCentrosDisponibles.some((b) => b.id === bodegaDestinoOtroCentroId)) {
+            setBodegaDestinoOtroCentroId(bodegasOtrosCentrosDisponibles[0]?.id ?? "");
         }
-    }, [otrosCentrosDisponibles, centroDestinoId]);
+    }, [bodegasOtrosCentrosDisponibles, bodegaDestinoOtroCentroId]);
+
+    useEffect(() => {
+        if (!otrosCentrosDisponibles.some((c) => c.id === centroDestinoId)) {
+            const nuevoCentro = otrosCentrosDisponibles[0]?.id ?? "";
+            setCentroDestinoId(nuevoCentro);
+            const bods = bodegasDestino.filter((b) => b.centroId === nuevoCentro && b.estado);
+            setBodegaDestinoOtroCentroId(bods[0]?.id ?? "");
+        }
+    }, [otrosCentrosDisponibles, centroDestinoId, bodegasDestino]);
 
     function cambiarCentro(nuevoCentroId: string): void {
         setCentroSeleccionado(nuevoCentroId);
@@ -267,35 +302,61 @@ export function OrdenSalidaForm({
                     />
                 </label>
             ) : esOtrosCentros ? (
-                <label className="space-y-1 text-sm">
-                    <span>Centro de salud destino *</span>
-                    <Select
-                        key="a-otros-centros"
-                        name="centroDestinoId"
-                        required
-                        value={centroDestinoId}
-                        onChange={(event) => setCentroDestinoId(event.currentTarget.value)}
-                    >
-                        {otrosCentrosDisponibles.length === 0 && (
-                            <option value="">No hay otros centros disponibles</option>
-                        )}
-                        {otrosCentrosDisponibles.map((centro) => (
-                            <option key={centro.id} value={centro.id}>
-                                {centro.nombre}
-                            </option>
-                        ))}
-                    </Select>
-                    <input
-                        type="hidden"
-                        name="destino"
-                        value={otrosCentrosDisponibles.find((c) => c.id === centroDestinoId)?.nombre ?? ""}
-                    />
-                </label>
+                <>
+                    <label className="space-y-1 text-sm">
+                        <span>Centro de salud destino *</span>
+                        <Select
+                            key="a-otros-centros"
+                            name="centroDestinoId"
+                            required
+                            value={centroDestinoId}
+                            onChange={(event) => {
+                                const nuevoCentro = event.currentTarget.value;
+                                setCentroDestinoId(nuevoCentro);
+                                const bods = bodegasDestino.filter((b) => b.centroId === nuevoCentro && b.estado);
+                                setBodegaDestinoOtroCentroId(bods[0]?.id ?? "");
+                            }}
+                        >
+                            {otrosCentrosDisponibles.length === 0 && (
+                                <option value="">No hay otros centros disponibles</option>
+                            )}
+                            {otrosCentrosDisponibles.map((centro) => (
+                                <option key={centro.id} value={centro.id}>
+                                    {centro.nombre}
+                                </option>
+                            ))}
+                        </Select>
+                        <input
+                            type="hidden"
+                            name="destino"
+                            value={otrosCentrosDisponibles.find((c) => c.id === centroDestinoId)?.nombre ?? ""}
+                        />
+                    </label>
+                    <label className="space-y-1 text-sm">
+                        <span>Bodega destino (Centro receptor) *</span>
+                        <Select
+                            key="bodega-destino-otro-centro"
+                            name="bodegaDestinoId"
+                            required
+                            value={bodegaDestinoOtroCentroId}
+                            onChange={(event) => setBodegaDestinoOtroCentroId(event.currentTarget.value)}
+                        >
+                            {bodegasOtrosCentrosDisponibles.length === 0 && (
+                                <option value="">No hay bodegas disponibles en este centro</option>
+                            )}
+                            {bodegasOtrosCentrosDisponibles.map((bodega) => (
+                                <option key={bodega.id} value={bodega.id}>
+                                    {bodega.nombre}
+                                </option>
+                            ))}
+                        </Select>
+                    </label>
+                </>
             ) : esMerma ? (
                 <label className="space-y-1 text-sm">
                     <span>Causal / Justificación sanitaria *</span>
-                    <Select key="merma" name="destino" required defaultValue={DESTINOS_MERMA[0]}>
-                        {DESTINOS_MERMA.map((causal) => (
+                    <Select key="merma" name="destino" required defaultValue={opcionesMerma[0] ?? ""}>
+                        {opcionesMerma.map((causal) => (
                             <option key={causal} value={causal}>
                                 {causal}
                             </option>
@@ -305,8 +366,8 @@ export function OrdenSalidaForm({
             ) : (
                 <label className="space-y-1 text-sm">
                     <span>Servicio / Unidad clínica destino *</span>
-                    <Select key="consumo-interno" name="destino" required defaultValue={DESTINOS_CONSUMO_INTERNO[0]}>
-                        {DESTINOS_CONSUMO_INTERNO.map((unidad) => (
+                    <Select key="consumo-interno" name="destino" required defaultValue={opcionesConsumo[0] ?? ""}>
+                        {opcionesConsumo.map((unidad) => (
                             <option key={unidad} value={unidad}>
                                 {unidad}
                             </option>

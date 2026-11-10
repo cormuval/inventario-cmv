@@ -114,20 +114,34 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
             parsed.destino = centroDestino.nombre;
 
-            if (parsed.bodegaDestinoId && parsed.bodegaDestinoId.trim() !== "") {
-                const bodegaDest = await prisma.bodega.findUnique({
-                    where: { id: parsed.bodegaDestinoId }
-                });
-                if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
-                    return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
-                }
-                bodegaDestinoId = bodegaDest.id;
+            if (!parsed.bodegaDestinoId || parsed.bodegaDestinoId.trim() === "") {
+                return { ok: false, message: "Debe seleccionar la bodega destino del centro receptor." };
             }
+
+            const bodegaDest = await prisma.bodega.findUnique({
+                where: { id: parsed.bodegaDestinoId }
+            });
+            if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
+                return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
+            }
+            bodegaDestinoId = bodegaDest.id;
 
             codigoRecepcion = generarCodigoRecepcion();
             estadoPrestamo = "EN_TRANSITO";
             // Plazo de 1 semana (7 días)
             fechaLimiteRecepcion = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+
+        const esConsumoInterno = parsed.tipoSalida.trim().toLowerCase() === "consumo interno";
+        if (esConsumoInterno) {
+            if (typeof prisma.unidad?.findFirst === "function") {
+                const unidadValida = await prisma.unidad.findFirst({
+                    where: { descripcion: parsed.destino.trim() }
+                });
+                if (!unidadValida) {
+                    return { ok: false, message: "El servicio o unidad clínica seleccionada no es válida." };
+                }
+            }
         }
 
         let orden: { id: string } | null = null;
