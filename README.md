@@ -38,7 +38,7 @@ El acceso es exclusivamente con Google (NextAuth v5). Reglas aplicadas en cada i
 2. El correo debe existir en la tabla `Usuario`.
 3. El usuario debe estar con `Estado = true`.
 
-`npm run db:seed` deja habilitados como administradores (`R01`) a `rvergara@cmvalparaiso.cl` y `dsantibanez@cmvalparaiso.cl`.
+`npm run db:seed` deja habilitados como administradores (`R01`) a los correos definidos en `SEED_ADMINISTRADORES` (ver `.env.example`).
 
 En Google Cloud debe estar registrada la redirect URI `http://localhost:3000/api/auth/callback/google`.
 

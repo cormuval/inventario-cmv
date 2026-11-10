@@ -11,7 +11,7 @@ const orden: OrdenSalidaPDFData = {
     centro: { nombre: "CESFAM Barón" },
     bodega: { nombre: "Bodega Farmacia" },
     bodegaDestino: null,
-    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "crojas@cmvalparaiso.cl" },
+    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "solicitante.demo@cmvalparaiso.cl" },
     detalles: [
         { id: "d1", cantidad: 5, lote: "L1", fechaCaducidad: new Date("2027-01-01"), producto: { descripcion: "Paracetamol" } },
         { id: "d2", cantidad: 2, lote: "L2", fechaCaducidad: new Date("2027-01-01"), producto: { descripcion: "Gasa" } }
@@ -26,7 +26,7 @@ describe("construirCorreoComprobante", () => {
 
         expect(correo.para).toBe("destino@cmvalparaiso.cl");
         expect(correo.asunto).toBe("Comprobante de salida N° sal-1 — CESFAM Barón");
-        expect(correo.responderA).toBe("crojas@cmvalparaiso.cl");
+        expect(correo.responderA).toBe("solicitante.demo@cmvalparaiso.cl");
         expect(correo.adjuntos).toEqual([{ nombre: "comprobante-salida-sal-1.pdf", contenido: pdf }]);
     });
 

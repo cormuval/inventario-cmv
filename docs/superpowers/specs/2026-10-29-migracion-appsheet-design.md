@@ -9,7 +9,7 @@
 
 ## 1. Problema
 
-El inventario de los centros de salud se opera hoy en AppSheet, sobre MySQL 8.0 en el VPS de AppSheet (base `inventario`). El sistema nuevo ya está desplegado en https://inventario.cmvalparaiso.cl (base `inventario_cmv` en server-das), pero solo tiene roles y administradores. Hay que traspasar los datos sin modificar la base AppSheet, que sigue en uso hasta el corte.
+El inventario de los centros de salud se opera hoy en AppSheet, sobre MySQL 8.0 en el VPS de AppSheet (base `inventario`). El sistema nuevo ya está desplegado en https://inventario.cmvalparaiso.cl (base `inventario_cmv` en el servidor de producción), pero solo tiene roles y administradores. Hay que traspasar los datos sin modificar la base AppSheet, que sigue en uso hasta el corte.
 
 ## 2. Objetivo
 
@@ -26,7 +26,7 @@ El inventario de los centros de salud se opera hoy en AppSheet, sobre MySQL 8.0 
 | Fuente del stock | La tabla `Stock` de AppSheet, tal cual | Recalcular desde los movimientos: no cuadran (entradas − salidas = 719.114; `Stock` = 688.090) |
 | Rol VISUALIZADOR (R04) | Se migra como R02 Encargado Centro | Migrarlo con un rol que la app no reconoce |
 | Rol ADMIN ASEO (`dac3497d`) | No se migra (sus usuarios van a rechazos) | Rol equivalente aún no definido |
-| Acceso al origen | Usuario MySQL `inventario_lectura` con `SELECT, SHOW VIEW` sobre `inventario.*`, restringido a las IPs de server-das (`200.54.81.50`) y del equipo del responsable (`190.161.230.43`) | Usar la cuenta `admin` |
+| Acceso al origen | Usuario MySQL de solo lectura (`SELECT, SHOW VIEW` sobre `inventario.*`), restringido por IP al servidor de producción y al equipo del responsable | Usar la cuenta `admin` |
 
 ## 4. Diagnóstico del origen (29/10/2026)
 
@@ -60,7 +60,7 @@ Problemas de datos que resuelven las reglas de la sección 5:
   - Cantidad ≤ 0: 16 detalles de entrada.
 - **Stock:** 15 claves `(producto, bodega, lote, caducidad)` duplicadas, que chocan con `stock_lote_unico`.
 - **Usuarios:**
-  - El correo `ccastillos@cmvalparaiso.cl` aparece con dos IDs activos.
+  - El correo `repetido@cmvalparaiso.cl` aparece con dos IDs activos.
   - Un usuario tiene correo de `alumnos.upla.cl`.
   - Los correos de los admins del seed pueden existir también en AppSheet.
 
@@ -81,7 +81,7 @@ Cada regla devuelve la fila transformada (con advertencias opcionales) o un rech
   - El rol R04 pasa a R02, con advertencia.
   - El rol `dac3497d` (ADMIN ASEO) se rechaza (`rol_no_migrado`).
   - Si el email (normalizado a minúsculas y sin espacios) **ya existe en el destino** (por ejemplo, un admin del seed), se conserva la fila del destino. El ID de AppSheet se registra en un mapa de reasignación hacia el ID del destino.
-    - Esta regla se evalúa **primero**, antes que las de rol y centro: en AppSheet, `rvergara@` y `dsantibanez@` están en "Centro Prueba", y `dsantibanez@` tiene el rol ADMIN ASEO.
+    - Esta regla se evalúa **primero**, antes que las de rol y centro: en AppSheet, algunos administradores del seed están en "Centro Prueba", y uno de ellos tiene el rol ADMIN ASEO.
     - Solo cuentan los usuarios del destino cuyo ID no viene de AppSheet. Así, un usuario cargado en una ejecución anterior no se reasigna a sí mismo y la simulación es determinista.
   - Si el email está **duplicado en el origen**, se conserva el ID con más órdenes (entradas más salidas) y el otro se reasigna a él, con advertencia.
   - Si el email no es del dominio `@cmvalparaiso.cl`, se migra con advertencia (no podrá iniciar sesión).
@@ -170,11 +170,11 @@ npm run migracion:appsheet -- [--ejecutar] [--vaciar=<base_destino>] [--salida=<
 ### 7.1 Etapas
 
 1. **Ensayo local:**
-   - origen VPS (`inventario_lectura`) y destino la base local de Docker (puerto 3308);
+   - origen VPS (usuario de solo lectura) y destino la base local de Docker (puerto 3308);
    - se itera hasta que el reporte solo contenga los rechazos esperados;
    - sin `RESEND_API_KEY` no se envían correos.
 2. **Ensayo en producción:**
-   - en server-das, desde el directorio del runner, con `.env.migracion` en el servidor (permisos 600);
+   - en el servidor de producción, desde el directorio del runner, con `.env.migracion` en el servidor (permisos 600);
    - primero se respalda con `mysqldump inventario_cmv`;
    - luego se simula, y después se ejecuta con `--ejecutar --vaciar=inventario_cmv`;
    - el responsable revisa https://inventario.cmvalparaiso.cl. La URL no se difunde hasta el corte, porque los usuarios migrados quedan activos.

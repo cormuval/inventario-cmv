@@ -8,13 +8,13 @@ Describe cómo se publica **Inventario CMV** en producción y qué hay configura
 
 | Elemento | Valor |
 |---|---|
-| Servidor | `server-das` (`informesdiarios`, Tailscale `100.107.10.105`) |
+| Servidor | Servidor Linux interno de la institución (acceso solo por VPN) |
 | Dominio | `https://inventario.cmvalparaiso.cl` |
-| Proxy | nginx (`/etc/nginx/sites-available/inventario`) → `127.0.0.1:3030`, TLS con Certbot |
+| Proxy | nginx → `127.0.0.1:3030`, TLS con Certbot |
 | Proceso | pm2, app `inventario-cmv` (`ecosystem.config.js`, `next start -p 3030`) |
-| Base de datos | MySQL nativo del servidor, base `inventario_cmv`, usuario `inventario@localhost` |
-| Runner | GitHub Actions self-hosted en `/var/www/inventario-aps/actions-runner`, labels `self-hosted, produccion` |
-| Código desplegado | `/var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv` |
+| Base de datos | MySQL nativo del servidor, base `inventario_cmv`, usuario local de la app |
+| Runner | GitHub Actions self-hosted instalado en el servidor, labels `self-hosted, produccion` |
+| Código desplegado | Directorio de trabajo del runner (`_work/inventario-cmv/inventario-cmv`) |
 
 ---
 
@@ -50,7 +50,10 @@ AUTH_URL="https://inventario.cmvalparaiso.cl"
 AUTH_TRUST_HOST="true"
 RESEND_API_KEY="<api key de Resend del proyecto>"
 CORREO_REMITENTE="Inventario CMV <inventario@gi.cmvalparaiso.cl>"
+SEED_ADMINISTRADORES="<correo|Nombre|Apellido;...>"
 ```
+
+`SEED_ADMINISTRADORES` define los administradores que crea el seed si aún no existen (los ya creados no se modifican).
 
 El envío de correos (comprobante de salida) usa Resend. El subdominio `gi.cmvalparaiso.cl` está verificado en la cuenta de Resend (el remitente debe usar ese subdominio); sin `RESEND_API_KEY` la app funciona igual pero no envía correos (queda registrado como `omitido` en auditoría).
 
@@ -72,7 +75,7 @@ En Google Cloud, el cliente OAuth debe tener registrada la URI de redirección
 ## 5. Operación
 
 ```bash
-ssh informesdiarios
+ssh <servidor-produccion>
 pm2 status inventario-cmv
 pm2 logs inventario-cmv --lines 100
 pm2 restart inventario-cmv
@@ -82,11 +85,11 @@ pm2 restart inventario-cmv
 
 ## 6. Migración de datos desde AppSheet
 
-La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. Se lee con el usuario `inventario_lectura` (`SELECT, SHOW VIEW` sobre `inventario.*`), restringido a las IPs de server-das y del equipo del responsable. Diseño: `docs/superpowers/specs/2026-10-29-migracion-appsheet-design.md`.
+La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. Se lee con un usuario MySQL de solo lectura, restringido por IP a los equipos autorizados. Diseño: `docs/superpowers/specs/2026-10-29-migracion-appsheet-design.md`.
 
 ```bash
 # .env.migracion (no se versiona):
-# ORIGEN_DATABASE_URL="mysql://inventario_lectura:<password>@<host VPS>:3306/inventario"
+# ORIGEN_DATABASE_URL="mysql://<usuario-lectura>:<password>@<host VPS>:3306/inventario"
 npm run migracion:appsheet                                   # simulación: solo reporte
 npm run migracion:appsheet -- --ejecutar --vaciar=<base>     # vacía lo migrado y carga
 ```
@@ -103,16 +106,16 @@ npm run migracion:appsheet
 npm run migracion:appsheet -- --ejecutar --vaciar=inventario
 ```
 
-### 6.2 Ensayo y corte en producción (server-das)
+### 6.2 Ensayo y corte en producción (servidor de producción)
 
-`actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en `/var/www/inventario-aps/migracion/`.
+`actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en un directorio del servidor fuera del runner (`<ruta-migracion>`).
 
 Antes de empezar, confirmar en GitHub Actions que "Deploy Produccion" no está en ejecución y **no hacer merge a `main` durante la migración**: un deploy limpia el directorio del runner y reescribe `.env`.
 
 ```bash
-ssh informesdiarios
-cd /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv
-M=/var/www/inventario-aps/migracion
+ssh <servidor-produccion>
+cd <directorio-del-runner>/_work/inventario-cmv/inventario-cmv
+M=<ruta-migracion>
 F=$(date +%F-%H%M)
 R=$M/reporte-$F
 B=$M/respaldo-$F.sql

@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
+// utils
+import { leerAdministradoresSeed } from "./administradores-seed";
+
 const prisma = new PrismaClient();
 
 // SEED_DEMO=false (produccion): solo roles y administradores, sin datos de prueba.
@@ -12,28 +15,13 @@ const CENTRO_ADMINISTRACION = {
     nombre: "Administracion DAS"
 };
 
-// Administradores institucionales habilitados para el login con Google.
+// Administradores institucionales habilitados para el login con Google (variable SEED_ADMINISTRADORES).
 // Solo se aceptan correos del dominio @cmvalparaiso.cl (ver src/config/auth.ts).
-const ADMINISTRADORES = [
-    {
-        id: "usuario-admin-rvergara",
-        nombre: "Renzo",
-        apPaterno: "Vergara",
-        email: "rvergara@cmvalparaiso.cl"
-    },
-    {
-        id: "usuario-admin-dsantibanez",
-        nombre: "Daniel",
-        apPaterno: "Santibanez",
-        email: "dsantibanez@cmvalparaiso.cl"
-    },
-    {
-        id: "usuario-admin-practicasdas",
-        nombre: "Practicas",
-        apPaterno: "DAS",
-        email: "practicasdas@cmvalparaiso.cl"
-    }
-];
+const ADMINISTRADORES = leerAdministradoresSeed(process.env.SEED_ADMINISTRADORES);
+
+if (ADMINISTRADORES.length === 0) {
+    console.warn("SEED_ADMINISTRADORES no esta definida: no se crean administradores.");
+}
 
 async function main(): Promise<void> {
     const roles = [

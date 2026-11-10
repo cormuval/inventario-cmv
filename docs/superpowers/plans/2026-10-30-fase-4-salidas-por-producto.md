@@ -998,5 +998,5 @@ git commit -m "feat(salidas): vista de salidas por producto con totales y listad
 ### Task 4: Verificación en producción (después del merge)
 
 - [ ] **Step 1:** Con un administrador, buscar un producto de alto consumo (p. ej. el de mayor `SUM(Cantidad)` del año) y medir `/salidas/por-producto?productoId=<id>` con el rango por defecto y con 12 meses: TTFB < 1 s y respuesta < 200 KB.
-- [ ] **Step 2:** Confirmar en server-das que `restart_time` de `inventario-cmv` no sube (mismo comando que la fase 1, Task 9).
+- [ ] **Step 2:** Confirmar en el servidor de producción que `restart_time` de `inventario-cmv` no sube (mismo comando que la fase 1, Task 9).
 - [ ] **Step 3:** Anotar los resultados en el PR de la fase 4.
