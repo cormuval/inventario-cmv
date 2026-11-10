@@ -1,4 +1,6 @@
 import type * as React from "react";
+import Link from "next/link";
+import { History } from "lucide-react";
 
 // actions
 import { listarStockConsolidado, type SortDirection, type StockSortKey } from "@/modules/stock/actions/stock.action";
@@ -45,9 +47,18 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
     return (
         <AppLayout>
             <div className="space-y-6">
-                <div>
-                    <p className="text-sm text-muted-foreground">Inventario consolidado por producto y bodega</p>
-                    <h2 className="text-2xl font-semibold">Stock</h2>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-sm text-muted-foreground">Inventario consolidado por producto y bodega</p>
+                        <h2 className="text-2xl font-semibold">Stock</h2>
+                    </div>
+                    <Link
+                        href="/stock/historico"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background h-8 px-3 text-sm font-medium hover:bg-accent transition-colors"
+                    >
+                        <History className="h-4 w-4" />
+                        Consultar Stock Histórico
+                    </Link>
                 </div>
                 <Card>
                     <CardHeader>

@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { History } from "lucide-react";
 
 // actions
 import type { SortDirection, StockConsolidadoVista, StockSortKey } from "@/modules/stock/actions/stock.action";
@@ -71,46 +72,56 @@ export function StockTable({ stocks, sort, direction, parametros }: StockTablePr
                             <Badge tone={alertaTone(stock.alerta)}>{alertaLabel(stock.alerta)}</Badge>
                         </Td>
                         <Td>
-                            <SimpleModal
-                                title={`Lotes: ${stock.productoDescripcion}`}
-                                triggerLabel={`Ver lotes (${stock.lotes.length})`}
-                                triggerClassName="min-w-20 whitespace-nowrap px-2"
-                            >
-                                <Table>
-                                    <thead>
-                                        <tr>
-                                            <Th>Lote</Th>
-                                            <Th>Caducidad</Th>
-                                            <Th>Disponible</Th>
-                                            <Th>Estado</Th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stock.lotes.map((lote) => {
-                                            const caducado = esLoteCaducado(lote.fechaCaducidad);
-                                            return (
-                                                <tr key={lote.id}>
-                                                    <Td>{lote.lote}</Td>
-                                                    <Td>{formatDate(lote.fechaCaducidad)}</Td>
-                                                    <Td>{formatNumber(lote.cantidadDisponible)}</Td>
-                                                    <Td>
-                                                        <Badge tone={caducado ? "danger" : "success"}>
-                                                            {caducado ? "Caducado" : "Vigente"}
-                                                        </Badge>
+                            <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                <SimpleModal
+                                    title={`Lotes: ${stock.productoDescripcion}`}
+                                    triggerLabel={`Ver lotes (${stock.lotes.length})`}
+                                    triggerClassName="min-w-20 whitespace-nowrap px-2"
+                                >
+                                    <Table>
+                                        <thead>
+                                            <tr>
+                                                <Th>Lote</Th>
+                                                <Th>Caducidad</Th>
+                                                <Th>Disponible</Th>
+                                                <Th>Estado</Th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stock.lotes.map((lote) => {
+                                                const caducado = esLoteCaducado(lote.fechaCaducidad);
+                                                return (
+                                                    <tr key={lote.id}>
+                                                        <Td>{lote.lote}</Td>
+                                                        <Td>{formatDate(lote.fechaCaducidad)}</Td>
+                                                        <Td>{formatNumber(lote.cantidadDisponible)}</Td>
+                                                        <Td>
+                                                            <Badge tone={caducado ? "danger" : "success"}>
+                                                                {caducado ? "Caducado" : "Vigente"}
+                                                            </Badge>
+                                                        </Td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {stock.lotes.length === 0 ? (
+                                                <tr>
+                                                    <Td colSpan={4} className="text-muted-foreground">
+                                                        Sin detalle de lotes.
                                                     </Td>
                                                 </tr>
-                                            );
-                                        })}
-                                        {stock.lotes.length === 0 ? (
-                                            <tr>
-                                                <Td colSpan={4} className="text-muted-foreground">
-                                                    Sin detalle de lotes.
-                                                </Td>
-                                            </tr>
-                                        ) : null}
-                                    </tbody>
-                                </Table>
-                            </SimpleModal>
+                                            ) : null}
+                                        </tbody>
+                                    </Table>
+                                </SimpleModal>
+                                <a
+                                    href={`/stock/historico?productoId=${stock.productoId}&centroId=${stock.centroId}&bodegaId=${stock.bodegaId}`}
+                                    className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    title="Consultar historial y evolución de stock"
+                                >
+                                    <History className="h-3 w-3" />
+                                    <span>Histórico</span>
+                                </a>
+                            </div>
                         </Td>
                     </tr>
                 ))}
