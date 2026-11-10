@@ -430,7 +430,7 @@ describe("normalizar", () => {
     });
 
     it("email normaliza a minúsculas sin espacios", () => {
-        expect(email("  CCastillos@CMValparaiso.cl ")).toBe("ccastillos@cmvalparaiso.cl");
+        expect(email("  Repetido@CMValparaiso.cl ")).toBe("repetido@cmvalparaiso.cl");
         expect(email("")).toBeNull();
     });
 
@@ -910,10 +910,10 @@ describe("reglas de usuarios", () => {
 
     it("el email existente en el destino se evalúa antes que rol y centro", () => {
         const r = transformarUsuarios(
-            [usuario({ ID_User: "x9", Email: " DSantibanez@cmvalparaiso.cl", Rol: "dac3497d", ID_Centro: "3d3f9a13" })],
-            contexto({ usuariosDestino: [{ id: "usuario-admin-dsantibanez", email: "dsantibanez@cmvalparaiso.cl" }] })
+            [usuario({ ID_User: "x9", Email: " Admin.Ejemplo@cmvalparaiso.cl", Rol: "dac3497d", ID_Centro: "3d3f9a13" })],
+            contexto({ usuariosDestino: [{ id: "usuario-admin-ejemplo", email: "admin.ejemplo@cmvalparaiso.cl" }] })
         );
-        expect(r.reasignaciones.get("x9")).toBe("usuario-admin-dsantibanez");
+        expect(r.reasignaciones.get("x9")).toBe("usuario-admin-ejemplo");
         expect(r.tabla.rechazos).toEqual([]);
         expect(r.tabla.advertencias.map((a) => a.regla)).toEqual(["email_existente_destino"]);
         expect(r.tabla.aceptados.map((u) => u.id)).toEqual(["migracion-appsheet"]);
@@ -928,8 +928,8 @@ describe("reglas de usuarios", () => {
     it("email duplicado: gana el usuario con más órdenes y el otro se reasigna", () => {
         const r = transformarUsuarios(
             [
-                usuario({ ID_User: "d4", Email: "ccastillos@cmvalparaiso.cl" }),
-                usuario({ ID_User: "1f", Email: "CCastillos@cmvalparaiso.cl" })
+                usuario({ ID_User: "d4", Email: "repetido@cmvalparaiso.cl" }),
+                usuario({ ID_User: "1f", Email: "Repetido@cmvalparaiso.cl" })
             ],
             contexto({ ordenesPorUsuario: new Map([["d4", 2], ["1f", 9]]) })
         );
@@ -2536,11 +2536,11 @@ En `docs/guias/deploy-produccion.md`, reemplazar la sección `## 6. Migración d
 ````markdown
 ## 6. Migración de datos desde AppSheet
 
-La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. Se lee con el usuario `inventario_lectura` (`SELECT, SHOW VIEW` sobre `inventario.*`), restringido a las IPs de server-das y del equipo del responsable. Diseño: `docs/superpowers/specs/2026-10-29-migracion-appsheet-design.md`.
+La base de producción actual (AppSheet) está en el VPS de AppSheet y **no se modifica**. Se lee con un usuario MySQL de solo lectura, restringido por IP a los equipos autorizados. Diseño: `docs/superpowers/specs/2026-10-29-migracion-appsheet-design.md`.
 
 ```bash
 # .env.migracion (no se versiona):
-# ORIGEN_DATABASE_URL="mysql://inventario_lectura:<password>@<host VPS>:3306/inventario"
+# ORIGEN_DATABASE_URL="mysql://<usuario-lectura>:<password>@<host VPS>:3306/inventario"
 npm run migracion:appsheet                                   # simulación: solo reporte
 npm run migracion:appsheet -- --ejecutar --vaciar=<base>     # vacía lo migrado y carga
 ```
@@ -2557,14 +2557,14 @@ npm run migracion:appsheet
 npm run migracion:appsheet -- --ejecutar --vaciar=inventario
 ```
 
-### 6.2 Ensayo y corte en producción (server-das)
+### 6.2 Ensayo y corte en producción (servidor de producción)
 
-`actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en `/var/www/inventario-aps/migracion/`.
+`actions/checkout` limpia el directorio de trabajo, así que las credenciales y los reportes viven fuera de él, en un directorio del servidor fuera del runner (`<ruta-migracion>`).
 
 ```bash
-ssh informesdiarios
-cd /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv
-M=/var/www/inventario-aps/migracion
+ssh <servidor-produccion>
+cd <directorio-del-runner>/_work/inventario-cmv/inventario-cmv
+M=<ruta-migracion>
 mysqldump --no-tablespaces inventario_cmv > $M/respaldo-$(date +%F-%H%M).sql   # credenciales en ~/.my.cnf
 npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$M/reporte-$(date +%F-%H%M)
 npm run migracion:appsheet -- --origen-env=$M/.env.migracion --salida=$M/reporte-$(date +%F-%H%M) --ejecutar --vaciar=inventario_cmv

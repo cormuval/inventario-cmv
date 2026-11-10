@@ -169,7 +169,7 @@ describe("generarComprobanteSalidaPDF", () => {
         usuario: {
             nombre: "Ana",
             apPaterno: "Gómez",
-            email: "agomez@cmvalparaiso.cl"
+            email: "operador.demo@cmvalparaiso.cl"
         },
         detalles: [
             {

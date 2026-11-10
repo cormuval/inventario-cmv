@@ -5,17 +5,17 @@ import { esCorreoInstitucional, normalizarEmail, obtenerDominio } from "@/module
 
 describe("esCorreoInstitucional", () => {
     it("acepta los correos institucionales habilitados", () => {
-        expect(esCorreoInstitucional("rvergara@cmvalparaiso.cl")).toBe(true);
-        expect(esCorreoInstitucional("dsantibanez@cmvalparaiso.cl")).toBe(true);
+        expect(esCorreoInstitucional("funcionario@cmvalparaiso.cl")).toBe(true);
+        expect(esCorreoInstitucional("admin.ejemplo@cmvalparaiso.cl")).toBe(true);
     });
 
     it("acepta correos con mayusculas y espacios alrededor", () => {
-        expect(esCorreoInstitucional("  RVergara@CMValparaiso.CL ")).toBe(true);
+        expect(esCorreoInstitucional("  Funcionario@CMValparaiso.CL ")).toBe(true);
     });
 
     it("rechaza cuentas personales de Gmail", () => {
-        expect(esCorreoInstitucional("rvergara@gmail.com")).toBe(false);
-        expect(esCorreoInstitucional("dsantibanez@googlemail.com")).toBe(false);
+        expect(esCorreoInstitucional("funcionario@gmail.com")).toBe(false);
+        expect(esCorreoInstitucional("funcionaria@googlemail.com")).toBe(false);
     });
 
     it("rechaza otros dominios externos", () => {
@@ -42,7 +42,7 @@ describe("esCorreoInstitucional", () => {
 
 describe("normalizarEmail", () => {
     it("recorta espacios y pasa a minusculas", () => {
-        expect(normalizarEmail("  RVergara@CMValparaiso.CL  ")).toBe("rvergara@cmvalparaiso.cl");
+        expect(normalizarEmail("  Funcionario@CMValparaiso.CL  ")).toBe("funcionario@cmvalparaiso.cl");
     });
 
     it("convierte nulos en cadena vacia", () => {
@@ -53,7 +53,7 @@ describe("normalizarEmail", () => {
 
 describe("obtenerDominio", () => {
     it("extrae el dominio del correo", () => {
-        expect(obtenerDominio("rvergara@cmvalparaiso.cl")).toBe("cmvalparaiso.cl");
+        expect(obtenerDominio("funcionario@cmvalparaiso.cl")).toBe("cmvalparaiso.cl");
     });
 
     it("retorna cadena vacia si el formato es invalido", () => {

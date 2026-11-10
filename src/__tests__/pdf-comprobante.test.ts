@@ -15,7 +15,7 @@ describe("generarComprobanteSalidaPDF", () => {
             usuario: {
                 nombre: "Ana",
                 apPaterno: "Gómez",
-                email: "agomez@cmvalparaiso.cl"
+                email: "operador.demo@cmvalparaiso.cl"
             },
             detalles: Array.from({ length: cantidadDetalles }, (_, i) => ({
                 id: `det-${i + 1}`,

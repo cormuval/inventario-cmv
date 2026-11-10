@@ -60,7 +60,7 @@ describe("normalizar", () => {
     });
 
     it("email normaliza a minúsculas sin espacios", () => {
-        expect(email("  CCastillos@CMValparaiso.cl ")).toBe("ccastillos@cmvalparaiso.cl");
+        expect(email("  Repetido@CMValparaiso.cl ")).toBe("repetido@cmvalparaiso.cl");
         expect(email("")).toBeNull();
     });
 

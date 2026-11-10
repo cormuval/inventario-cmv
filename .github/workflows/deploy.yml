@@ -1,7 +1,7 @@
 name: Deploy Produccion
 
 # Se ejecuta en el runner self-hosted instalado en el servidor de produccion
-# (server-das, label `produccion`). Al vivir en el mismo host, se conecta a MySQL
+# (label `produccion`). Al vivir en el mismo host, se conecta a MySQL
 # por localhost (el usuario `inventario` es solo-localhost).
 #
 # Se dispara con cada push a main (incluye la fusion de un PR) y tambien

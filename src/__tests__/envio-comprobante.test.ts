@@ -32,7 +32,7 @@ const ordenCompleta = {
     centro: { nombre: "CESFAM Barón" },
     bodega: { nombre: "Bodega Farmacia" },
     bodegaDestino: null,
-    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "crojas@cmvalparaiso.cl" },
+    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "solicitante.demo@cmvalparaiso.cl" },
     detalles: []
 };
 
