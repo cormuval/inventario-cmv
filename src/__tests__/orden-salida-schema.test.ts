@@ -48,27 +48,16 @@ describe("crearOrdenSalidaSchema - validaciones sanitarias", () => {
         expect(result.success).toBe(true);
     });
 
-    it("rechaza salida 'Merma' si el destino/justificacion es demasiado corto o vacio", () => {
-        const payload = {
+    it("acepta 'Merma' con la causal REAS aunque tenga menos de 5 caracteres", () => {
+        const result = crearOrdenSalidaSchema.safeParse({
             fecha: hoy,
             bodegaId: "bodega-1",
             centroId: "centro-1",
             tipoSalida: "Merma",
-            destino: "baja",
-            detalles: [{
-                productoId: 1,
-                cantidad: 5,
-                lote: "LOT-CADUCADO",
-                fechaCaducidad: ayer
-            }]
-        };
-
-        const result = crearOrdenSalidaSchema.safeParse(payload);
-        expect(result.success).toBe(false);
-        if (!result.success) {
-            const hasJustificacionMsg = result.error.issues.some((issue) => /justificaci[oó]n/i.test(issue.message));
-            expect(hasJustificacionMsg).toBe(true);
-        }
+            destino: "REAS",
+            detalles: [{ productoId: 1, cantidad: 5, lote: "LOT-CADUCADO", fechaCaducidad: ayer }]
+        });
+        expect(result.success).toBe(true);
     });
 
     it("permite salida 'Consumo Interno' si los lotes son vigentes", () => {
@@ -90,47 +79,66 @@ describe("crearOrdenSalidaSchema - validaciones sanitarias", () => {
         expect(result.success).toBe(true);
     });
 
-    it("todos los destinos de CONSUMO_INTERNO y MERMA cumplen con los requisitos del schema", async () => {
-        const { DESTINOS_CONSUMO_INTERNO, DESTINOS_MERMA } = await import(
-            "@/modules/orden-salida/constants/destinos"
-        );
+    it("clasifica las unidades: solo 'Regularización de Bodega' y 'REAS' son causales de merma", async () => {
+        const { clasificarUnidadesSalida, esUnidadMerma } = await import("@/modules/orden-salida/constants/destinos");
 
-        expect(DESTINOS_CONSUMO_INTERNO.length).toBeGreaterThan(0);
-        for (const destino of DESTINOS_CONSUMO_INTERNO) {
-            const result = crearOrdenSalidaSchema.safeParse({
-                fecha: hoy,
-                bodegaId: "bodega-1",
-                centroId: "centro-1",
-                tipoSalida: "Consumo Interno",
-                destino,
-                detalles: [{
-                    productoId: 1,
-                    cantidad: 1,
-                    lote: "LOT-OK",
-                    fechaCaducidad: manana
-                }]
-            });
-            expect(result.success).toBe(true);
-        }
+        expect(
+            clasificarUnidadesSalida([
+                { descripcion: "Box" },
+                { descripcion: "REAS" },
+                { descripcion: "Dental" },
+                { descripcion: "Regularización de Bodega" }
+            ])
+        ).toEqual({ consumo: ["Box", "Dental"], merma: ["REAS", "Regularización de Bodega"] });
+        expect(esUnidadMerma("  regularizacion de bodega ")).toBe(true);
+        expect(esUnidadMerma("reas")).toBe(true);
+        expect(esUnidadMerma("SAPU")).toBe(false);
+    });
 
-        expect(DESTINOS_MERMA.length).toBeGreaterThan(0);
-        for (const merma of DESTINOS_MERMA) {
-            expect(merma.trim().length).toBeGreaterThanOrEqual(5);
-            const result = crearOrdenSalidaSchema.safeParse({
-                fecha: hoy,
-                bodegaId: "bodega-1",
-                centroId: "centro-1",
-                tipoSalida: "Merma",
-                destino: merma,
-                detalles: [{
-                    productoId: 1,
-                    cantidad: 1,
-                    lote: "LOT-CAD",
-                    fechaCaducidad: ayer
-                }]
-            });
-            expect(result.success).toBe(true);
+    it("rechaza salida 'A Otros Centros' si falta bodegaDestinoId", () => {
+        const payload = {
+            fecha: hoy,
+            bodegaId: "bodega-1",
+            centroId: "centro-1",
+            tipoSalida: "A Otros Centros",
+            destino: "CESFAM Playa Ancha",
+            centroDestinoId: "centro-2",
+            detalles: [{
+                productoId: 1,
+                cantidad: 2,
+                lote: "LOT-1",
+                fechaCaducidad: manana
+            }]
+        };
+
+        const result = crearOrdenSalidaSchema.safeParse(payload);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            const hasBodegaMsg = result.error.issues.some((i) => /bodega destino/i.test(i.message));
+            expect(hasBodegaMsg).toBe(true);
         }
+    });
+
+    it("permite salida 'A Otros Centros' con centroDestinoId y bodegaDestinoId válidos", () => {
+        const payload = {
+            fecha: hoy,
+            bodegaId: "bodega-1",
+            centroId: "centro-1",
+            tipoSalida: "A Otros Centros",
+            destino: "CESFAM Playa Ancha",
+            centroDestinoId: "centro-2",
+            bodegaDestinoId: "bodega-2",
+            advertenciaCaducidadAceptada: true,
+            detalles: [{
+                productoId: 1,
+                cantidad: 2,
+                lote: "LOT-1",
+                fechaCaducidad: manana
+            }]
+        };
+
+        const result = crearOrdenSalidaSchema.safeParse(payload);
+        expect(result.success).toBe(true);
     });
 });
 

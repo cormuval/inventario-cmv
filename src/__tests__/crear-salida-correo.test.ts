@@ -25,7 +25,12 @@ vi.mock("@/modules/orden-salida/utils/envio-comprobante", () => ({
     enviarComprobanteSalida: vi.fn(),
     cargarOrdenParaComprobante: vi.fn()
 }));
-vi.mock("@/shared/lib/prisma", () => ({ prisma: { $transaction: vi.fn() } }));
+vi.mock("@/shared/lib/prisma", () => ({
+    prisma: {
+        $transaction: vi.fn(),
+        unidad: { findFirst: vi.fn().mockResolvedValue({ id: "u1", descripcion: "Box 1" }) }
+    }
+}));
 
 function formDataSalida(correoDestino?: string): FormData {
     const formData = new FormData();

@@ -98,7 +98,11 @@ function crearFormDataIntercentro(
     fd.append("destino", "CESFAM Playa Ancha");
     fd.append("centroDestinoId", options.centroDestinoId ?? "centro-2");
     if (options.bodegaDestinoId !== undefined) {
-        fd.append("bodegaDestinoId", options.bodegaDestinoId);
+        if (options.bodegaDestinoId !== "") {
+            fd.append("bodegaDestinoId", options.bodegaDestinoId);
+        }
+    } else {
+        fd.append("bodegaDestinoId", "b2");
     }
     if (options.advertenciaCaducidadAceptada) {
         fd.append("advertenciaCaducidadAceptada", options.advertenciaCaducidadAceptada);
@@ -131,6 +135,13 @@ describe("Emisión y Gestión de Traspaso / Préstamo Intercentros (orden-salida
             const res = await crearOrdenSalida(initialState, fd);
             expect(res.ok).toBe(false);
             expect(res.message).toMatch(/El centro destino no puede ser el mismo centro de origen/i);
+        });
+
+        it("rechaza si no se especifica la bodega destino del centro receptor", async () => {
+            const fd = crearFormDataIntercentro({ bodegaDestinoId: "" });
+            const res = await crearOrdenSalida(initialState, fd);
+            expect(res.ok).toBe(false);
+            expect(res.message).toMatch(/Debe seleccionar la bodega destino del centro receptor/i);
         });
 
         it("rechaza si bodegaDestinoId provista no pertenece al centroDestino o no está activa", async () => {
