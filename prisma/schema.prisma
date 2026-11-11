@@ -76,6 +76,7 @@ model Usuario {
 model Unidad {
     id          String     @id @default(cuid()) @map("ID_Unidad") @db.VarChar(255)
     descripcion String     @unique @map("Descripcion") @db.VarChar(255)
+    estado      Boolean    @default(true) @map("Estado")
 
     @@map("Unidad")
 }
