@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type * as React from "react";
+import { Suspense } from "react";
 
 // actions
 import { listarMantenedores } from "@/modules/mantenedores/actions/mantenedores.action";
@@ -8,9 +9,7 @@ import { listarMantenedores } from "@/modules/mantenedores/actions/mantenedores.
 import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
 
 // components
-import { BodegaForm, CentroForm, UnidadForm, UsuarioForm } from "@/modules/mantenedores/components/mantenedores-forms";
-import { UsuariosTabla } from "@/modules/mantenedores/components/usuarios-tabla";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { MantenedoresTabs } from "@/modules/mantenedores/components/mantenedores-tabs";
 import { AppLayout } from "@/shared/components/layout/app-layout";
 
 export const dynamic = "force-dynamic";
@@ -28,57 +27,21 @@ export default async function MantenedoresPage(): Promise<React.ReactElement> {
         <AppLayout>
             <div className="space-y-6">
                 <div>
-                    <p className="text-sm text-muted-foreground">Gestión de centros de salud, bodegas, unidades y usuarios del sistema</p>
+                    <p className="text-sm text-muted-foreground">
+                        Gestión y configuración de entidades base del sistema de inventario de salud primaria
+                    </p>
                     <h2 className="text-2xl font-semibold">Mantenedores</h2>
                 </div>
-                <section className="grid gap-4 lg:grid-cols-3">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Centro</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <CentroForm />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Bodega</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <BodegaForm centros={data.centros} />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Unidad</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <UnidadForm />
-                        </CardContent>
-                    </Card>
-                </section>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Usuario</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <UsuarioForm centros={data.centros} bodegas={data.bodegas} roles={data.roles} />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Usuarios registrados</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <UsuariosTabla
-                            usuarios={data.usuarios}
-                            currentUserId={sessionUser.id}
-                            centros={data.centros}
-                            bodegas={data.bodegas}
-                            roles={data.roles}
-                        />
-                    </CardContent>
-                </Card>
+                <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando mantenedores…</p>}>
+                    <MantenedoresTabs
+                        centros={data.centros}
+                        bodegas={data.bodegas}
+                        roles={data.roles}
+                        usuarios={data.usuarios}
+                        unidades={data.unidades}
+                        currentUserId={sessionUser.id}
+                    />
+                </Suspense>
             </div>
         </AppLayout>
     );

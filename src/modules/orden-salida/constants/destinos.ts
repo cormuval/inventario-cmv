@@ -7,26 +7,29 @@ export const TIPOS_SALIDA = [
 
 export type TipoSalida = (typeof TIPOS_SALIDA)[number];
 
-export const DESTINOS_CONSUMO_INTERNO = [
-    "Urgencia / SAPU / SAR",
-    "Box Médico / Consulta Médica",
-    "Vacunatorio",
-    "Dental / Odontología",
-    "Toma de Muestras / Laboratorio",
-    "Sala de Curaciones",
-    "Sala ERA / IRA",
-    "Control Ginecológico / Maternidad",
-    "Kinesiología / Rehabilitación",
-    "Farmacia Despacho Paciente",
-    "Atención Domiciliaria",
-    "Otro Servicio Clínico"
-] as const;
+// La tabla Unidad mezcla servicios clinicos y causales de merma (herencia de AppSheet).
+// Mientras no se separe, estas descripciones son las unicas validas para "Merma";
+// todas las demas unidades corresponden a destinos de "Consumo Interno".
+export const UNIDADES_MERMA = ["Regularización de Bodega", "REAS"] as const;
 
-export const DESTINOS_MERMA = [
-    "Baja por caducidad en estantería",
-    "Rotura o deterioro de envase",
-    "Falla de cadena de frío",
-    "Retiro de mercado / Alerta sanitaria ISP",
-    "Contaminación o pérdida de esterilidad",
-    "Otra causal sanitaria"
-] as const;
+function normalizarDescripcion(descripcion: string): string {
+    return descripcion.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+const UNIDADES_MERMA_NORMALIZADAS = new Set(UNIDADES_MERMA.map(normalizarDescripcion));
+
+export function esUnidadMerma(descripcion: string): boolean {
+    return UNIDADES_MERMA_NORMALIZADAS.has(normalizarDescripcion(descripcion));
+}
+
+export function clasificarUnidadesSalida(unidades: Array<{ descripcion: string }>): {
+    consumo: string[];
+    merma: string[];
+} {
+    const consumo: string[] = [];
+    const merma: string[] = [];
+    for (const unidad of unidades) {
+        (esUnidadMerma(unidad.descripcion) ? merma : consumo).push(unidad.descripcion);
+    }
+    return { consumo, merma };
+}

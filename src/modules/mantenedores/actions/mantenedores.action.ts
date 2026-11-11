@@ -16,6 +16,9 @@ import { prisma } from "@/shared/lib/prisma";
 import {
     bodegaSchema,
     centroSchema,
+    editarBodegaSchema,
+    editarCentroSchema,
+    editarUnidadSchema,
     editarUsuarioSchema,
     unidadSchema,
     usuarioSchema
@@ -53,7 +56,7 @@ export async function crearCentro(prevState: ActionState, formData: FormData): P
     return ejecutarAdmin("Centro", "/mantenedores", async (usuarioId) => {
         const parsed = centroSchema.parse({
             nombre: formData.get("nombre"),
-            estado: formData.get("estado") === "on"
+            estado: formData.get("estado") === "on" || formData.get("estado") === "true"
         });
         const centro = await prisma.centro.create({ data: parsed });
         await AuditLogger.log({ usuarioId, centroId: centro.id, accion: "crear", entidad: "Centro", entidadId: centro.id });
@@ -61,12 +64,168 @@ export async function crearCentro(prevState: ActionState, formData: FormData): P
     });
 }
 
+export async function editarCentro(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar centros." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const estado = estadoRaw === "on" || estadoRaw === "true";
+        const parsed = editarCentroSchema.parse({
+            id: formData.get("id"),
+            nombre: formData.get("nombre"),
+            estado
+        });
+
+        const previo = await prisma.centro.findUnique({
+            where: { id: parsed.id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Centro no encontrado." };
+        }
+
+        // Regla R-02: Bloqueo preventivo al desactivar Centro
+        if (previo.estado && !parsed.estado) {
+            const bodegasActivas = await prisma.bodega.count({
+                where: { centroId: parsed.id, estado: true }
+            });
+            if (bodegasActivas > 0) {
+                return {
+                    ok: false,
+                    message: `No se puede desactivar el centro porque contiene ${bodegasActivas} bodega(s) activa(s). Desactívelas primero.`
+                };
+            }
+
+            const usuariosActivos = await prisma.usuario.count({
+                where: { centroId: parsed.id, estado: true }
+            });
+            if (usuariosActivos > 0) {
+                return {
+                    ok: false,
+                    message: `No se puede desactivar el centro porque contiene ${usuariosActivos} usuario(s) activo(s). Reasígnelos o desactívelos primero.`
+                };
+            }
+        }
+
+        const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
+        if (previo.nombre !== parsed.nombre) {
+            cambios.nombre = { antes: previo.nombre, despues: parsed.nombre };
+        }
+        if (previo.estado !== parsed.estado) {
+            cambios.estado = { antes: previo.estado, despues: parsed.estado };
+        }
+
+        await prisma.centro.update({
+            where: { id: parsed.id },
+            data: {
+                nombre: parsed.nombre,
+                estado: parsed.estado
+            }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: parsed.id,
+            accion: "actualizar",
+            entidad: "Centro",
+            entidadId: parsed.id,
+            detalle: { cambios: cambios as unknown as Prisma.InputJsonObject }
+        });
+
+        revalidatePath("/mantenedores");
+        return { ok: true, message: "Centro actualizado exitosamente." };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Centro", "No se pudo actualizar el centro.")
+        };
+    }
+}
+
+export async function toggleEstadoCentro(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar centros." };
+        }
+
+        const id = formData.get("id")?.toString();
+        if (!id) {
+            return { ok: false, message: "ID de centro requerido." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const nuevoEstado = estadoRaw === "true" || estadoRaw === "on";
+
+        const previo = await prisma.centro.findUnique({
+            where: { id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Centro no encontrado." };
+        }
+
+        // Regla R-02: Bloqueo preventivo al desactivar Centro
+        if (!nuevoEstado) {
+            const bodegasActivas = await prisma.bodega.count({
+                where: { centroId: id, estado: true }
+            });
+            if (bodegasActivas > 0) {
+                return {
+                    ok: false,
+                    message: `No se puede desactivar el centro porque contiene ${bodegasActivas} bodega(s) activa(s). Desactívelas primero.`
+                };
+            }
+
+            const usuariosActivos = await prisma.usuario.count({
+                where: { centroId: id, estado: true }
+            });
+            if (usuariosActivos > 0) {
+                return {
+                    ok: false,
+                    message: `No se puede desactivar el centro porque contiene ${usuariosActivos} usuario(s) activo(s). Reasígnelos o desactívelos primero.`
+                };
+            }
+        }
+
+        await prisma.centro.update({
+            where: { id },
+            data: { estado: nuevoEstado }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: id,
+            accion: "actualizar",
+            entidad: "Centro",
+            entidadId: id,
+            detalle: {
+                cambios: {
+                    estado: { antes: previo.estado, despues: nuevoEstado }
+                }
+            }
+        });
+
+        revalidatePath("/mantenedores");
+        return {
+            ok: true,
+            message: nuevoEstado ? "Centro activado exitosamente." : "Centro desactivado exitosamente."
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Centro", "No se pudo cambiar el estado del centro.")
+        };
+    }
+}
+
 export async function crearBodega(prevState: ActionState, formData: FormData): Promise<ActionState> {
     return ejecutarAdmin("Bodega", "/mantenedores", async (usuarioId) => {
         const parsed = bodegaSchema.parse({
             nombre: formData.get("nombre"),
             centroId: formData.get("centroId"),
-            estado: formData.get("estado") === "on"
+            estado: formData.get("estado") === "on" || formData.get("estado") === "true"
         });
         const bodega = await prisma.bodega.create({ data: parsed });
         await AuditLogger.log({
@@ -81,13 +240,269 @@ export async function crearBodega(prevState: ActionState, formData: FormData): P
     });
 }
 
+export async function editarBodega(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar bodegas." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const estado = estadoRaw === "on" || estadoRaw === "true";
+        const parsed = editarBodegaSchema.parse({
+            id: formData.get("id"),
+            nombre: formData.get("nombre"),
+            centroId: formData.get("centroId"),
+            estado
+        });
+
+        const previo = await prisma.bodega.findUnique({
+            where: { id: parsed.id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Bodega no encontrada." };
+        }
+
+        // Regla R-03: Bloqueo preventivo al desactivar bodega con stock disponible positivo
+        if (previo.estado && !parsed.estado) {
+            const stockPositivo = await prisma.stock.findFirst({
+                where: { bodegaId: parsed.id, cantidadDisponible: { gt: 0 } }
+            });
+            if (stockPositivo) {
+                return {
+                    ok: false,
+                    message: "No se puede desactivar la bodega porque mantiene existencias de stock disponibles. Debe realizar los traspasos o salidas correspondientes antes de darla de baja."
+                };
+            }
+        }
+
+        const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
+        if (previo.nombre !== parsed.nombre) {
+            cambios.nombre = { antes: previo.nombre, despues: parsed.nombre };
+        }
+        if (previo.centroId !== parsed.centroId) {
+            cambios.centroId = { antes: previo.centroId, despues: parsed.centroId };
+        }
+        if (previo.estado !== parsed.estado) {
+            cambios.estado = { antes: previo.estado, despues: parsed.estado };
+        }
+
+        await prisma.bodega.update({
+            where: { id: parsed.id },
+            data: {
+                nombre: parsed.nombre,
+                centroId: parsed.centroId,
+                estado: parsed.estado
+            }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: parsed.centroId,
+            bodegaId: parsed.id,
+            accion: "actualizar",
+            entidad: "Bodega",
+            entidadId: parsed.id,
+            detalle: { cambios: cambios as unknown as Prisma.InputJsonObject }
+        });
+
+        revalidatePath("/mantenedores");
+        return { ok: true, message: "Bodega actualizada exitosamente." };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Bodega", "No se pudo actualizar la bodega.")
+        };
+    }
+}
+
+export async function toggleEstadoBodega(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar bodegas." };
+        }
+
+        const id = formData.get("id")?.toString();
+        if (!id) {
+            return { ok: false, message: "ID de bodega requerido." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const nuevoEstado = estadoRaw === "true" || estadoRaw === "on";
+
+        const previo = await prisma.bodega.findUnique({
+            where: { id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Bodega no encontrada." };
+        }
+
+        // Regla R-03: Bloqueo preventivo al desactivar bodega
+        if (!nuevoEstado) {
+            const stockPositivo = await prisma.stock.findFirst({
+                where: { bodegaId: id, cantidadDisponible: { gt: 0 } }
+            });
+            if (stockPositivo) {
+                return {
+                    ok: false,
+                    message: "No se puede desactivar la bodega porque mantiene existencias de stock disponibles. Debe realizar los traspasos o salidas correspondientes antes de darla de baja."
+                };
+            }
+        }
+
+        await prisma.bodega.update({
+            where: { id },
+            data: { estado: nuevoEstado }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: previo.centroId,
+            bodegaId: id,
+            accion: "actualizar",
+            entidad: "Bodega",
+            entidadId: id,
+            detalle: {
+                cambios: {
+                    estado: { antes: previo.estado, despues: nuevoEstado }
+                }
+            }
+        });
+
+        revalidatePath("/mantenedores");
+        return {
+            ok: true,
+            message: nuevoEstado ? "Bodega activada exitosamente." : "Bodega desactivada exitosamente."
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Bodega", "No se pudo cambiar el estado de la bodega.")
+        };
+    }
+}
+
 export async function crearUnidad(prevState: ActionState, formData: FormData): Promise<ActionState> {
     return ejecutarAdmin("Unidad", "/mantenedores", async (usuarioId) => {
-        const parsed = unidadSchema.parse({ descripcion: formData.get("descripcion") });
+        const estadoRaw = formData.get("estado");
+        const estado = estadoRaw === null ? true : (estadoRaw === "on" || estadoRaw === "true");
+        const parsed = unidadSchema.parse({
+            descripcion: formData.get("descripcion"),
+            estado
+        });
         const unidad = await prisma.unidad.create({ data: parsed });
         await AuditLogger.log({ usuarioId, accion: "crear", entidad: "Unidad", entidadId: unidad.id });
         return "Unidad creada.";
     });
+}
+
+export async function editarUnidad(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar unidades." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const estado = estadoRaw === "on" || estadoRaw === "true";
+        const parsed = editarUnidadSchema.parse({
+            id: formData.get("id"),
+            descripcion: formData.get("descripcion"),
+            estado
+        });
+
+        const previo = await prisma.unidad.findUnique({
+            where: { id: parsed.id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Unidad no encontrada." };
+        }
+
+        const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
+        if (previo.descripcion !== parsed.descripcion) {
+            cambios.descripcion = { antes: previo.descripcion, despues: parsed.descripcion };
+        }
+        if (previo.estado !== parsed.estado) {
+            cambios.estado = { antes: previo.estado, despues: parsed.estado };
+        }
+
+        await prisma.unidad.update({
+            where: { id: parsed.id },
+            data: {
+                descripcion: parsed.descripcion,
+                estado: parsed.estado
+            }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "actualizar",
+            entidad: "Unidad",
+            entidadId: parsed.id,
+            detalle: { cambios: cambios as unknown as Prisma.InputJsonObject }
+        });
+
+        revalidatePath("/mantenedores");
+        return { ok: true, message: "Unidad actualizada exitosamente." };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Unidad", "No se pudo actualizar la unidad.")
+        };
+    }
+}
+
+export async function toggleEstadoUnidad(prevState: ActionState, formData: FormData): Promise<ActionState> {
+    try {
+        const user = await requireSessionUser();
+        if (!puedeAdministrar(user.rol)) {
+            return { ok: false, message: "Solo administradores pueden modificar unidades." };
+        }
+
+        const id = formData.get("id")?.toString();
+        if (!id) {
+            return { ok: false, message: "ID de unidad requerido." };
+        }
+
+        const estadoRaw = formData.get("estado");
+        const nuevoEstado = estadoRaw === "true" || estadoRaw === "on";
+
+        const previo = await prisma.unidad.findUnique({
+            where: { id }
+        });
+        if (!previo) {
+            return { ok: false, message: "Unidad no encontrada." };
+        }
+
+        await prisma.unidad.update({
+            where: { id },
+            data: { estado: nuevoEstado }
+        });
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            accion: "actualizar",
+            entidad: "Unidad",
+            entidadId: id,
+            detalle: {
+                cambios: {
+                    estado: { antes: previo.estado, despues: nuevoEstado }
+                }
+            }
+        });
+
+        revalidatePath("/mantenedores");
+        return {
+            ok: true,
+            message: nuevoEstado ? "Unidad activada exitosamente." : "Unidad desactivada exitosamente."
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: obtenerMensajeError(error, "Unidad", "No se pudo cambiar el estado de la unidad.")
+        };
+    }
 }
 
 async function validarBodegasDelCentro(bodegaIds: string[], centroId: string): Promise<string[]> {
@@ -106,7 +521,9 @@ async function validarBodegasDelCentro(bodegaIds: string[], centroId: string): P
 /** Mensaje por entidad cuando Prisma rechaza un valor duplicado (restriccion unica, codigo P2002). */
 const MENSAJES_DUPLICADO: Partial<Record<string, string>> = {
     Usuario: "Ya existe un usuario con ese correo.",
-    Unidad: "Ya existe una unidad con esa descripción."
+    Unidad: "Ya existe una unidad con esa descripción.",
+    Centro: "Ya existe un centro con ese nombre.",
+    Bodega: "Ya existe una bodega con ese nombre."
 };
 
 /**
@@ -245,7 +662,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
             return { ok: false, message: "Usuario no encontrado." };
         }
 
-        const cambios: Record<string, { antes: any; despues: any }> = {};
+        const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
         if (previo.nombre !== parsed.nombre) {
             cambios.nombre = { antes: previo.nombre, despues: parsed.nombre };
         }
@@ -319,7 +736,7 @@ export async function editarUsuario(prevState: ActionState, formData: FormData):
             accion: "actualizar",
             entidad: "Usuario",
             entidadId: parsed.id,
-            detalle: { cambios }
+            detalle: { cambios: cambios as unknown as Prisma.InputJsonObject }
         });
 
         revalidatePath("/mantenedores");
