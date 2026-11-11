@@ -11,6 +11,9 @@ import { AuditLogger } from "@/shared/lib/logger";
 import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
 
+// constants
+import { esUnidadMerma } from "@/modules/orden-salida/constants/destinos";
+
 // schemas
 import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema, reenvioComprobanteSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
 
@@ -132,15 +135,20 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             fechaLimiteRecepcion = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         }
 
-        const esConsumoInterno = parsed.tipoSalida.trim().toLowerCase() === "consumo interno";
-        if (esConsumoInterno) {
-            if (typeof prisma.unidad?.findFirst === "function") {
-                const unidadValida = await prisma.unidad.findFirst({
-                    where: { descripcion: parsed.destino.trim() }
-                });
-                if (!unidadValida) {
-                    return { ok: false, message: "El servicio o unidad clínica seleccionada no es válida." };
-                }
+        // Consumo Interno y Merma toman su destino de la tabla Unidad (ver UNIDADES_MERMA).
+        const tipoNormalizado = parsed.tipoSalida.trim().toLowerCase();
+        const esMerma = tipoNormalizado === "merma";
+        if (esMerma || tipoNormalizado === "consumo interno") {
+            const unidad = await prisma.unidad.findFirst({
+                where: { descripcion: parsed.destino.trim() }
+            });
+            if (!unidad || esUnidadMerma(unidad.descripcion) !== esMerma) {
+                return {
+                    ok: false,
+                    message: esMerma
+                        ? "La causal de merma seleccionada no es válida."
+                        : "El servicio o unidad clínica seleccionada no es válida."
+                };
             }
         }
 

@@ -12,13 +12,13 @@
 ## 1. Diagnóstico del Problema y Justificación Técnica
 
 ### 1.1. Situación Previa y Deuda Técnica:
-En la implementación inicial del formulario de egresos ([`src/modules/orden-salida/components/orden-salida-form.tsx`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/orden-salida/components/orden-salida-form.tsx)), el campo **Destino** se seleccionaba mediante listas estáticas en controles `<Select>` según el tipo de salida:
+En la implementación inicial del formulario de egresos (`src/modules/orden-salida/components/orden-salida-form.tsx`), el campo **Destino** se seleccionaba mediante listas estáticas en controles `<Select>` según el tipo de salida:
 - Para **Consumo Interno**: utilizaba una lista cerrada hardcodeada en código TypeScript (`DESTINOS_CONSUMO_INTERNO`).
 - Para **Merma**: utilizaba otra lista estática (`DESTINOS_MERMA`).
 - Para **A otra bodega**: utilizaba la lista de bodegas hermanas del centro.
 - Para **A Otros Centros**: únicamente solicitaba el centro de destino (`centroDestinoId`), sin requerir la bodega receptora del préstamo.
 
-En el backend ([`src/modules/orden-salida/schemas/orden-salida.schema.ts`](file:///c:/Users/benja/OneDrive/Escritorio/inventario-cmv-main/src/modules/orden-salida/schemas/orden-salida.schema.ts)):
+En el backend (`src/modules/orden-salida/schemas/orden-salida.schema.ts`):
 1. El schema Zod declaraba `destino: z.string().min(1)`, aceptando cualquier texto arbitrario si se enviaba una petición manipulada.
 2. No se validaba la existencia del servicio clínico o causal en la base de datos.
 3. Para **A Otros Centros**, se omitía la selección obligatoria de la bodega receptora específica (`bodegaDestinoId`), dejando una brecha de trazabilidad logística respecto a qué recinto físico de destino custodiaría el material en tránsito.
@@ -50,8 +50,8 @@ En el backend ([`src/modules/orden-salida/schemas/orden-salida.schema.ts`](file:
 
 | Tipo de Salida | Campos Obligatorios | Regla en Schema Zod | Regla en Server Action (BD) | Mensaje de Error en Rechazo |
 |---|---|---|---|---|
-| **Consumo Interno** | `destino` | `min(1)` no vacío | Debe coincidir con una `Unidad` registrada en la base de datos | *"El servicio o unidad clínica seleccionada no es válida."* |
-| **Merma** | `destino` | `min(5)` caracteres descriptivos | Debe registrarse la causal (apoyada en `Unidad` o glosa descriptiva $\ge 5$ chars) | *"Para registrar una salida por Merma se requiere una causal o justificación detallada de al menos 5 caracteres."* |
+| **Consumo Interno** | `destino` | `min(1)` no vacío | Debe coincidir con una `Unidad` registrada que **no** sea causal de merma (`UNIDADES_MERMA`) | *"El servicio o unidad clínica seleccionada no es válida."* |
+| **Merma** | `destino` | `min(1)` no vacío | Debe coincidir con una `Unidad` registrada que sea causal de merma (`UNIDADES_MERMA`: "Regularización de Bodega", "REAS") | *"La causal de merma seleccionada no es válida."* |
 | **A otra bodega** | `bodegaDestinoId` | `bodegaDestinoId` obligatorio y `!= bodegaId` | Debe existir en BD, estar activa (`estado: true`), pertenecer al mismo `centroId` y persistir su nombre oficial en `destino` | *"La bodega destino seleccionada no existe o no pertenece al mismo centro de salud."* |
 | **A Otros Centros** | `centroDestinoId` y `bodegaDestinoId` | Ambos IDs obligatorios; `centroDestinoId != centroId` | El centro debe existir y estar activo. La bodega destino debe existir, estar activa y pertenecer estrictamente a `centroDestinoId`. Se persiste el nombre del centro en `destino` | *"Debe seleccionar la bodega de destino del centro receptor."* / *"La bodega de destino seleccionada no pertenece al centro receptor o no está activa."* |
 
@@ -65,6 +65,7 @@ En el backend ([`src/modules/orden-salida/schemas/orden-salida.schema.ts`](file:
   const unidades = await prisma.unidad.findMany({ orderBy: { descripcion: "asc" } });
   ```
 - Se erradica la dependencia de arrays estáticos en código (`DESTINOS_CONSUMO_INTERNO` y `DESTINOS_MERMA` de `destinos.ts`), permitiendo que el mantenedor de unidades en `/mantenedores` administre directamente los puntos asistenciales comunales.
+- **Deuda técnica heredada de AppSheet:** la tabla `Unidad` mezcla servicios clínicos y causales de merma. Para no alterar el modelo antes de la migración definitiva, `UNIDADES_MERMA` (`src/modules/orden-salida/constants/destinos.ts`) lista las únicas descripciones válidas para *"Merma"* ("Regularización de Bodega" y "REAS"); todas las demás unidades corresponden a *"Consumo Interno"*. La comparación ignora mayúsculas y tildes.
 - Si la tabla `Unidad` está vacía o un servicio fue deshabilitado, el selector lo refleja de inmediato sin redespliegue de código.
 
 ### Regla R-02: Selección Obligatoria de Bodega Destino en Traspasos Intercentros
@@ -86,13 +87,15 @@ En `crearOrdenSalidaSchema.superRefine((data, ctx) => { ... })`:
    - Exige `bodegaDestinoId` presente y no vacío.
    - Mantiene la advertencia sanitaria consultiva si algún lote caduca en $\le 7$ días sin confirmación.
 3. **Consumo Interno y Merma:**
-   - Exige `destino` no vacío. Para Merma, exige longitud $\ge 5$ caracteres.
+   - Exige `destino` no vacío. La validez del servicio o causal se verifica en el servidor (R-04), porque "REAS" tiene menos de 5 caracteres.
 
 ### Regla R-04: Garantía de Integridad y Validación en Servidor (`orden-salida.action.ts`)
 En `crearOrdenSalida`:
 1. **Consumo Interno:**
    - El servidor verifica contra `prisma.unidad` que `parsed.destino` corresponda a una unidad válida registrada. Si no coincide, retorna error:
      *"El servicio o unidad clínica seleccionada no es válida."*
+   - Una causal de merma (`UNIDADES_MERMA`) no es un destino válido de Consumo Interno.
+   - **Merma:** `parsed.destino` debe ser una `Unidad` registrada incluida en `UNIDADES_MERMA`. Si no, retorna *"La causal de merma seleccionada no es válida."*
 2. **Traspaso a otra bodega:**
    - Consulta `prisma.bodega.findUnique`. Verifica `estado === true` y `centroId === parsed.centroId`.
    - Sobrescribe `parsed.destino = bodegaDestino.nombre`.
@@ -118,7 +121,8 @@ En `crearOrdenSalida`:
    - Pasar `unidades` y `bodegasDestino` completas a `OrdenSalidaForm`.
 4. `src/modules/orden-salida/components/orden-salida-form.tsx`:
    - Aceptar prop `unidades: Unidad[]`.
-   - Poblar el select de servicio/consumo y merma dinámicamente con `unidades`.
+   - Poblar el select de Consumo Interno con las unidades que no son causales de merma, y el de Merma solo con `UNIDADES_MERMA` (`clasificarUnidadesSalida`). Sin listas de respaldo: si no hay opciones, el selector lo indica.
+   - La bodega destino de "A Otros Centros" no se preselecciona: el usuario debe elegirla.
    - Incorporar selector en cascada de `bodegaDestinoId` para `A Otros Centros`, filtrado por `centroDestinoId`.
 5. `prisma/seed.ts`:
    - Asegurar que la semilla inicial contenga servicios clínicos representativos en la tabla `Unidad` para desarrollo y testing.

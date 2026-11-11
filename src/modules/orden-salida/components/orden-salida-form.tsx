@@ -18,11 +18,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 
 // constants
-import {
-    TIPOS_SALIDA,
-    DESTINOS_CONSUMO_INTERNO,
-    DESTINOS_MERMA
-} from "@/modules/orden-salida/constants/destinos";
+import { TIPOS_SALIDA, clasificarUnidadesSalida } from "@/modules/orden-salida/constants/destinos";
 
 // types
 import { initialActionState } from "@/shared/types/action-state";
@@ -137,23 +133,13 @@ export function OrdenSalidaForm({
     const bodegasOtrosCentrosDisponibles = useMemo(() => {
         return bodegasDestino.filter((b) => b.centroId === centroDestinoId && b.estado);
     }, [bodegasDestino, centroDestinoId]);
-    const [bodegaDestinoOtroCentroId, setBodegaDestinoOtroCentroId] = useState(
-        bodegasOtrosCentrosDisponibles[0]?.id ?? ""
+    // Sin preseleccion: el usuario debe elegir explicitamente la bodega que recibe el prestamo.
+    const [bodegaDestinoOtroCentroId, setBodegaDestinoOtroCentroId] = useState("");
+
+    const { consumo: opcionesConsumo, merma: opcionesMerma } = useMemo(
+        () => clasificarUnidadesSalida(unidades),
+        [unidades]
     );
-
-    const opcionesConsumo = useMemo(() => {
-        if (unidades && unidades.length > 0) {
-            return unidades.map((u) => u.descripcion);
-        }
-        return DESTINOS_CONSUMO_INTERNO;
-    }, [unidades]);
-
-    const opcionesMerma = useMemo(() => {
-        if (unidades && unidades.length > 0) {
-            return unidades.map((u) => u.descripcion);
-        }
-        return DESTINOS_MERMA;
-    }, [unidades]);
 
     useEffect(() => {
         if (!bodegasDestinoDisponibles.some((b) => b.id === bodegaDestinoId)) {
@@ -163,18 +149,16 @@ export function OrdenSalidaForm({
 
     useEffect(() => {
         if (!bodegasOtrosCentrosDisponibles.some((b) => b.id === bodegaDestinoOtroCentroId)) {
-            setBodegaDestinoOtroCentroId(bodegasOtrosCentrosDisponibles[0]?.id ?? "");
+            setBodegaDestinoOtroCentroId("");
         }
     }, [bodegasOtrosCentrosDisponibles, bodegaDestinoOtroCentroId]);
 
     useEffect(() => {
         if (!otrosCentrosDisponibles.some((c) => c.id === centroDestinoId)) {
-            const nuevoCentro = otrosCentrosDisponibles[0]?.id ?? "";
-            setCentroDestinoId(nuevoCentro);
-            const bods = bodegasDestino.filter((b) => b.centroId === nuevoCentro && b.estado);
-            setBodegaDestinoOtroCentroId(bods[0]?.id ?? "");
+            setCentroDestinoId(otrosCentrosDisponibles[0]?.id ?? "");
+            setBodegaDestinoOtroCentroId("");
         }
-    }, [otrosCentrosDisponibles, centroDestinoId, bodegasDestino]);
+    }, [otrosCentrosDisponibles, centroDestinoId]);
 
     function cambiarCentro(nuevoCentroId: string): void {
         setCentroSeleccionado(nuevoCentroId);
@@ -311,10 +295,8 @@ export function OrdenSalidaForm({
                             required
                             value={centroDestinoId}
                             onChange={(event) => {
-                                const nuevoCentro = event.currentTarget.value;
-                                setCentroDestinoId(nuevoCentro);
-                                const bods = bodegasDestino.filter((b) => b.centroId === nuevoCentro && b.estado);
-                                setBodegaDestinoOtroCentroId(bods[0]?.id ?? "");
+                                setCentroDestinoId(event.currentTarget.value);
+                                setBodegaDestinoOtroCentroId("");
                             }}
                         >
                             {otrosCentrosDisponibles.length === 0 && (
@@ -341,9 +323,11 @@ export function OrdenSalidaForm({
                             value={bodegaDestinoOtroCentroId}
                             onChange={(event) => setBodegaDestinoOtroCentroId(event.currentTarget.value)}
                         >
-                            {bodegasOtrosCentrosDisponibles.length === 0 && (
-                                <option value="">No hay bodegas disponibles en este centro</option>
-                            )}
+                            <option value="">
+                                {bodegasOtrosCentrosDisponibles.length === 0
+                                    ? "No hay bodegas disponibles en este centro"
+                                    : "Seleccione la bodega destino"}
+                            </option>
                             {bodegasOtrosCentrosDisponibles.map((bodega) => (
                                 <option key={bodega.id} value={bodega.id}>
                                     {bodega.nombre}
@@ -356,6 +340,9 @@ export function OrdenSalidaForm({
                 <label className="space-y-1 text-sm">
                     <span>Causal / Justificación sanitaria *</span>
                     <Select key="merma" name="destino" required defaultValue={opcionesMerma[0] ?? ""}>
+                        {opcionesMerma.length === 0 && (
+                            <option value="">No hay causales de merma en Mantenedores &gt; Unidades</option>
+                        )}
                         {opcionesMerma.map((causal) => (
                             <option key={causal} value={causal}>
                                 {causal}
@@ -367,6 +354,9 @@ export function OrdenSalidaForm({
                 <label className="space-y-1 text-sm">
                     <span>Servicio / Unidad clínica destino *</span>
                     <Select key="consumo-interno" name="destino" required defaultValue={opcionesConsumo[0] ?? ""}>
+                        {opcionesConsumo.length === 0 && (
+                            <option value="">No hay unidades clínicas en Mantenedores &gt; Unidades</option>
+                        )}
                         {opcionesConsumo.map((unidad) => (
                             <option key={unidad} value={unidad}>
                                 {unidad}

@@ -90,25 +90,15 @@ async function main(): Promise<void> {
         }
     });
 
+    // Unidad mezcla servicios (Consumo Interno) y causales de merma (ver UNIDADES_MERMA).
     const unidadesBase = [
-        "Caja",
-        "Unidad",
-        "Box Médico / Consulta Médica",
-        "Urgencia / SAPU / SAR",
+        "Box",
+        "Dental",
+        "Farmacia",
+        "SAPU",
         "Vacunatorio",
-        "Dental / Odontología",
-        "Toma de Muestras / Laboratorio",
-        "Sala de Curaciones",
-        "Sala ERA / IRA",
-        "Farmacia Despacho Paciente",
-        "Atención Domiciliaria",
-        "Kinesiología / Rehabilitación",
-        "Baja por caducidad en estantería",
-        "Rotura o deterioro de envase",
-        "Falla de cadena de frío",
-        "Retiro de mercado / Alerta sanitaria ISP",
-        "Contaminación o pérdida de esterilidad",
-        "Otra causal sanitaria"
+        "Regularización de Bodega",
+        "REAS"
     ];
 
     for (const descripcion of unidadesBase) {

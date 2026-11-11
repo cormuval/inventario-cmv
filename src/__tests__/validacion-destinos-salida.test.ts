@@ -131,6 +131,61 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
             expect(res.ok).toBe(true);
             expect(res.id).toBe("ord-1");
         });
+
+        it("rechaza Consumo Interno si el destino es una causal de merma", async () => {
+            vi.mocked(prisma.unidad.findFirst).mockResolvedValue({ id: "u-2", descripcion: "REAS" } as never);
+
+            const res = await crearOrdenSalida(initialState, crearFormDataConsumo("REAS"));
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toMatch(/servicio o unidad clínica seleccionada no es válida/i);
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("Merma — Solo causales de UNIDADES_MERMA", () => {
+        function crearFormDataMerma(destino: string): FormData {
+            const fd = new FormData();
+            fd.append("fecha", "2026-11-10");
+            fd.append("centroId", "centro-1");
+            fd.append("bodegaId", "b1");
+            fd.append("tipoSalida", "Merma");
+            fd.append("destino", destino);
+            fd.append("productoId", "1");
+            fd.append("cantidad", "2");
+            fd.append("lote", "LOT-1");
+            fd.append("fechaCaducidad", "2027-12-31");
+            return fd;
+        }
+
+        it("rechaza Merma si el destino es un servicio clínico", async () => {
+            vi.mocked(prisma.unidad.findFirst).mockResolvedValue({ id: "u-3", descripcion: "Dental" } as never);
+
+            const res = await crearOrdenSalida(initialState, crearFormDataMerma("Dental"));
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toMatch(/causal de merma seleccionada no es válida/i);
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+
+        it("rechaza Merma si la causal no existe en la tabla Unidad", async () => {
+            vi.mocked(prisma.unidad.findFirst).mockResolvedValue(null);
+
+            const res = await crearOrdenSalida(initialState, crearFormDataMerma("REAS"));
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toMatch(/causal de merma seleccionada no es válida/i);
+        });
+
+        it("permite Merma con la causal REAS registrada", async () => {
+            vi.mocked(prisma.unidad.findFirst).mockResolvedValue({ id: "u-2", descripcion: "REAS" } as never);
+            vi.mocked(prisma.$transaction).mockResolvedValue({ id: "ord-2" } as never);
+
+            const res = await crearOrdenSalida(initialState, crearFormDataMerma("REAS"));
+
+            expect(res.message).not.toMatch(/no es válida/i);
+            expect(prisma.$transaction).toHaveBeenCalled();
+        });
     });
 
     describe("A Otros Centros — Validación de Bodega Destino Obligatoria", () => {
