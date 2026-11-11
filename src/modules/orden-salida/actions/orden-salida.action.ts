@@ -222,14 +222,19 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
         });
 
+        let notificacionPrestamo: ResultadoCorreo | undefined;
         if (esAOtroCentro && orden) {
-            // Fail-safe: notificación interna
-            // TODO correo: se conecta en el PR de integración Resend.
-            await notificarPrestamoEnviado(orden.id);
+            notificacionPrestamo = await notificarPrestamoEnviado(orden.id).catch(
+                (error: unknown): ResultadoCorreo => ({
+                    ok: false,
+                    error: error instanceof Error ? error.message : "Error inesperado al notificar el préstamo"
+                })
+            );
         }
 
-        // El envío del comprobante nunca debe revertir ni ocultar la salida ya registrada
-        const envio = parsed.correoDestino
+        // El envío del comprobante regular aplica solo a salidas que no sean préstamos intercentros
+        // (los préstamos se notifican con su propio correo institucional que incluye el código de recepción)
+        const envio = !esAOtroCentro && parsed.correoDestino
             ? await enviarComprobanteSalida({
                   ordenId: orden.id,
                   usuarioId: user.id,
@@ -249,12 +254,18 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         revalidatePath("/reporte");
 
         if (esAOtroCentro && codigoRecepcion) {
+            const advertencia =
+                notificacionPrestamo && !notificacionPrestamo.ok && !notificacionPrestamo.omitido
+                    ? `No se pudo enviar el correo con el código de recepción: ${notificacionPrestamo.error}. Por favor comunique el código manualmente al centro destinatario.`
+                    : undefined;
+
             return {
                 ok: true,
                 message: `Préstamo intercentros registrado exitosamente. Código de recepción: ${codigoRecepcion}`,
                 id: orden.id,
                 ordenId: orden.id,
-                codigoRecepcion
+                codigoRecepcion,
+                ...(advertencia ? { advertencia } : {})
             };
         }
 
