@@ -10,9 +10,9 @@ CREATE TABLE `pedidos` (
     `ID_Usuario_Solicitante` VARCHAR(255) NOT NULL,
     `Fecha_Solicitud` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `Observaciones` VARCHAR(500) NULL,
-    `ID_Usuario_Revision` VARCHAR(255) NULL,
-    `Fecha_Revision` DATETIME(3) NULL,
-    `Observaciones_Revision` VARCHAR(500) NULL,
+    `Fecha_Envio` DATETIME(3) NULL,
+    `Fecha_Anulacion` DATETIME(3) NULL,
+    `Motivo_Anulacion` VARCHAR(255) NULL,
 
     UNIQUE INDEX `pedidos_Numero_key`(`Numero`),
     INDEX `pedidos_ID_Centro_idx`(`ID_Centro`),
@@ -27,13 +27,10 @@ CREATE TABLE `pedidos_detalle` (
     `ID_Pedido` VARCHAR(255) NOT NULL,
     `ID_Product` INTEGER NOT NULL,
     `Cantidad_Solicitada` INTEGER NOT NULL,
-    `Cantidad_Aprobada` INTEGER NULL,
-    `Observacion_Ajuste` VARCHAR(255) NULL,
     `Stock_Actual_Momento` INTEGER NULL,
-    `Stock_Minimo_Momento` INTEGER NULL,
 
-    INDEX `pedidos_detalle_ID_Pedido_idx`(`ID_Pedido`),
     INDEX `pedidos_detalle_ID_Product_idx`(`ID_Product`),
+    UNIQUE INDEX `pedidos_detalle_ID_Pedido_ID_Product_key`(`ID_Pedido`, `ID_Product`),
     PRIMARY KEY (`ID_PedidoDetalle`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -57,9 +54,6 @@ ALTER TABLE `pedidos` ADD CONSTRAINT `pedidos_ID_Bodega_fkey` FOREIGN KEY (`ID_B
 
 -- AddForeignKey
 ALTER TABLE `pedidos` ADD CONSTRAINT `pedidos_ID_Usuario_Solicitante_fkey` FOREIGN KEY (`ID_Usuario_Solicitante`) REFERENCES `Usuario`(`ID_User`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `pedidos` ADD CONSTRAINT `pedidos_ID_Usuario_Revision_fkey` FOREIGN KEY (`ID_Usuario_Revision`) REFERENCES `Usuario`(`ID_User`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `pedidos_detalle` ADD CONSTRAINT `pedidos_detalle_ID_Pedido_fkey` FOREIGN KEY (`ID_Pedido`) REFERENCES `pedidos`(`ID_Pedido`) ON DELETE CASCADE ON UPDATE CASCADE;

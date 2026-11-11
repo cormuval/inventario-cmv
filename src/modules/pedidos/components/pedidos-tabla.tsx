@@ -15,7 +15,6 @@ import { formatDate } from "@/shared/utils/format";
 
 interface PedidosTablaProps {
     pedidos: PedidoFilaLista[];
-    esAdquisiciones: boolean;
 }
 
 function renderBadgeEstado(estado: string): React.ReactElement {
@@ -23,9 +22,7 @@ function renderBadgeEstado(estado: string): React.ReactElement {
         case "BORRADOR":
             return <Badge tone="default">Borrador</Badge>;
         case "ENVIADO":
-            return <Badge tone="muted">Enviado</Badge>;
-        case "REVISADO":
-            return <Badge tone="success">Revisado / Aprobado</Badge>;
+            return <Badge tone="success">Enviado</Badge>;
         case "ANULADO":
             return <Badge tone="danger">Anulado</Badge>;
         default:
@@ -33,7 +30,7 @@ function renderBadgeEstado(estado: string): React.ReactElement {
     }
 }
 
-export function PedidosTabla({ pedidos, esAdquisiciones }: PedidosTablaProps): React.ReactElement {
+export function PedidosTabla({ pedidos }: PedidosTablaProps): React.ReactElement {
     if (pedidos.length === 0) {
         return (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -55,7 +52,6 @@ export function PedidosTabla({ pedidos, esAdquisiciones }: PedidosTablaProps): R
                         <Th>Solicitante</Th>
                         <Th className="text-right">Ítems</Th>
                         <Th className="text-right">Solicitado</Th>
-                        <Th className="text-right">Aprobado</Th>
                         <Th>Estado</Th>
                         <Th className="text-right">Acciones</Th>
                     </tr>
@@ -87,9 +83,6 @@ export function PedidosTabla({ pedidos, esAdquisiciones }: PedidosTablaProps): R
                             </Td>
                             <Td className="text-right text-xs">{p.totalItems}</Td>
                             <Td className="text-right text-xs font-semibold">{p.totalUnidadesSolicitadas}</Td>
-                            <Td className="text-right text-xs font-bold text-emerald-600">
-                                {p.totalUnidadesAprobadas !== null ? p.totalUnidadesAprobadas : "—"}
-                            </Td>
                             <Td className="whitespace-nowrap">{renderBadgeEstado(p.estado)}</Td>
                             <Td className="text-right whitespace-nowrap">
                                 <div className="inline-flex items-center gap-2">
@@ -98,7 +91,7 @@ export function PedidosTabla({ pedidos, esAdquisiciones }: PedidosTablaProps): R
                                         className="inline-flex items-center gap-1 rounded border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
                                     >
                                         <Eye className="h-3.5 w-3.5" />
-                                        <span>{p.estado === "ENVIADO" && esAdquisiciones ? "Revisar" : "Ver"}</span>
+                                        <span>Ver</span>
                                     </Link>
                                     <BotonDescargarPedido pedidoId={p.id} numero={p.numero} />
                                 </div>

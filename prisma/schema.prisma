@@ -70,7 +70,6 @@ model Usuario {
     encargos   EncargadosBodega[] @relation("UsuarioEncargado")
     logs       Log[]
     pedidosSolicitados Pedido[]   @relation("PedidoSolicitante")
-    pedidosRevisados   Pedido[]   @relation("PedidoRevisor")
 
     @@index([rolId])
     @@index([centroId])
@@ -261,14 +260,13 @@ model Pedido {
     usuarioSolicitanteId  String          @map("ID_Usuario_Solicitante") @db.VarChar(255)
     fechaSolicitud        DateTime        @default(now()) @map("Fecha_Solicitud")
     observaciones         String?         @map("Observaciones") @db.VarChar(500)
-    usuarioRevisionId     String?         @map("ID_Usuario_Revision") @db.VarChar(255)
-    fechaRevision         DateTime?       @map("Fecha_Revision")
-    observacionesRevision String?         @map("Observaciones_Revision") @db.VarChar(500)
+    fechaEnvio            DateTime?       @map("Fecha_Envio")
+    fechaAnulacion        DateTime?       @map("Fecha_Anulacion")
+    motivoAnulacion       String?         @map("Motivo_Anulacion") @db.VarChar(255)
 
     centro                Centro          @relation(fields: [centroId], references: [id])
     bodega                Bodega?         @relation(fields: [bodegaId], references: [id])
     usuarioSolicitante    Usuario         @relation("PedidoSolicitante", fields: [usuarioSolicitanteId], references: [id])
-    usuarioRevision       Usuario?        @relation("PedidoRevisor", fields: [usuarioRevisionId], references: [id])
     detalles              PedidoDetalle[]
 
     @@index([centroId])
@@ -282,15 +280,12 @@ model PedidoDetalle {
     pedidoId           String   @map("ID_Pedido") @db.VarChar(255)
     productoId         Int      @map("ID_Product")
     cantidadSolicitada Int      @map("Cantidad_Solicitada")
-    cantidadAprobada   Int?     @map("Cantidad_Aprobada")
-    observacionAjuste  String?  @map("Observacion_Ajuste") @db.VarChar(255)
     stockActualMomento Int?     @map("Stock_Actual_Momento")
-    stockMinimoMomento Int?     @map("Stock_Minimo_Momento")
 
     pedido             Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
     producto           Producto @relation(fields: [productoId], references: [id])
 
-    @@index([pedidoId])
+    @@unique([pedidoId, productoId])
     @@index([productoId])
     @@map("pedidos_detalle")
 }

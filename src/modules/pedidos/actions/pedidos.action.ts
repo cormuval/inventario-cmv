@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 
 // lib
-import { requireSessionUser } from "@/shared/lib/auth";
+import { puedeGestionarPedidos, requireSessionUser, type SessionUser } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario, validarCentroBodegaEnAlcance } from "@/shared/lib/inventario-alcance";
 import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
@@ -11,21 +13,17 @@ import { prisma } from "@/shared/lib/prisma";
 // schemas
 import {
     anularPedidoSchema,
-    crearPedidoSchema,
-    guardarBorradorSchema,
+    guardarPedidoSchema,
     guardarPlantillaSchema,
-    revisarPedidoSchema,
-    type CrearPedidoInput,
-    type GuardarBorradorInput,
-    type GuardarPlantillaInput,
-    type RevisarPedidoInput
+    type GuardarPedidoInput,
+    type GuardarPlantillaInput
 } from "@/modules/pedidos/schemas/pedidos.schema";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
 
 // utils
-import { obtenerCatalogoAseo } from "@/modules/pedidos/utils/catalogo-aseo";
+import { obtenerCatalogoAseo, type ItemCatalogoAseo } from "@/modules/pedidos/utils/catalogo-aseo";
 import { generarNumeroPedido } from "@/modules/pedidos/utils/correlativo";
 import { construirExcelPedido } from "@/modules/pedidos/utils/pedidos-excel";
 import { generarPedidoPDF } from "@/modules/pedidos/utils/pedidos-pdf";
@@ -38,65 +36,175 @@ export interface ResultadoDescarga {
     mimeType?: string;
 }
 
-export async function obtenerCatalogoAseoAction(centroId: string, bodegaId?: string | null) {
+const MAX_INTENTOS_NUMERO = 3;
+
+class ErrorPedido extends Error {}
+
+function mensajeError(error: unknown, porDefecto: string): string {
+    if (error instanceof ZodError) {
+        return error.issues[0]?.message ?? porDefecto;
+    }
+    if (error instanceof ErrorPedido) {
+        return error.message;
+    }
+    if (error instanceof Error && /^(No tienes permiso|La bodega seleccionada)/.test(error.message)) {
+        return error.message;
+    }
+    return porDefecto;
+}
+
+async function requerirGestor(): Promise<SessionUser> {
+    const user = await requireSessionUser();
+    if (!puedeGestionarPedidos(user.rol)) {
+        throw new ErrorPedido("Tu rol solo permite consultar pedidos de aseo.");
+    }
+    return user;
+}
+
+/** Lectura y gestión exigen que el centro del pedido esté dentro del alcance del usuario. */
+async function validarCentroPedido(centroId: string, bodegaId?: string | null): Promise<void> {
+    const alcance = await obtenerAlcanceInventario({ centroId });
+    if (!alcance.centroIds.includes(centroId)) {
+        throw new ErrorPedido("No tienes permiso para operar pedidos de este centro.");
+    }
+    if (bodegaId) {
+        await validarCentroBodegaEnAlcance(centroId, bodegaId);
+    }
+}
+
+/** Catálogo cerrado: solo productos activos de aseo; descarta las filas en 0. */
+function validarDetallesCatalogo(
+    detalles: Array<{ productoId: number; cantidadSolicitada: number }>,
+    catalogo: ItemCatalogoAseo[]
+): Array<{ productoId: number; cantidadSolicitada: number; stockActualMomento: number }> {
+    const porProducto = new Map(catalogo.map((item) => [item.productoId, item]));
+    return detalles
+        .filter((detalle) => detalle.cantidadSolicitada > 0)
+        .map((detalle) => {
+            const item = porProducto.get(detalle.productoId);
+            if (!item) {
+                throw new ErrorPedido(`El producto ${detalle.productoId} no pertenece al catálogo de aseo.`);
+            }
+            return { ...detalle, stockActualMomento: item.stockDisponible };
+        });
+}
+
+function esNumeroDuplicado(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function revalidarPedido(pedidoId: string): void {
+    revalidatePath("/pedidos");
+    revalidatePath(`/pedidos/${pedidoId}`);
+}
+
+export async function obtenerCatalogoAseoAction(centroId: string, bodegaId?: string | null): Promise<ItemCatalogoAseo[]> {
     await requireSessionUser();
+    await validarCentroPedido(centroId, bodegaId);
     return obtenerCatalogoAseo({ centroId, bodegaId });
 }
 
-export async function crearPedidoAction(input: CrearPedidoInput): Promise<ActionState & { pedidoId?: string }> {
+export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<ActionState & { pedidoId?: string }> {
     try {
-        const user = await requireSessionUser();
-        const parsed = crearPedidoSchema.parse(input);
+        const user = await requerirGestor();
+        const parsed = guardarPedidoSchema.parse(input);
+        const estado = parsed.enviar ? "ENVIADO" : "BORRADOR";
+        const periodo = parsed.tipo === "MENSUAL" ? parsed.periodo ?? null : null;
+        const observaciones = parsed.observaciones || null;
 
-        // Validar alcance sobre el centro
-        const alcance = await obtenerAlcanceInventario({ centroId: parsed.centroId, bodegaId: parsed.bodegaId ?? undefined });
-        if (!alcance.centroIds.includes(parsed.centroId)) {
-            return { ok: false, message: "No tienes permiso para solicitar pedidos en el centro indicado." };
-        }
-        if (parsed.bodegaId) {
-            await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
-        }
-
-        const estado = parsed.enviarInmediatamente ? "ENVIADO" : "BORRADOR";
-
-        // Obtener foto de stock actual y mínimo para cada producto
-        const catalogo = await obtenerCatalogoAseo({ centroId: parsed.centroId, bodegaId: parsed.bodegaId });
-        const stockPorProducto = new Map(catalogo.map((c) => [c.productoId, c]));
-
-        const nuevoPedido = await prisma.$transaction(async (tx) => {
-            const numero = await generarNumeroPedido(tx);
-
-            const pedido = await tx.pedido.create({
-                data: {
-                    numero,
-                    tipo: parsed.tipo,
-                    estado,
-                    periodo: parsed.periodo ?? null,
-                    centroId: parsed.centroId,
-                    bodegaId: parsed.bodegaId ?? null,
-                    usuarioSolicitanteId: user.id,
-                    observaciones: parsed.observaciones ?? null
-                }
+        if (parsed.pedidoId) {
+            // El centro y la bodega de un borrador existente no cambian: se toman de la base.
+            const existente = await prisma.pedido.findUnique({
+                where: { id: parsed.pedidoId },
+                select: { id: true, numero: true, estado: true, centroId: true, bodegaId: true }
             });
+            if (!existente) {
+                return { ok: false, message: "El pedido no existe." };
+            }
+            if (existente.estado !== "BORRADOR") {
+                return { ok: false, message: "Solo se pueden modificar pedidos en estado borrador." };
+            }
+            await validarCentroPedido(existente.centroId, existente.bodegaId);
 
-            for (const item of parsed.detalles) {
-                if (item.cantidadSolicitada <= 0 && !parsed.enviarInmediatamente) {
-                    continue; // En borrador se pueden omitir filas en 0
-                }
-                const info = stockPorProducto.get(item.productoId);
-                await tx.pedidoDetalle.create({
+            const catalogo = await obtenerCatalogoAseo({ centroId: existente.centroId, bodegaId: existente.bodegaId });
+            const detalles = validarDetallesCatalogo(parsed.detalles, catalogo);
+
+            await prisma.$transaction(async (tx) => {
+                // Condicional sobre el estado: si otro usuario lo envió o anuló entretanto, no se pisa.
+                const actualizado = await tx.pedido.updateMany({
+                    where: { id: existente.id, estado: "BORRADOR" },
                     data: {
-                        pedidoId: pedido.id,
-                        productoId: item.productoId,
-                        cantidadSolicitada: item.cantidadSolicitada,
-                        stockActualMomento: info?.stockDisponible ?? 0,
-                        stockMinimoMomento: info?.stockMinimo ?? 0
+                        tipo: parsed.tipo,
+                        periodo,
+                        observaciones,
+                        estado,
+                        ...(parsed.enviar ? { fechaEnvio: new Date() } : {})
                     }
                 });
-            }
+                if (actualizado.count !== 1) {
+                    throw new ErrorPedido("El pedido ya no está en borrador. Recarga la página.");
+                }
+                await tx.pedidoDetalle.deleteMany({ where: { pedidoId: existente.id } });
+                await tx.pedidoDetalle.createMany({
+                    data: detalles.map((detalle) => ({ ...detalle, pedidoId: existente.id }))
+                });
+            });
 
-            return pedido;
-        });
+            await AuditLogger.log({
+                usuarioId: user.id,
+                centroId: existente.centroId,
+                bodegaId: existente.bodegaId ?? undefined,
+                accion: "actualizar",
+                entidad: "Pedido",
+                entidadId: existente.id,
+                detalle: { numero: existente.numero, estado, productos: detalles.length }
+            });
+
+            revalidarPedido(existente.id);
+            return {
+                ok: true,
+                message: parsed.enviar ? `Pedido ${existente.numero} enviado.` : `Borrador ${existente.numero} guardado.`,
+                pedidoId: existente.id
+            };
+        }
+
+        await validarCentroPedido(parsed.centroId, parsed.bodegaId);
+        const catalogo = await obtenerCatalogoAseo({ centroId: parsed.centroId, bodegaId: parsed.bodegaId });
+        const detalles = validarDetallesCatalogo(parsed.detalles, catalogo);
+
+        let pedido: { id: string; numero: string } | null = null;
+        for (let intento = 1; intento <= MAX_INTENTOS_NUMERO && !pedido; intento++) {
+            try {
+                pedido = await prisma.$transaction(async (tx) => {
+                    const creado = await tx.pedido.create({
+                        data: {
+                            numero: await generarNumeroPedido(tx),
+                            tipo: parsed.tipo,
+                            estado,
+                            periodo,
+                            centroId: parsed.centroId,
+                            bodegaId: parsed.bodegaId || null,
+                            usuarioSolicitanteId: user.id,
+                            observaciones,
+                            fechaEnvio: parsed.enviar ? new Date() : null
+                        },
+                        select: { id: true, numero: true }
+                    });
+                    await tx.pedidoDetalle.createMany({
+                        data: detalles.map((detalle) => ({ ...detalle, pedidoId: creado.id }))
+                    });
+                    return creado;
+                });
+            } catch (error: unknown) {
+                // Dos pedidos simultáneos pueden calcular el mismo correlativo: se reintenta.
+                if (!esNumeroDuplicado(error) || intento === MAX_INTENTOS_NUMERO) {
+                    throw error;
+                }
+            }
+        }
+        if (!pedido) {
+            return { ok: false, message: "No fue posible asignar un número al pedido. Intenta nuevamente." };
+        }
 
         await AuditLogger.log({
             usuarioId: user.id,
@@ -104,266 +212,42 @@ export async function crearPedidoAction(input: CrearPedidoInput): Promise<Action
             bodegaId: parsed.bodegaId ?? undefined,
             accion: "crear",
             entidad: "Pedido",
-            entidadId: nuevoPedido.id,
-            detalle: {
-                numero: nuevoPedido.numero,
-                tipo: nuevoPedido.tipo,
-                estado: nuevoPedido.estado,
-                detalles: parsed.detalles.length
-            }
+            entidadId: pedido.id,
+            detalle: { numero: pedido.numero, tipo: parsed.tipo, estado, productos: detalles.length }
         });
 
-        revalidatePath("/pedidos");
+        revalidarPedido(pedido.id);
         return {
             ok: true,
-            message: parsed.enviarInmediatamente
-                ? `Pedido ${nuevoPedido.numero} enviado correctamente a Adquisiciones.`
-                : `Borrador ${nuevoPedido.numero} guardado correctamente.`,
-            pedidoId: nuevoPedido.id
+            message: parsed.enviar ? `Pedido ${pedido.numero} enviado.` : `Borrador ${pedido.numero} guardado.`,
+            pedidoId: pedido.id
         };
     } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error inesperado al crear el pedido."
-        };
-    }
-}
-
-export async function guardarBorradorPedidoAction(input: GuardarBorradorInput): Promise<ActionState & { pedidoId?: string }> {
-    try {
-        const user = await requireSessionUser();
-        const parsed = guardarBorradorSchema.parse(input);
-
-        const alcance = await obtenerAlcanceInventario({ centroId: parsed.centroId, bodegaId: parsed.bodegaId ?? undefined });
-        if (!alcance.centroIds.includes(parsed.centroId)) {
-            return { ok: false, message: "No tienes permiso para operar en este centro." };
-        }
-
-        const catalogo = await obtenerCatalogoAseo({ centroId: parsed.centroId, bodegaId: parsed.bodegaId });
-        const stockPorProducto = new Map(catalogo.map((c) => [c.productoId, c]));
-
-        if (parsed.pedidoId) {
-            // Actualizar borrador existente
-            const pedidoExistente = await prisma.pedido.findUnique({
-                where: { id: parsed.pedidoId }
-            });
-
-            if (!pedidoExistente) {
-                return { ok: false, message: "El pedido especificado no existe." };
-            }
-            if (pedidoExistente.estado !== "BORRADOR") {
-                return { ok: false, message: "Solo se pueden editar pedidos en estado BORRADOR." };
-            }
-
-            await prisma.$transaction(async (tx) => {
-                await tx.pedido.update({
-                    where: { id: pedidoExistente.id },
-                    data: {
-                        tipo: parsed.tipo,
-                        periodo: parsed.periodo ?? null,
-                        observaciones: parsed.observaciones ?? null
-                    }
-                });
-
-                // Reemplazar detalles
-                await tx.pedidoDetalle.deleteMany({
-                    where: { pedidoId: pedidoExistente.id }
-                });
-
-                for (const item of parsed.detalles) {
-                    const info = stockPorProducto.get(item.productoId);
-                    await tx.pedidoDetalle.create({
-                        data: {
-                            pedidoId: pedidoExistente.id,
-                            productoId: item.productoId,
-                            cantidadSolicitada: item.cantidadSolicitada,
-                            stockActualMomento: info?.stockDisponible ?? 0,
-                            stockMinimoMomento: info?.stockMinimo ?? 0
-                        }
-                    });
-                }
-            });
-
-            revalidatePath(`/pedidos/${pedidoExistente.id}`);
-            revalidatePath("/pedidos");
-            return { ok: true, message: `Borrador ${pedidoExistente.numero} actualizado.`, pedidoId: pedidoExistente.id };
-        }
-
-        // Crear nuevo borrador
-        return crearPedidoAction({
-            ...parsed,
-            enviarInmediatamente: false
-        });
-    } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error al guardar el borrador."
-        };
-    }
-}
-
-export async function enviarPedidoAction(pedidoId: string): Promise<ActionState> {
-    try {
-        const user = await requireSessionUser();
-        const pedido = await prisma.pedido.findUnique({
-            where: { id: pedidoId },
-            include: { detalles: true }
-        });
-
-        if (!pedido) {
-            return { ok: false, message: "El pedido no existe." };
-        }
-        if (pedido.estado !== "BORRADOR") {
-            return { ok: false, message: "Solo se pueden enviar pedidos en estado BORRADOR." };
-        }
-        if (pedido.detalles.length === 0) {
-            return { ok: false, message: "El pedido no contiene ningún producto de aseo." };
-        }
-
-        await validarCentroBodegaEnAlcance(pedido.centroId, pedido.bodegaId ?? undefined as never);
-
-        await prisma.pedido.update({
-            where: { id: pedido.id },
-            data: {
-                estado: "ENVIADO",
-                fechaSolicitud: new Date()
-            }
-        });
-
-        await AuditLogger.log({
-            usuarioId: user.id,
-            centroId: pedido.centroId,
-            bodegaId: pedido.bodegaId ?? undefined,
-            accion: "enviar",
-            entidad: "Pedido",
-            entidadId: pedido.id,
-            detalle: { numero: pedido.numero, estado: "ENVIADO" }
-        });
-
-        revalidatePath(`/pedidos/${pedido.id}`);
-        revalidatePath("/pedidos");
-        return { ok: true, message: `Pedido ${pedido.numero} enviado a Adquisiciones.` };
-    } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error al enviar el pedido."
-        };
-    }
-}
-
-export async function revisarPedidoAction(input: RevisarPedidoInput): Promise<ActionState> {
-    try {
-        const user = await requireSessionUser();
-        if (user.rol !== "R01") {
-            return { ok: false, message: "Solo el personal de Adquisiciones/Administración puede revisar y aprobar pedidos." };
-        }
-
-        const parsed = revisarPedidoSchema.parse(input);
-        const pedido = await prisma.pedido.findUnique({
-            where: { id: parsed.pedidoId },
-            include: { detalles: true }
-        });
-
-        if (!pedido) {
-            return { ok: false, message: "El pedido no existe." };
-        }
-        if (pedido.estado !== "ENVIADO") {
-            return { ok: false, message: "Solo se pueden revisar pedidos en estado ENVIADO." };
-        }
-
-        const detallesMap = new Map(pedido.detalles.map((d) => [d.id, d]));
-
-        // Validar que si la cantidad aprobada difiere de la solicitada, se provea observación
-        for (const ajuste of parsed.ajustes) {
-            const original = detallesMap.get(ajuste.detalleId);
-            if (!original) continue;
-
-            if (ajuste.cantidadAprobada !== original.cantidadSolicitada) {
-                const obs = ajuste.observacionAjuste?.trim();
-                if (!obs || obs.length < 3) {
-                    return {
-                        ok: false,
-                        message: `Debe indicar una justificación de ajuste para el producto ID ${original.productoId} (modificado de ${original.cantidadSolicitada} a ${ajuste.cantidadAprobada}).`
-                    };
-                }
-            }
-        }
-
-        await prisma.$transaction(async (tx) => {
-            await tx.pedido.update({
-                where: { id: pedido.id },
-                data: {
-                    estado: "REVISADO",
-                    usuarioRevisionId: user.id,
-                    fechaRevision: new Date(),
-                    observacionesRevision: parsed.observacionesRevision ?? null
-                }
-            });
-
-            for (const ajuste of parsed.ajustes) {
-                await tx.pedidoDetalle.update({
-                    where: { id: ajuste.detalleId },
-                    data: {
-                        cantidadAprobada: ajuste.cantidadAprobada,
-                        observacionAjuste: ajuste.observacionAjuste ?? null
-                    }
-                });
-            }
-        });
-
-        await AuditLogger.log({
-            usuarioId: user.id,
-            centroId: pedido.centroId,
-            bodegaId: pedido.bodegaId ?? undefined,
-            accion: "revisar",
-            entidad: "Pedido",
-            entidadId: pedido.id,
-            detalle: {
-                numero: pedido.numero,
-                estado: "REVISADO",
-                observaciones: parsed.observacionesRevision
-            }
-        });
-
-        revalidatePath(`/pedidos/${pedido.id}`);
-        revalidatePath("/pedidos");
-        return { ok: true, message: `Pedido ${pedido.numero} revisado y aprobado formalmente.` };
-    } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error al revisar el pedido."
-        };
+        return { ok: false, message: mensajeError(error, "No fue posible guardar el pedido.") };
     }
 }
 
 export async function anularPedidoAction(pedidoId: string, motivo: string): Promise<ActionState> {
     try {
-        const user = await requireSessionUser();
+        const user = await requerirGestor();
         const parsed = anularPedidoSchema.parse({ pedidoId, motivo });
 
         const pedido = await prisma.pedido.findUnique({
-            where: { id: parsed.pedidoId }
+            where: { id: parsed.pedidoId },
+            select: { id: true, numero: true, estado: true, centroId: true, bodegaId: true }
         });
-
         if (!pedido) {
             return { ok: false, message: "El pedido no existe." };
         }
-        if (pedido.estado === "ANULADO") {
+        await validarCentroPedido(pedido.centroId);
+
+        const anulado = await prisma.pedido.updateMany({
+            where: { id: pedido.id, estado: { in: ["BORRADOR", "ENVIADO"] } },
+            data: { estado: "ANULADO", motivoAnulacion: parsed.motivo, fechaAnulacion: new Date() }
+        });
+        if (anulado.count !== 1) {
             return { ok: false, message: "El pedido ya se encuentra anulado." };
         }
-
-        const alcance = await obtenerAlcanceInventario({ centroId: pedido.centroId });
-        if (!alcance.centroIds.includes(pedido.centroId) && user.rol !== "R01") {
-            return { ok: false, message: "No tienes permiso para anular este pedido." };
-        }
-
-        await prisma.pedido.update({
-            where: { id: pedido.id },
-            data: {
-                estado: "ANULADO",
-                observacionesRevision: `Anulado: ${parsed.motivo}`
-            }
-        });
 
         await AuditLogger.log({
             usuarioId: user.id,
@@ -372,137 +256,114 @@ export async function anularPedidoAction(pedidoId: string, motivo: string): Prom
             accion: "anular",
             entidad: "Pedido",
             entidadId: pedido.id,
-            detalle: { numero: pedido.numero, motivo: parsed.motivo }
+            detalle: { numero: pedido.numero, estadoAnterior: pedido.estado, motivo: parsed.motivo }
         });
 
-        revalidatePath(`/pedidos/${pedido.id}`);
-        revalidatePath("/pedidos");
+        revalidarPedido(pedido.id);
         return { ok: true, message: `Pedido ${pedido.numero} anulado.` };
     } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error al anular el pedido."
-        };
+        return { ok: false, message: mensajeError(error, "No fue posible anular el pedido.") };
     }
 }
 
 export async function guardarPlantillaCentroAction(input: GuardarPlantillaInput): Promise<ActionState> {
     try {
-        const user = await requireSessionUser();
+        const user = await requerirGestor();
         const parsed = guardarPlantillaSchema.parse(input);
+        await validarCentroPedido(parsed.centroId);
 
-        const alcance = await obtenerAlcanceInventario({ centroId: parsed.centroId });
-        if (!alcance.centroIds.includes(parsed.centroId) && user.rol !== "R01") {
-            return { ok: false, message: "No tienes permiso para configurar la plantilla de este centro." };
+        const catalogo = await obtenerCatalogoAseo({ centroId: parsed.centroId });
+        const productosAseo = new Set(catalogo.map((item) => item.productoId));
+        const ajeno = parsed.items.find((item) => !productosAseo.has(item.productoId));
+        if (ajeno) {
+            return { ok: false, message: `El producto ${ajeno.productoId} no pertenece al catálogo de aseo.` };
         }
 
-        await prisma.$transaction(async (tx) => {
-            for (const item of parsed.items) {
-                await tx.pedidoPlantillaAseo.upsert({
-                    where: {
-                        centroId_productoId: {
-                            centroId: parsed.centroId,
-                            productoId: item.productoId
-                        }
-                    },
-                    update: {
-                        cantidadHabitual: item.cantidadHabitual
-                    },
-                    create: {
-                        centroId: parsed.centroId,
-                        productoId: item.productoId,
-                        cantidadHabitual: item.cantidadHabitual
-                    }
-                });
-            }
+        await prisma.$transaction(
+            parsed.items.map((item) =>
+                prisma.pedidoPlantillaAseo.upsert({
+                    where: { centroId_productoId: { centroId: parsed.centroId, productoId: item.productoId } },
+                    update: { cantidadHabitual: item.cantidadHabitual },
+                    create: { centroId: parsed.centroId, productoId: item.productoId, cantidadHabitual: item.cantidadHabitual }
+                })
+            )
+        );
+
+        await AuditLogger.log({
+            usuarioId: user.id,
+            centroId: parsed.centroId,
+            accion: "actualizar",
+            entidad: "Pedido",
+            entidadId: `plantilla-${parsed.centroId}`,
+            detalle: { plantilla: true, productos: parsed.items.filter((item) => item.cantidadHabitual > 0).length }
         });
 
-        return { ok: true, message: "Plantilla habitual de aseo guardada con éxito." };
+        return { ok: true, message: "Plantilla habitual del centro guardada." };
     } catch (error: unknown) {
-        return {
-            ok: false,
-            message: error instanceof Error ? error.message : "Error al guardar la plantilla."
-        };
+        return { ok: false, message: mensajeError(error, "No fue posible guardar la plantilla.") };
     }
+}
+
+async function cargarPedidoParaDescarga(pedidoId: string, formato: "pdf" | "excel") {
+    const user = await requireSessionUser();
+    const pedido = await prisma.pedido.findUnique({
+        where: { id: pedidoId },
+        include: {
+            centro: true,
+            bodega: true,
+            usuarioSolicitante: true,
+            detalles: { include: { producto: true }, orderBy: { producto: { descripcion: "asc" } } }
+        }
+    });
+    if (!pedido) {
+        return null;
+    }
+    await validarCentroPedido(pedido.centroId);
+
+    await AuditLogger.log({
+        usuarioId: user.id,
+        centroId: pedido.centroId,
+        bodegaId: pedido.bodegaId ?? undefined,
+        accion: "exportar",
+        entidad: "Pedido",
+        entidadId: pedido.id,
+        detalle: { numero: pedido.numero, formato }
+    });
+    return pedido;
 }
 
 export async function descargarPedidoPdfAction(pedidoId: string): Promise<ResultadoDescarga> {
     try {
-        await requireSessionUser();
-        const pedido = await prisma.pedido.findUnique({
-            where: { id: pedidoId },
-            include: {
-                centro: true,
-                bodega: true,
-                usuarioSolicitante: true,
-                usuarioRevision: true,
-                detalles: {
-                    include: {
-                        producto: true
-                    }
-                }
-            }
-        });
-
+        const pedido = await cargarPedidoParaDescarga(pedidoId, "pdf");
         if (!pedido) {
             return { ok: false, error: "Pedido no encontrado." };
         }
-
         const buffer = await generarPedidoPDF(pedido);
-        const base64 = buffer.toString("base64");
-        const nombreArchivo = `${pedido.numero}-${pedido.estado.toLowerCase()}.pdf`;
-
         return {
             ok: true,
-            base64,
-            nombreArchivo,
+            base64: buffer.toString("base64"),
+            nombreArchivo: `${pedido.numero}.pdf`,
             mimeType: "application/pdf"
         };
     } catch (error: unknown) {
-        return {
-            ok: false,
-            error: error instanceof Error ? error.message : "Error al generar PDF."
-        };
+        return { ok: false, error: mensajeError(error, "No fue posible generar el PDF.") };
     }
 }
 
 export async function descargarPedidoExcelAction(pedidoId: string): Promise<ResultadoDescarga> {
     try {
-        await requireSessionUser();
-        const pedido = await prisma.pedido.findUnique({
-            where: { id: pedidoId },
-            include: {
-                centro: true,
-                bodega: true,
-                usuarioSolicitante: true,
-                usuarioRevision: true,
-                detalles: {
-                    include: {
-                        producto: true
-                    }
-                }
-            }
-        });
-
+        const pedido = await cargarPedidoParaDescarga(pedidoId, "excel");
         if (!pedido) {
             return { ok: false, error: "Pedido no encontrado." };
         }
-
         const buffer = await construirExcelPedido(pedido);
-        const base64 = buffer.toString("base64");
-        const nombreArchivo = `${pedido.numero}-${pedido.estado.toLowerCase()}.xlsx`;
-
         return {
             ok: true,
-            base64,
-            nombreArchivo,
+            base64: buffer.toString("base64"),
+            nombreArchivo: `${pedido.numero}.xlsx`,
             mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         };
     } catch (error: unknown) {
-        return {
-            ok: false,
-            error: error instanceof Error ? error.message : "Error al generar Excel."
-        };
+        return { ok: false, error: mensajeError(error, "No fue posible generar el Excel.") };
     }
 }
-

@@ -1,5 +1,6 @@
 import type * as React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
 
 // components
@@ -8,12 +9,16 @@ import { AppLayout } from "@/shared/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 
 // lib
+import { puedeGestionarPedidos } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 
 export const dynamic = "force-dynamic";
 
 export default async function NuevoPedidoPage(): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
+    if (!puedeGestionarPedidos(alcance.usuario.rol)) {
+        redirect("/pedidos");
+    }
 
     return (
         <AppLayout>

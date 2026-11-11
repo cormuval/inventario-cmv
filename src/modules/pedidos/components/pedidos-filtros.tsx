@@ -91,7 +91,6 @@ export function PedidosFiltros({
                     <option value="">Todos los estados</option>
                     <option value="BORRADOR">Borrador</option>
                     <option value="ENVIADO">Enviado</option>
-                    <option value="REVISADO">Revisado / Aprobado</option>
                     <option value="ANULADO">Anulado</option>
                 </Select>
             </label>

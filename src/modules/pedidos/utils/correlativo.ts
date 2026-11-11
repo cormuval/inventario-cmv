@@ -1,12 +1,15 @@
 import type { Prisma } from "@prisma/client";
 
+// utils
+import { fechaHoyChile } from "@/shared/utils/filtros-registros";
+
 /**
  * Genera un código correlativo único para un pedido de aseo.
  * Formato: PED-YYYY-0001
  */
 export async function generarNumeroPedido(
     tx: Prisma.TransactionClient,
-    año: number = new Date().getFullYear()
+    año: number = Number(fechaHoyChile().slice(0, 4))
 ): Promise<string> {
     const prefijo = `PED-${año}-`;
 

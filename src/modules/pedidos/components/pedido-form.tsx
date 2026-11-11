@@ -3,13 +3,12 @@
 import type * as React from "react";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Bookmark, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { Bookmark, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 // actions
 import {
-    crearPedidoAction,
-    guardarBorradorPedidoAction,
+    guardarPedidoAction,
     guardarPlantillaCentroAction,
     obtenerCatalogoAseoAction
 } from "@/modules/pedidos/actions/pedidos.action";
@@ -22,7 +21,7 @@ import { Select } from "@/shared/components/ui/select";
 import { Table, Td, Th } from "@/shared/components/ui/table";
 
 // types
-import type { ItemCatalogoAseo } from "@/modules/pedidos/utils/catalogo-aseo";
+import { UMBRAL_SUGERENCIA_ASEO, type ItemCatalogoAseo } from "@/modules/pedidos/utils/catalogo-aseo";
 
 interface PedidoFormProps {
     centros: Array<{ id: string; nombre: string }>;
@@ -129,12 +128,19 @@ export function PedidoForm({
     }
 
     function aplicarSugerenciasStock(): void {
-        const nuevo: Record<number, number> = {};
-        for (const item of catalogo) {
-            nuevo[item.productoId] = item.sugerencia;
+        const sugeridos = catalogo.filter((item) => item.sugerido);
+        if (sugeridos.length === 0) {
+            toast.info(`Ningún producto tiene menos de ${UMBRAL_SUGERENCIA_ASEO} unidades.`);
+            return;
         }
-        setCantidades(nuevo);
-        toast.info("Cantidades sugeridas según stock disponible y mínimo aplicadas.");
+        setCantidades((prev) => {
+            const nuevo = { ...prev };
+            for (const item of sugeridos) {
+                nuevo[item.productoId] = item.sugerencia;
+            }
+            return nuevo;
+        });
+        toast.info(`Se completaron ${sugeridos.length} productos con menos de ${UMBRAL_SUGERENCIA_ASEO} unidades.`);
     }
 
     async function guardarComoPlantilla(): Promise<void> {
@@ -164,63 +170,38 @@ export function PedidoForm({
         });
     }
 
-    async function guardarBorrador(): Promise<void> {
-        startTransition(async () => {
-            const detalles = Object.entries(cantidades)
-                .map(([pid, cant]) => ({
-                    productoId: Number(pid),
-                    cantidadSolicitada: cant
-                }))
-                .filter((d) => d.cantidadSolicitada > 0);
-
-            const res = await guardarBorradorPedidoAction({
-                pedidoId: pedidoExistente?.id,
-                centroId,
-                bodegaId: bodegaId || null,
-                tipo,
-                periodo: tipo === "MENSUAL" ? periodo : null,
-                observaciones: observaciones || null,
-                detalles
-            });
-
-            if (res.ok) {
-                toast.success(res.message);
-                router.push(res.pedidoId ? `/pedidos/${res.pedidoId}` : "/pedidos");
-            } else {
-                toast.error(res.message);
-            }
-        });
-    }
-
-    async function enviarPedido(): Promise<void> {
+    function guardar(enviar: boolean): void {
         const detalles = Object.entries(cantidades)
-            .map(([pid, cant]) => ({
-                productoId: Number(pid),
-                cantidadSolicitada: cant
-            }))
+            .map(([pid, cant]) => ({ productoId: Number(pid), cantidadSolicitada: cant }))
             .filter((d) => d.cantidadSolicitada > 0);
 
-        if (detalles.length === 0) {
-            toast.error("Debe solicitar al menos un insumo de aseo con cantidad mayor a 0.");
+        if (enviar && detalles.length === 0) {
+            toast.error("Debe solicitar al menos un producto de aseo con cantidad mayor a 0.");
             return;
         }
 
         startTransition(async () => {
-            const res = await crearPedidoAction({
-                centroId,
-                bodegaId: bodegaId || null,
-                tipo,
-                periodo: tipo === "MENSUAL" ? periodo : null,
-                observaciones: observaciones || null,
-                detalles,
-                enviarInmediatamente: true
-            });
+            try {
+                const res = await guardarPedidoAction({
+                    pedidoId: pedidoExistente?.id ?? null,
+                    centroId,
+                    bodegaId: bodegaId || null,
+                    tipo,
+                    periodo: tipo === "MENSUAL" ? periodo : null,
+                    observaciones: observaciones || null,
+                    detalles,
+                    enviar
+                });
 
-            if (res.ok) {
-                toast.success(res.message);
-                router.push(res.pedidoId ? `/pedidos/${res.pedidoId}` : "/pedidos");
-            } else {
-                toast.error(res.message);
+                if (res.ok) {
+                    toast.success(res.message);
+                    router.push(res.pedidoId ? `/pedidos/${res.pedidoId}` : "/pedidos");
+                    router.refresh();
+                } else {
+                    toast.error(res.message);
+                }
+            } catch {
+                toast.error("No fue posible guardar el pedido.");
             }
         });
     }
@@ -254,7 +235,7 @@ export function PedidoForm({
                 </label>
 
                 <label className="space-y-1 text-sm font-medium">
-                    <span>Bodega Destino</span>
+                    <span>Bodega</span>
                     <Select
                         value={bodegaId}
                         onChange={(e) => setBodegaId(e.target.value)}
@@ -336,9 +317,8 @@ export function PedidoForm({
                         <tr>
                             <Th>Cód.</Th>
                             <Th>Insumo de Aseo</Th>
-                            <Th>Línea</Th>
-                            <Th className="text-right">Stock Actual</Th>
-                            <Th className="text-right">Stock Mínimo</Th>
+                            <Th className="text-right">Stock vigente</Th>
+                            <Th>Sugerencia</Th>
                             <Th className="text-right">Habitual</Th>
                             <Th className="w-36 text-right">Cant. Solicitada</Th>
                         </tr>
@@ -346,14 +326,14 @@ export function PedidoForm({
                     <tbody>
                         {cargandoCatalogo ? (
                             <tr>
-                                <Td colSpan={7} className="text-center py-8">
+                                <Td colSpan={6} className="text-center py-8">
                                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
                                     <p className="mt-2 text-xs text-muted-foreground">Cargando catálogo de aseo...</p>
                                 </Td>
                             </tr>
                         ) : catalogo.length === 0 ? (
                             <tr>
-                                <Td colSpan={7} className="text-center py-8 text-muted-foreground">
+                                <Td colSpan={6} className="text-center py-8 text-muted-foreground">
                                     No se encontraron productos activos en la línea de Aseo.
                                 </Td>
                             </tr>
@@ -364,20 +344,28 @@ export function PedidoForm({
                                     <tr key={item.productoId} className="hover:bg-muted/30">
                                         <Td className="font-mono text-xs">{item.productoId}</Td>
                                         <Td className="font-medium text-sm">{item.descripcion}</Td>
-                                        <Td className="text-xs text-muted-foreground">{item.linea}</Td>
                                         <Td className="text-right">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 <span className="font-semibold text-xs">{item.stockDisponible}</span>
                                                 {item.estadoStock === "sin_stock" ? (
-                                                    <span className="h-2 w-2 rounded-full bg-rose-600 inline-block" title="Sin stock disponible" />
-                                                ) : item.estadoStock === "bajo_minimo" ? (
-                                                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" title="Stock bajo o próximo al mínimo" />
+                                                    <span className="h-2 w-2 rounded-full bg-rose-600 inline-block" title="Sin stock vigente" />
+                                                ) : item.estadoStock === "bajo_umbral" ? (
+                                                    <span
+                                                        className="h-2 w-2 rounded-full bg-amber-500 inline-block"
+                                                        title={`Menos de ${UMBRAL_SUGERENCIA_ASEO} unidades`}
+                                                    />
                                                 ) : (
-                                                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" title="Stock normal" />
+                                                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" title="Stock suficiente" />
                                                 )}
                                             </div>
                                         </Td>
-                                        <Td className="text-right text-xs text-muted-foreground">{item.stockMinimo}</Td>
+                                        <Td>
+                                            {item.sugerido ? (
+                                                <Badge tone={item.estadoStock === "sin_stock" ? "danger" : "warning"}>
+                                                    Sugerido: {item.sugerencia}
+                                                </Badge>
+                                            ) : null}
+                                        </Td>
                                         <Td className="text-right text-xs text-muted-foreground">{item.cantidadHabitual}</Td>
                                         <Td className="text-right">
                                             <Input
@@ -411,7 +399,7 @@ export function PedidoForm({
                 <Button
                     type="button"
                     variant="outline"
-                    onClick={guardarBorrador}
+                    onClick={() => guardar(false)}
                     disabled={isPending || cargandoCatalogo}
                 >
                     {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
@@ -420,11 +408,11 @@ export function PedidoForm({
                 <Button
                     type="button"
                     variant="default"
-                    onClick={enviarPedido}
+                    onClick={() => guardar(true)}
                     disabled={isPending || cargandoCatalogo}
                 >
                     {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                    Enviar a Adquisiciones
+                    Enviar pedido
                 </Button>
             </div>
         </div>

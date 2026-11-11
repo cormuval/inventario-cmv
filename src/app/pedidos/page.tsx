@@ -57,9 +57,10 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps): P
                             <h2 className="text-2xl font-semibold">Pedidos de Existencias de Aseo</h2>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                            Gestión, revisión y exportación de pedidos mensuales y suplementarios de aseo para centros de salud.
+                            Pedidos mensuales y suplementarios de aseo: arma el pedido, descárgalo en PDF o Excel y envíalo a Adquisiciones.
                         </p>
                     </div>
+                    {data.puedeGestionar ? (
                     <Link
                         href="/pedidos/nuevo"
                         className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground h-9 px-4 text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -67,6 +68,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps): P
                         <PlusCircle className="h-4 w-4" />
                         Nuevo Pedido
                     </Link>
+                    ) : null}
                 </div>
 
                 <Card>
@@ -96,7 +98,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps): P
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <PedidosTabla pedidos={data.pedidos} esAdquisiciones={data.esAdquisiciones} />
+                        <PedidosTabla pedidos={data.pedidos} />
                         <Paginacion paginacion={data.paginacion} ruta="/pedidos" parametros={parametrosUrl} />
                     </CardContent>
                 </Card>

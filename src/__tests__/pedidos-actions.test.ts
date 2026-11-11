@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 
 // lib
 import * as authLib from "@/shared/lib/auth";
 import * as alcanceLib from "@/shared/lib/inventario-alcance";
+import { AuditLogger } from "@/shared/lib/logger";
 import { prisma } from "@/shared/lib/prisma";
 
 // actions
 import {
     anularPedidoAction,
-    crearPedidoAction,
-    descargarPedidoExcelAction,
     descargarPedidoPdfAction,
-    enviarPedidoAction,
-    guardarBorradorPedidoAction,
-    revisarPedidoAction
+    guardarPedidoAction,
+    guardarPlantillaCentroAction
 } from "@/modules/pedidos/actions/pedidos.action";
+
+// utils
+import { obtenerCatalogoAseo } from "@/modules/pedidos/utils/catalogo-aseo";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -23,236 +25,242 @@ vi.mock("@/shared/lib/auth", async (importOriginal) => {
     return { ...original, requireSessionUser: vi.fn() };
 });
 
-vi.mock("@/shared/lib/inventario-alcance", async (importOriginal) => {
-    const original = await importOriginal<typeof import("@/shared/lib/inventario-alcance")>();
-    return {
-        ...original,
-        obtenerAlcanceInventario: vi.fn(),
-        validarCentroBodegaEnAlcance: vi.fn()
-    };
-});
+vi.mock("@/shared/lib/inventario-alcance", () => ({
+    obtenerAlcanceInventario: vi.fn(),
+    validarCentroBodegaEnAlcance: vi.fn()
+}));
+
+vi.mock("@/modules/pedidos/utils/catalogo-aseo", () => ({ obtenerCatalogoAseo: vi.fn() }));
+vi.mock("@/modules/pedidos/utils/correlativo", () => ({ generarNumeroPedido: vi.fn().mockResolvedValue("PED-2026-0001") }));
+vi.mock("@/modules/pedidos/utils/pedidos-pdf", () => ({ generarPedidoPDF: vi.fn().mockResolvedValue(Buffer.from("pdf")) }));
+vi.mock("@/modules/pedidos/utils/pedidos-excel", () => ({ construirExcelPedido: vi.fn() }));
 
 vi.mock("@/shared/lib/prisma", () => ({
     prisma: {
-        $transaction: vi.fn((callback) => callback(prisma)),
-        pedido: {
-            create: vi.fn(),
-            findFirst: vi.fn(),
-            findUnique: vi.fn(),
-            update: vi.fn()
-        },
-        pedidoDetalle: {
-            create: vi.fn(),
-            update: vi.fn(),
-            deleteMany: vi.fn()
-        },
-        pedidoPlantillaAseo: {
-            findMany: vi.fn(),
-            upsert: vi.fn()
-        },
-        producto: { findMany: vi.fn() },
-        bodega: { findMany: vi.fn() },
-        stock: { findMany: vi.fn() },
-        log: { create: vi.fn() }
+        $transaction: vi.fn(),
+        pedido: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+        pedidoDetalle: { createMany: vi.fn(), deleteMany: vi.fn() },
+        pedidoPlantillaAseo: { upsert: vi.fn() }
     }
 }));
 
-vi.mock("@/shared/lib/logger", () => ({
-    AuditLogger: { log: vi.fn() }
-}));
+vi.mock("@/shared/lib/logger", () => ({ AuditLogger: { log: vi.fn() } }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-vi.mock("next/cache", () => ({
-    revalidatePath: vi.fn()
-}));
-
-describe("pedidos.action (INV-18, INV-22, INV-23)", () => {
-    const sesionCentro = {
-        id: "user-c1",
-        nombre: "Encargado",
-        apPaterno: "Centro",
-        email: "encargado@cmvalparaiso.cl",
-        rol: "R02",
+function sesion(rol: string) {
+    return {
+        id: `user-${rol}`,
+        nombre: "Usuario",
+        apPaterno: "Prueba",
+        email: "usuario@cmvalparaiso.cl",
+        rol,
         centroId: "c1",
-        bodegaId: null
+        bodegaId: "b1"
     };
+}
 
-    const alcanceMock = {
-        usuario: sesionCentro,
-        centros: [{ id: "c1", nombre: "CESFAM Barón", estado: true, direccion: "" }],
-        bodegas: [{ id: "b1", nombre: "Bodega Aseo", centroId: "c1", estado: true }],
-        centroId: "c1",
-        bodegaId: null,
-        centroIds: ["c1"],
-        bodegaIds: ["b1"],
-        puedeFiltrarCentro: false
-    };
+const catalogo = [
+    { productoId: 1, descripcion: "Cloro", stockDisponible: 3, estadoStock: "bajo_umbral", sugerido: true, sugerencia: 7, cantidadHabitual: 0 },
+    { productoId: 2, descripcion: "Jabón", stockDisponible: 40, estadoStock: "ok", sugerido: false, sugerencia: 0, cantidadHabitual: 0 }
+];
 
+const pedidoNuevo = {
+    centroId: "c1",
+    bodegaId: null,
+    tipo: "MENSUAL" as const,
+    periodo: "2026-11",
+    detalles: [
+        { productoId: 1, cantidadSolicitada: 12 },
+        { productoId: 2, cantidadSolicitada: 0 }
+    ]
+};
+
+describe("pedidos.action (INV-18 a INV-23)", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(authLib.requireSessionUser).mockResolvedValue(sesionCentro);
-        vi.mocked(alcanceLib.obtenerAlcanceInventario).mockResolvedValue(alcanceMock as never);
-        vi.mocked(alcanceLib.validarCentroBodegaEnAlcance).mockResolvedValue();
-        vi.mocked(prisma.producto.findMany).mockResolvedValue([
-            { id: 10, descripcion: "Cloro 5L", linea: "ASEO" }
-        ] as never);
-        vi.mocked(prisma.bodega.findMany).mockResolvedValue([{ id: "b1" }] as never);
-        vi.mocked(prisma.stock.findMany).mockResolvedValue([] as never);
-        vi.mocked(prisma.pedidoPlantillaAseo.findMany).mockResolvedValue([] as never);
+        vi.mocked(authLib.requireSessionUser).mockResolvedValue(sesion("R02") as never);
+        vi.mocked(alcanceLib.obtenerAlcanceInventario).mockResolvedValue({ centroIds: ["c1"] } as never);
+        vi.mocked(obtenerCatalogoAseo).mockResolvedValue(catalogo as never);
+        vi.mocked(prisma.$transaction).mockImplementation((async (arg: unknown) =>
+            typeof arg === "function" ? (arg as (tx: typeof prisma) => unknown)(prisma) : Promise.all(arg as unknown[])) as never);
+        vi.mocked(prisma.pedido.create).mockResolvedValue({ id: "ped-1", numero: "PED-2026-0001" } as never);
     });
 
-    it("crea un pedido en estado BORRADOR o ENVIADO con número correlativo", async () => {
-        vi.mocked(prisma.pedido.findFirst).mockResolvedValue(null);
-        vi.mocked(prisma.pedido.create).mockResolvedValue({
-            id: "ped-1",
-            numero: "PED-2026-0001",
-            tipo: "MENSUAL",
-            estado: "BORRADOR",
-            centroId: "c1"
-        } as never);
+    describe("permisos por rol", () => {
+        it.each(["R06", "R07", "R08"])("el rol %s solo consulta: no crea pedidos", async (rol) => {
+            vi.mocked(authLib.requireSessionUser).mockResolvedValue(sesion(rol) as never);
 
-        const res = await crearPedidoAction({
-            centroId: "c1",
-            tipo: "MENSUAL",
-            periodo: "2026-11",
-            detalles: [{ productoId: 10, cantidadSolicitada: 15 }],
-            enviarInmediatamente: false
+            const res = await guardarPedidoAction(pedidoNuevo);
+
+            expect(res).toMatchObject({ ok: false, message: "Tu rol solo permite consultar pedidos de aseo." });
+            expect(prisma.pedido.create).not.toHaveBeenCalled();
         });
 
-        expect(res.ok).toBe(true);
-        expect(res.pedidoId).toBe("ped-1");
-        expect(prisma.pedido.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    numero: "PED-2026-0001",
-                    estado: "BORRADOR"
-                })
-            })
-        );
+        it("el visualizador R08 no puede anular", async () => {
+            vi.mocked(authLib.requireSessionUser).mockResolvedValue(sesion("R08") as never);
+
+            const res = await anularPedidoAction("ped-1", "Pedido duplicado");
+
+            expect(res.ok).toBe(false);
+            expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
+        });
+
+        it("rechaza crear pedidos para un centro fuera del alcance", async () => {
+            const res = await guardarPedidoAction({ ...pedidoNuevo, centroId: "c2" });
+
+            expect(res).toMatchObject({ ok: false, message: "No tienes permiso para operar pedidos de este centro." });
+            expect(prisma.pedido.create).not.toHaveBeenCalled();
+        });
     });
 
-    it("rechaza si el centro está fuera del alcance del usuario", async () => {
-        const res = await crearPedidoAction({
-            centroId: "centro-no-autorizado",
-            tipo: "MENSUAL",
-            detalles: [{ productoId: 10, cantidadSolicitada: 5 }],
-            enviarInmediatamente: false
+    describe("crear y enviar", () => {
+        it("crea un borrador solo con filas mayores a 0 y la foto del stock", async () => {
+            const res = await guardarPedidoAction(pedidoNuevo);
+
+            expect(res).toMatchObject({ ok: true, pedidoId: "ped-1", message: "Borrador PED-2026-0001 guardado." });
+            expect(prisma.pedido.create).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ estado: "BORRADOR", fechaEnvio: null, usuarioSolicitanteId: "user-R02" }) })
+            );
+            expect(prisma.pedidoDetalle.createMany).toHaveBeenCalledWith({
+                data: [{ productoId: 1, cantidadSolicitada: 12, stockActualMomento: 3, pedidoId: "ped-1" }]
+            });
+            expect(AuditLogger.log).toHaveBeenCalledWith(expect.objectContaining({ accion: "crear", entidad: "Pedido" }));
         });
 
-        expect(res.ok).toBe(false);
-        expect(res.message).toContain("No tienes permiso");
+        it("rechaza productos fuera del catálogo de aseo", async () => {
+            const res = await guardarPedidoAction({ ...pedidoNuevo, detalles: [{ productoId: 99, cantidadSolicitada: 1 }] });
+
+            expect(res).toMatchObject({ ok: false, message: "El producto 99 no pertenece al catálogo de aseo." });
+            expect(prisma.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it("muestra el mensaje de validación, no el error técnico", async () => {
+            const res = await guardarPedidoAction({ ...pedidoNuevo, periodo: null });
+
+            expect(res).toMatchObject({ ok: false, message: "Debe indicar el período del pedido mensual." });
+        });
+
+        it("reintenta cuando dos pedidos obtienen el mismo correlativo", async () => {
+            const duplicado = new Prisma.PrismaClientKnownRequestError("Unique", { code: "P2002", clientVersion: "6" });
+            vi.mocked(prisma.pedido.create).mockRejectedValueOnce(duplicado).mockResolvedValueOnce({
+                id: "ped-2",
+                numero: "PED-2026-0002"
+            } as never);
+
+            const res = await guardarPedidoAction({ ...pedidoNuevo, enviar: true });
+
+            expect(res).toMatchObject({ ok: true, pedidoId: "ped-2", message: "Pedido PED-2026-0002 enviado." });
+            expect(prisma.pedido.create).toHaveBeenCalledTimes(2);
+        });
+
+        it("enviar un borrador existente lo actualiza, sin crear otro pedido", async () => {
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
+                id: "ped-1",
+                numero: "PED-2026-0001",
+                estado: "BORRADOR",
+                centroId: "c1",
+                bodegaId: null
+            } as never);
+            vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 1 } as never);
+
+            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", enviar: true });
+
+            expect(res).toMatchObject({ ok: true, message: "Pedido PED-2026-0001 enviado." });
+            expect(prisma.pedido.create).not.toHaveBeenCalled();
+            expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
+                where: { id: "ped-1", estado: "BORRADOR" },
+                data: expect.objectContaining({ estado: "ENVIADO", fechaEnvio: expect.any(Date) })
+            });
+        });
+
+        it("no modifica el borrador de un centro fuera del alcance", async () => {
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
+                id: "ped-9",
+                numero: "PED-2026-0009",
+                estado: "BORRADOR",
+                centroId: "c2",
+                bodegaId: null
+            } as never);
+
+            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-9" });
+
+            expect(res.ok).toBe(false);
+            expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
+        });
+
+        it("no pisa un borrador que otro usuario envió entretanto", async () => {
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
+                id: "ped-1",
+                numero: "PED-2026-0001",
+                estado: "BORRADOR",
+                centroId: "c1",
+                bodegaId: null
+            } as never);
+            vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 0 } as never);
+
+            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", enviar: true });
+
+            expect(res).toMatchObject({ ok: false, message: "El pedido ya no está en borrador. Recarga la página." });
+            expect(prisma.pedidoDetalle.deleteMany).not.toHaveBeenCalled();
+        });
     });
 
-    it("enviarPedidoAction cambia estado de BORRADOR a ENVIADO", async () => {
-        vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
-            id: "ped-1",
-            numero: "PED-2026-0001",
-            estado: "BORRADOR",
-            centroId: "c1",
-            bodegaId: null,
-            detalles: [{ id: "d1", cantidadSolicitada: 10 }]
-        } as never);
+    describe("anular", () => {
+        beforeEach(() => {
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
+                id: "ped-1",
+                numero: "PED-2026-0001",
+                estado: "ENVIADO",
+                centroId: "c1",
+                bodegaId: null
+            } as never);
+        });
 
-        const res = await enviarPedidoAction("ped-1");
-        expect(res.ok).toBe(true);
-        expect(prisma.pedido.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: "ped-1" },
-                data: expect.objectContaining({ estado: "ENVIADO" })
-            })
-        );
+        it("anula un pedido enviado con su motivo", async () => {
+            vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 1 } as never);
+
+            const res = await anularPedidoAction("ped-1", "Pedido duplicado");
+
+            expect(res.ok).toBe(true);
+            expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
+                where: { id: "ped-1", estado: { in: ["BORRADOR", "ENVIADO"] } },
+                data: expect.objectContaining({ estado: "ANULADO", motivoAnulacion: "Pedido duplicado" })
+            });
+        });
+
+        it("informa si el pedido ya estaba anulado", async () => {
+            vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 0 } as never);
+
+            const res = await anularPedidoAction("ped-1", "Pedido duplicado");
+
+            expect(res).toMatchObject({ ok: false, message: "El pedido ya se encuentra anulado." });
+        });
     });
 
-    it("revisarPedidoAction exige rol de Adquisiciones (R01)", async () => {
-        // Usuario con rol R02 (encargado de centro) intenta revisar
-        const res = await revisarPedidoAction({
-            pedidoId: "ped-1",
-            ajustes: [{ detalleId: "d1", cantidadAprobada: 8 }]
+    describe("descargas y plantilla", () => {
+        it("no entrega el PDF de un pedido de otro centro", async () => {
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({ id: "ped-9", numero: "PED-2026-0009", centroId: "c2" } as never);
+
+            const res = await descargarPedidoPdfAction("ped-9");
+
+            expect(res).toMatchObject({ ok: false, error: "No tienes permiso para operar pedidos de este centro." });
         });
 
-        expect(res.ok).toBe(false);
-        expect(res.message).toContain("Solo el personal de Adquisiciones");
-    });
+        it("el visualizador descarga el PDF de un pedido de su alcance y queda auditado", async () => {
+            vi.mocked(authLib.requireSessionUser).mockResolvedValue(sesion("R08") as never);
+            vi.mocked(prisma.pedido.findUnique).mockResolvedValue({ id: "ped-1", numero: "PED-2026-0001", centroId: "c1" } as never);
 
-    it("revisarPedidoAction exige observación si la cantidad aprobada difiere de la solicitada", async () => {
-        // Usuario con rol R01 (Adquisiciones)
-        vi.mocked(authLib.requireSessionUser).mockResolvedValue({
-            ...sesionCentro,
-            id: "user-admin",
-            rol: "R01"
+            const res = await descargarPedidoPdfAction("ped-1");
+
+            expect(res).toMatchObject({ ok: true, nombreArchivo: "PED-2026-0001.pdf" });
+            expect(AuditLogger.log).toHaveBeenCalledWith(expect.objectContaining({ accion: "exportar", detalle: expect.objectContaining({ formato: "pdf" }) }));
         });
 
-        vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
-            id: "ped-1",
-            numero: "PED-2026-0001",
-            estado: "ENVIADO",
-            detalles: [
-                { id: "d1", productoId: 10, cantidadSolicitada: 20 }
-            ]
-        } as never);
+        it("la plantilla rechaza productos fuera del catálogo de aseo", async () => {
+            const res = await guardarPlantillaCentroAction({ centroId: "c1", items: [{ productoId: 99, cantidadHabitual: 5 }] });
 
-        // Sin observación de ajuste
-        const res = await revisarPedidoAction({
-            pedidoId: "ped-1",
-            ajustes: [{ detalleId: "d1", cantidadAprobada: 10, observacionAjuste: "" }]
+            expect(res).toMatchObject({ ok: false, message: "El producto 99 no pertenece al catálogo de aseo." });
+            expect(prisma.pedidoPlantillaAseo.upsert).not.toHaveBeenCalled();
         });
-
-        expect(res.ok).toBe(false);
-        expect(res.message).toContain("Debe indicar una justificación de ajuste");
-    });
-
-    it("revisarPedidoAction aprueba y actualiza cantidades con justificación", async () => {
-        vi.mocked(authLib.requireSessionUser).mockResolvedValue({
-            ...sesionCentro,
-            id: "user-admin",
-            rol: "R01"
-        });
-
-        vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
-            id: "ped-1",
-            numero: "PED-2026-0001",
-            estado: "ENVIADO",
-            detalles: [
-                { id: "d1", productoId: 10, cantidadSolicitada: 20 }
-            ]
-        } as never);
-
-        const res = await revisarPedidoAction({
-            pedidoId: "ped-1",
-            observacionesRevision: "Aprobado con ajuste de cuota",
-            ajustes: [
-                {
-                    detalleId: "d1",
-                    cantidadAprobada: 15,
-                    observacionAjuste: "Ajuste por cuota comunal de noviembre"
-                }
-            ]
-        });
-
-        expect(res.ok).toBe(true);
-        expect(prisma.pedido.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: "ped-1" },
-                data: expect.objectContaining({ estado: "REVISADO" })
-            })
-        );
-    });
-
-    it("anularPedidoAction anula el pedido y registra auditoría", async () => {
-        vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
-            id: "ped-1",
-            numero: "PED-2026-0001",
-            estado: "ENVIADO",
-            centroId: "c1"
-        } as never);
-
-        const res = await anularPedidoAction("ped-1", "Pedido duplicado por error");
-        expect(res.ok).toBe(true);
-        expect(prisma.pedido.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: "ped-1" },
-                data: expect.objectContaining({ estado: "ANULADO" })
-            })
-        );
     });
 });
-

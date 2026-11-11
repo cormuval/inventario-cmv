@@ -3,7 +3,7 @@
 import type { Prisma } from "@prisma/client";
 
 // lib
-import { requireSessionUser } from "@/shared/lib/auth";
+import { puedeGestionarPedidos, requireSessionUser } from "@/shared/lib/auth";
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -31,14 +31,13 @@ export interface PedidoFilaLista {
     solicitanteNombre: string;
     totalItems: number;
     totalUnidadesSolicitadas: number;
-    totalUnidadesAprobadas: number | null;
 }
 
 export interface ResultadoListarPedidos {
     centros: Array<{ id: string; nombre: string }>;
     centroId: string | null;
     puedeFiltrarCentro: boolean;
-    esAdquisiciones: boolean;
+    puedeGestionar: boolean;
     pedidos: PedidoFilaLista[];
     paginacion: Paginacion;
 }
@@ -47,7 +46,7 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
     const user = await requireSessionUser();
     const alcance = await obtenerAlcanceInventario({ centroId: filtros.centroId });
 
-    const esAdquisiciones = user.rol === "R01";
+    const puedeGestionar = puedeGestionarPedidos(user.rol);
     const pagina = filtros.pagina && filtros.pagina > 0 ? filtros.pagina : 1;
 
     if (alcance.centroIds.length === 0) {
@@ -55,7 +54,7 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
             centros: alcance.centros,
             centroId: alcance.centroId,
             puedeFiltrarCentro: alcance.puedeFiltrarCentro,
-            esAdquisiciones,
+            puedeGestionar,
             pedidos: [],
             paginacion: calcularPaginacion(pagina, 0)
         };
@@ -96,8 +95,7 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
             usuarioSolicitante: { select: { nombre: true, apPaterno: true } },
             detalles: {
                 select: {
-                    cantidadSolicitada: true,
-                    cantidadAprobada: true
+                    cantidadSolicitada: true
                 }
             }
         },
@@ -109,10 +107,6 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
     const pedidos: PedidoFilaLista[] = pedidosDb.map((p) => {
         const totalItems = p.detalles.length;
         const totalUnidadesSolicitadas = p.detalles.reduce((acc, d) => acc + d.cantidadSolicitada, 0);
-        const tieneAprobadas = p.detalles.some((d) => d.cantidadAprobada !== null);
-        const totalUnidadesAprobadas = tieneAprobadas
-            ? p.detalles.reduce((acc, d) => acc + (d.cantidadAprobada ?? d.cantidadSolicitada), 0)
-            : null;
 
         const solicitante = `${p.usuarioSolicitante.nombre} ${p.usuarioSolicitante.apPaterno ?? ""}`.trim();
 
@@ -127,8 +121,7 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
             bodegaNombre: p.bodega?.nombre ?? null,
             solicitanteNombre: solicitante,
             totalItems,
-            totalUnidadesSolicitadas,
-            totalUnidadesAprobadas
+            totalUnidadesSolicitadas
         };
     });
 
@@ -136,7 +129,7 @@ export async function listarPedidosAction(filtros: FiltrosListarPedidos = {}): P
         centros: alcance.centros.map((c) => ({ id: c.id, nombre: c.nombre })),
         centroId: alcance.centroId,
         puedeFiltrarCentro: alcance.puedeFiltrarCentro,
-        esAdquisiciones,
+        puedeGestionar,
         pedidos,
         paginacion
     };
@@ -150,16 +143,9 @@ export async function obtenerPedidoPorIdAction(pedidoId: string) {
             centro: true,
             bodega: true,
             usuarioSolicitante: true,
-            usuarioRevision: true,
             detalles: {
-                include: {
-                    producto: true
-                },
-                orderBy: {
-                    producto: {
-                        descripcion: "asc"
-                    }
-                }
+                include: { producto: true },
+                orderBy: { producto: { descripcion: "asc" } }
             }
         }
     });
@@ -169,13 +155,12 @@ export async function obtenerPedidoPorIdAction(pedidoId: string) {
     }
 
     const alcance = await obtenerAlcanceInventario({ centroId: pedido.centroId });
-    if (!alcance.centroIds.includes(pedido.centroId) && user.rol !== "R01") {
-        throw new Error("No tienes permiso para ver este pedido.");
+    if (!alcance.centroIds.includes(pedido.centroId)) {
+        return null;
     }
 
     return {
         ...pedido,
-        esRevisor: user.rol === "R01"
+        puedeGestionar: puedeGestionarPedidos(user.rol)
     };
 }
-

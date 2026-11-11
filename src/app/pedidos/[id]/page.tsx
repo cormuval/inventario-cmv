@@ -9,7 +9,7 @@ import { obtenerPedidoPorIdAction } from "@/modules/pedidos/actions/consultar-pe
 // components
 import { BotonDescargarPedido } from "@/modules/pedidos/components/boton-descargar-pedido";
 import { PedidoForm } from "@/modules/pedidos/components/pedido-form";
-import { PedidoRevisionForm } from "@/modules/pedidos/components/pedido-revision-form";
+import { PedidoDetalle } from "@/modules/pedidos/components/pedido-detalle";
 import { Badge } from "@/shared/components/ui/badge";
 import { AppLayout } from "@/shared/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -31,9 +31,7 @@ function renderBadgeEstado(estado: string): React.ReactElement {
         case "BORRADOR":
             return <Badge tone="default">Borrador</Badge>;
         case "ENVIADO":
-            return <Badge tone="muted">Enviado</Badge>;
-        case "REVISADO":
-            return <Badge tone="success">Revisado / Aprobado</Badge>;
+            return <Badge tone="success">Enviado</Badge>;
         case "ANULADO":
             return <Badge tone="danger">Anulado</Badge>;
         default:
@@ -102,14 +100,20 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
 
                     <Card>
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground">Revisión Adquisiciones</p>
+                            <p className="text-xs text-muted-foreground">Estado</p>
                             <p className="font-semibold text-sm mt-0.5">
-                                {pedido.usuarioRevision
-                                    ? `${pedido.usuarioRevision.nombre} ${pedido.usuarioRevision.apPaterno ?? ""}`
-                                    : "Pendiente"}
+                                {pedido.estado === "ANULADO"
+                                    ? "Anulado"
+                                    : pedido.estado === "ENVIADO"
+                                      ? "Enviado"
+                                      : "Borrador"}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                {pedido.fechaRevision ? `Fecha: ${formatDate(pedido.fechaRevision)}` : "En espera de revisión"}
+                                {pedido.estado === "ANULADO" && pedido.fechaAnulacion
+                                    ? `Fecha: ${formatDate(pedido.fechaAnulacion)}`
+                                    : pedido.fechaEnvio
+                                      ? `Enviado el ${formatDate(pedido.fechaEnvio)}`
+                                      : "Aún no enviado"}
                             </p>
                         </CardContent>
                     </Card>
@@ -132,21 +136,21 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
                     </div>
                 ) : null}
 
-                {pedido.observacionesRevision ? (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 text-sm">
-                        <span className="font-semibold text-blue-900">Observaciones de Adquisiciones:</span>{" "}
-                        <span className="text-blue-800">{pedido.observacionesRevision}</span>
+                {pedido.motivoAnulacion ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-3 text-sm">
+                        <span className="font-semibold text-rose-900">Motivo de anulación:</span>{" "}
+                        <span className="text-rose-800">{pedido.motivoAnulacion}</span>
                     </div>
                 ) : null}
 
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base font-semibold">
-                            {pedido.estado === "BORRADOR" ? "Edición de Borrador" : "Detalle de Insumos y Aprobación"}
+                            {pedido.estado === "BORRADOR" && pedido.puedeGestionar ? "Edición de borrador" : "Detalle del pedido"}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {pedido.estado === "BORRADOR" ? (
+                        {pedido.estado === "BORRADOR" && pedido.puedeGestionar ? (
                             <PedidoForm
                                 centros={alcance.centros.map((c) => ({ id: c.id, nombre: c.nombre }))}
                                 bodegas={alcance.bodegas.map((b) => ({ id: b.id, nombre: b.nombre, centroId: b.centroId }))}
@@ -167,8 +171,13 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
                                     }))
                                 }}
                             />
+                        ) : null}
+                        {pedido.estado === "BORRADOR" && pedido.puedeGestionar ? (
+                            <div className="mt-6 border-t pt-4">
+                                <PedidoDetalle pedido={pedido} puedeAnular mostrarDetalle={false} />
+                            </div>
                         ) : (
-                            <PedidoRevisionForm pedido={pedido} esRevisor={pedido.esRevisor} />
+                            <PedidoDetalle pedido={pedido} puedeAnular={pedido.puedeGestionar} />
                         )}
                     </CardContent>
                 </Card>

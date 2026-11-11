@@ -14,13 +14,12 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/modules/pedidos/actions/pedidos.action", () => ({
     descargarPedidoPdfAction: vi.fn(),
     descargarPedidoExcelAction: vi.fn(),
-    revisarPedidoAction: vi.fn(),
     anularPedidoAction: vi.fn()
 }));
 
 describe("PedidosTabla (INV-18, INV-20)", () => {
     it("muestra mensaje de estado vacío cuando no hay pedidos", () => {
-        render(<PedidosTabla pedidos={[]} esAdquisiciones={false} />);
+        render(<PedidosTabla pedidos={[]} />);
         expect(screen.getByText(/No se encontraron pedidos de existencias/)).toBeDefined();
     });
 
@@ -37,26 +36,24 @@ describe("PedidosTabla (INV-18, INV-20)", () => {
                 bodegaNombre: "Bodega Aseo",
                 solicitanteNombre: "Juan Perez",
                 totalItems: 5,
-                totalUnidadesSolicitadas: 50,
-                totalUnidadesAprobadas: null
+                totalUnidadesSolicitadas: 50
             },
             {
                 id: "ped-2",
                 numero: "PED-2026-0002",
                 tipo: "SUPLEMENTARIO",
-                estado: "REVISADO",
+                estado: "ANULADO",
                 periodo: null,
                 fechaSolicitud: new Date("2026-11-05T12:00:00.000Z"),
                 centroNombre: "CESFAM Cordillera",
                 bodegaNombre: null,
                 solicitanteNombre: "Maria Soto",
                 totalItems: 2,
-                totalUnidadesSolicitadas: 20,
-                totalUnidadesAprobadas: 15
+                totalUnidadesSolicitadas: 20
             }
         ];
 
-        render(<PedidosTabla pedidos={pedidosMock} esAdquisiciones={true} />);
+        render(<PedidosTabla pedidos={pedidosMock} />);
 
         expect(screen.getByText("PED-2026-0001")).toBeDefined();
         expect(screen.getByText("MENSUAL")).toBeDefined();
@@ -66,7 +63,7 @@ describe("PedidosTabla (INV-18, INV-20)", () => {
         expect(screen.getByText("PED-2026-0002")).toBeDefined();
         expect(screen.getByText("SUPLEMENTARIO")).toBeDefined();
         expect(screen.getByText("CESFAM Cordillera")).toBeDefined();
-        expect(screen.getByText("Revisado / Aprobado")).toBeDefined();
+        expect(screen.getByText("Anulado")).toBeDefined();
     });
 });
 
