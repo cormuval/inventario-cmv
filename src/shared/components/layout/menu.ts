@@ -10,6 +10,7 @@ import {
     PackageMinus,
     PackagePlus,
     PackageSearch,
+    ShoppingCart,
     SlidersHorizontal,
     type LucideIcon
 } from "lucide-react";
@@ -60,6 +61,7 @@ export function construirMenu(rolId?: string): ItemMenu[] {
         enlace("/productos", "Productos", Package),
         { tipo: "grupo", label: "Gestión de entrada", icon: ArrowDownToLine, items: entrada },
         { tipo: "grupo", label: "Gestión de salida", icon: ArrowUpFromLine, items: salida },
+        enlace("/pedidos", "Pedidos", ShoppingCart),
         enlace("/reporte", "Reporte", FileBarChart),
         ...(rol === ROL_ADMINISTRADOR ? [enlace("/mantenedores", "Mantenedores", SlidersHorizontal)] : []),
         ...(rol === ROL_ADMINISTRADOR ? [enlace("/auditoria", "Auditoría", History)] : [])
