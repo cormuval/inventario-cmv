@@ -32,6 +32,7 @@ describe("construirMenu", () => {
             "/salidas/nueva",
             "/salidas/registros",
             "/salidas/por-producto",
+            "/pedidos",
             "/reporte",
             "/mantenedores",
             "/auditoria"

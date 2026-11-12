@@ -17,6 +17,8 @@ model Centro {
     salidas        OrdenSalida[]      @relation("OrdenSalidaCentroOrigen")
     salidasDestino OrdenSalida[]      @relation("OrdenSalidaCentroDestino")
     encargados     EncargadosBodega[]
+    pedidos        Pedido[]
+    plantillasAseo PedidoPlantillaAseo[]
 
     @@map("Centro")
 }
@@ -33,6 +35,7 @@ model Bodega {
     salidasDestino OrdenSalida[]      @relation("OrdenSalidaBodegaDestino")
     stocks         Stock[]
     encargados     EncargadosBodega[]
+    pedidos        Pedido[]
 
     @@index([centroId])
     @@map("Bodega")
@@ -66,6 +69,7 @@ model Usuario {
     salidasRecepcionadas OrdenSalida[]      @relation("OrdenSalidaUsuarioReceptor")
     encargos   EncargadosBodega[] @relation("UsuarioEncargado")
     logs       Log[]
+    pedidosSolicitados Pedido[]   @relation("PedidoSolicitante")
 
     @@index([rolId])
     @@index([centroId])
@@ -89,6 +93,8 @@ model Producto {
     entradas    OrdenEntradaDetalle[]
     salidas     OrdenSalidaDetalle[]
     stocks      Stock[]
+    pedidosDetalle PedidoDetalle[]
+    plantillasAseo PedidoPlantillaAseo[]
 
     @@map("Producto")
 }
@@ -241,5 +247,60 @@ model Log {
     @@index([fecha])
     @@index([entidad])
     @@map("logs")
+}
+
+model Pedido {
+    id                    String          @id @default(cuid()) @map("ID_Pedido") @db.VarChar(255)
+    numero                String          @unique @map("Numero") @db.VarChar(50)
+    tipo                  String          @map("Tipo") @db.VarChar(50)
+    estado                String          @default("BORRADOR") @map("Estado") @db.VarChar(50)
+    periodo               String?         @map("Periodo") @db.VarChar(7)
+    centroId              String          @map("ID_Centro") @db.VarChar(255)
+    bodegaId              String?         @map("ID_Bodega") @db.VarChar(255)
+    usuarioSolicitanteId  String          @map("ID_Usuario_Solicitante") @db.VarChar(255)
+    fechaSolicitud        DateTime        @default(now()) @map("Fecha_Solicitud")
+    observaciones         String?         @map("Observaciones") @db.VarChar(500)
+    fechaFinalizacion     DateTime?       @map("Fecha_Finalizacion")
+    fechaAnulacion        DateTime?       @map("Fecha_Anulacion")
+    motivoAnulacion       String?         @map("Motivo_Anulacion") @db.VarChar(255)
+
+    centro                Centro          @relation(fields: [centroId], references: [id])
+    bodega                Bodega?         @relation(fields: [bodegaId], references: [id])
+    usuarioSolicitante    Usuario         @relation("PedidoSolicitante", fields: [usuarioSolicitanteId], references: [id])
+    detalles              PedidoDetalle[]
+
+    @@index([centroId])
+    @@index([estado])
+    @@index([periodo])
+    @@map("pedidos")
+}
+
+model PedidoDetalle {
+    id                 String   @id @default(cuid()) @map("ID_PedidoDetalle") @db.VarChar(255)
+    pedidoId           String   @map("ID_Pedido") @db.VarChar(255)
+    productoId         Int      @map("ID_Product")
+    cantidadSolicitada Int      @map("Cantidad_Solicitada")
+    stockActualMomento Int?     @map("Stock_Actual_Momento")
+
+    pedido             Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+    producto           Producto @relation(fields: [productoId], references: [id])
+
+    @@unique([pedidoId, productoId])
+    @@index([productoId])
+    @@map("pedidos_detalle")
+}
+
+model PedidoPlantillaAseo {
+    id               String   @id @default(cuid()) @map("ID_Plantilla") @db.VarChar(255)
+    centroId         String   @map("ID_Centro") @db.VarChar(255)
+    productoId       Int      @map("ID_Product")
+    cantidadHabitual Int      @default(0) @map("Cantidad_Habitual")
+    actualizadoEn    DateTime @updatedAt @map("Actualizado_En")
+
+    centro           Centro   @relation(fields: [centroId], references: [id])
+    producto         Producto @relation(fields: [productoId], references: [id])
+
+    @@unique([centroId, productoId])
+    @@map("pedidos_plantilla_aseo")
 }
 

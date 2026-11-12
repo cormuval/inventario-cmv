@@ -1,5 +1,5 @@
 // config
-import { ROL_ADMINISTRADOR, ROL_VISUALIZADOR_DROGUERIA, ROLES_OPERAN_ENTRADA, ROLES_OPERAN_SALIDA } from "@/config/auth";
+import { ROL_ADMINISTRADOR, ROL_VISUALIZADOR_DROGUERIA, ROLES_GESTIONAN_PEDIDOS, ROLES_OPERAN_ENTRADA, ROLES_OPERAN_SALIDA } from "@/config/auth";
 
 // lib
 import { auth } from "@/auth";
@@ -82,6 +82,10 @@ export function puedeOperarEntrada(rol: string): boolean {
 
 export function puedeOperarSalida(rol: string): boolean {
     return (ROLES_OPERAN_SALIDA as readonly string[]).includes(rol);
+}
+
+export function puedeGestionarPedidos(rol: string): boolean {
+    return (ROLES_GESTIONAN_PEDIDOS as readonly string[]).includes(rol);
 }
 
 export function esVisualizadorSoloLectura(rol: string): boolean {
