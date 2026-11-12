@@ -12,7 +12,7 @@
 
 Hoy los centros arman su pedido mensual o suplementario de aseo por correo, Drive o documentos sueltos, sin trazabilidad. El módulo **Pedidos** les permite construirlo en el sistema, a partir de un catálogo cerrado de aseo, y guardar un historial consultable.
 
-- El centro arma el pedido, lo guarda como borrador y lo envía.
+- El centro arma el pedido, lo guarda como borrador y lo finaliza. Finalizar no envía nada: solo cierra el pedido para que no se edite más.
 - El sistema genera el documento en **PDF o Excel**. El centro lo envía a Adquisiciones por correo u otro medio y lo adjunta al TD.
 - **Adquisiciones no opera en este sistema** (usa el suyo). Por eso no hay revisión, aprobación ni ajuste de cantidades dentro del módulo. INV-22 se cumple fuera del sistema; si en el futuro Adquisiciones tiene acceso, será con un rol de solo lectura.
 - **El pedido no mueve stock.** El stock solo aumenta cuando el centro registra la `OrdenEntrada` al recibir físicamente los productos.
@@ -26,15 +26,15 @@ Hoy los centros arman su pedido mensual o suplementario de aseo por correo, Driv
 ## 2. Estados
 
 ```
-BORRADOR ──(Enviar)──► ENVIADO
-    │                     │
- (Anular)              (Anular)
-    ▼                     ▼
- ANULADO               ANULADO
+BORRADOR ──(Finalizar)──► FINALIZADO
+    │                        │
+ (Anular)                 (Anular)
+    ▼                        ▼
+ ANULADO                  ANULADO
 ```
 
 - **BORRADOR:** el centro edita cantidades, tipo, período y observaciones. El centro y la bodega quedan fijos desde la creación.
-- **ENVIADO:** el centro cerró el pedido; ya no se edita. Se registra `fechaEnvio`.
+- **FINALIZADO:** el centro cerró el pedido; ya no se edita. Se registra `fechaFinalizacion`.
 - **ANULADO:** cancelado con motivo obligatorio (5 a 255 caracteres); se registran `motivoAnulacion` y `fechaAnulacion`.
 
 Las transiciones son condicionales sobre el estado (`updateMany` con `estado` en el `where`): si dos usuarios actúan a la vez, el segundo recibe un aviso y no pisa el cambio del primero.
@@ -45,7 +45,7 @@ Las transiciones son condicionales sobre el estado (`updateMany` con `estado` en
 
 Migración `20261111120000_modulo_pedidos_aseo`, solo tablas nuevas:
 
-- **`pedidos`** (`Pedido`): número correlativo `PED-AAAA-NNNN` único, tipo (`MENSUAL` | `SUPLEMENTARIO`), estado, período `AAAA-MM` (obligatorio en mensual), centro, bodega opcional, solicitante, `fechaSolicitud` (creación), `fechaEnvio`, observaciones (500), `fechaAnulacion` y `motivoAnulacion` (255).
+- **`pedidos`** (`Pedido`): número correlativo `PED-AAAA-NNNN` único, tipo (`MENSUAL` | `SUPLEMENTARIO`), estado, período `AAAA-MM` (obligatorio en mensual), centro, bodega opcional, solicitante, `fechaSolicitud` (creación), `fechaFinalizacion`, observaciones (500), `fechaAnulacion` y `motivoAnulacion` (255).
 - **`pedidos_detalle`** (`PedidoDetalle`): producto, cantidad solicitada y `stockActualMomento` (stock vigente al guardar). Único por `(pedido, producto)`.
 - **`pedidos_plantilla_aseo`** (`PedidoPlantillaAseo`): cantidad habitual por `(centro, producto)`.
 
@@ -57,7 +57,7 @@ El correlativo se calcula con el año de Chile. Si dos pedidos se crean a la vez
 
 | Acción | Roles | Alcance |
 |---|---|---|
-| Crear, editar borrador, enviar, anular, guardar plantilla | R01, R02, R03 (`ROLES_GESTIONAN_PEDIDOS`) | Centros del alcance del usuario (`obtenerAlcanceInventario`); si se elige bodega, debe pertenecer al centro y al alcance |
+| Crear, editar borrador, finalizar, anular, guardar plantilla | R01, R02, R03 (`ROLES_GESTIONAN_PEDIDOS`) | Centros del alcance del usuario (`obtenerAlcanceInventario`); si se elige bodega, debe pertenecer al centro y al alcance |
 | Ver historial, ver detalle, descargar PDF/Excel | Todos los roles | Centros del alcance del usuario. R01 y R08 ven todos los centros activos |
 
 R06, R07 y R08 solo consultan. La página `/pedidos/nuevo` redirige al historial si el rol no gestiona pedidos.
@@ -90,7 +90,7 @@ Todas las acciones validan en el servidor: rol, alcance del centro (también par
 
 ## 7. Documentos (INV-19, INV-23)
 
-- **PDF** (pdfkit, carta): encabezado institucional, número, centro, bodega, tipo y período, fecha (envío o creación), estado, solicitante, observaciones, tabla con código, insumo, stock al pedir y cantidad solicitada, total y firmas ("Firma y timbre encargado(a) del centro" y "Recepción Adquisiciones"). Un pedido anulado lo indica junto con su motivo.
+- **PDF** (pdfkit, carta): encabezado institucional, número, centro, bodega, tipo y período, fecha (finalización o creación), estado, solicitante, observaciones, tabla con código, insumo, stock al pedir y cantidad solicitada, total y firmas ("Firma y timbre encargado(a) del centro" y "Recepción Adquisiciones"). Un pedido anulado lo indica junto con su motivo.
 - **Excel** (exceljs): los mismos datos en una hoja.
 - Cada descarga queda en auditoría con la acción `exportar`.
 
@@ -98,4 +98,4 @@ Todas las acciones validan en el servidor: rol, alcance del centro (también par
 
 ## 8. Auditoría
 
-Entidad `Pedido`: `crear`, `actualizar` (guardar o enviar un borrador, guardar plantilla), `anular` (con estado anterior y motivo) y `exportar` (formato).
+Entidad `Pedido`: `crear`, `actualizar` (guardar o finalizar un borrador, guardar plantilla), `anular` (con estado anterior y motivo) y `exportar` (formato).

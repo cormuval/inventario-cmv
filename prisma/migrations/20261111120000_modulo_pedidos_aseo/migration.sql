@@ -10,7 +10,7 @@ CREATE TABLE `pedidos` (
     `ID_Usuario_Solicitante` VARCHAR(255) NOT NULL,
     `Fecha_Solicitud` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `Observaciones` VARCHAR(500) NULL,
-    `Fecha_Envio` DATETIME(3) NULL,
+    `Fecha_Finalizacion` DATETIME(3) NULL,
     `Fecha_Anulacion` DATETIME(3) NULL,
     `Motivo_Anulacion` VARCHAR(255) NULL,
 

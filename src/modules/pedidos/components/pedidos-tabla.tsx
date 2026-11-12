@@ -21,8 +21,8 @@ function renderBadgeEstado(estado: string): React.ReactElement {
     switch (estado) {
         case "BORRADOR":
             return <Badge tone="default">Borrador</Badge>;
-        case "ENVIADO":
-            return <Badge tone="success">Enviado</Badge>;
+        case "FINALIZADO":
+            return <Badge tone="success">Finalizado</Badge>;
         case "ANULADO":
             return <Badge tone="danger">Anulado</Badge>;
         default:

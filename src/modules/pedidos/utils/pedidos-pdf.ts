@@ -10,7 +10,7 @@ export interface PedidoPDFData {
     estado: string;
     periodo?: string | null;
     fechaSolicitud: Date;
-    fechaEnvio?: Date | null;
+    fechaFinalizacion?: Date | null;
     observaciones?: string | null;
     motivoAnulacion?: string | null;
     centro: { nombre: string };
@@ -67,7 +67,7 @@ export function generarPedidoPDF(pedido: PedidoPDFData): Promise<Buffer> {
             doc.text(`Centro: ${pedido.centro.nombre}`, 40, inicioY);
             doc.text(`Bodega: ${pedido.bodega?.nombre ?? "Todas las bodegas del centro"}`, 40, inicioY + 14);
             doc.text(`Tipo: ${pedido.tipo}${pedido.periodo ? ` (${pedido.periodo})` : ""}`, 40, inicioY + 28);
-            doc.text(`Fecha: ${fechaDdMmAaaa(pedido.fechaEnvio ?? pedido.fechaSolicitud)}`, 340, inicioY);
+            doc.text(`Fecha: ${fechaDdMmAaaa(pedido.fechaFinalizacion ?? pedido.fechaSolicitud)}`, 340, inicioY);
             doc.text(`Estado: ${pedido.estado}`, 340, inicioY + 14);
             doc.text(`Solicitante: ${solicitante}`, 340, inicioY + 28, { width: 232 });
             doc.y = inicioY + 50;

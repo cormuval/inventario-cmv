@@ -3,7 +3,7 @@ import { z } from "zod";
 export const tipoPedidoEnum = z.enum(["MENSUAL", "SUPLEMENTARIO"]);
 export type TipoPedido = z.infer<typeof tipoPedidoEnum>;
 
-export const estadoPedidoEnum = z.enum(["BORRADOR", "ENVIADO", "ANULADO"]);
+export const estadoPedidoEnum = z.enum(["BORRADOR", "FINALIZADO", "ANULADO"]);
 export type EstadoPedido = z.infer<typeof estadoPedidoEnum>;
 
 export const pedidoDetalleInputSchema = z.object({
@@ -19,7 +19,7 @@ function sinProductosRepetidos(detalles: Array<{ productoId: number }>): boolean
     return new Set(detalles.map((d) => d.productoId)).size === detalles.length;
 }
 
-/** Guarda un borrador nuevo o existente; con `enviar` lo deja en estado ENVIADO. */
+/** Guarda un borrador nuevo o existente; con `finalizar` lo deja en estado FINALIZADO. */
 export const guardarPedidoSchema = z
     .object({
         pedidoId: z.string().min(1).optional().nullable(),
@@ -29,13 +29,13 @@ export const guardarPedidoSchema = z
         periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "El período debe tener formato AAAA-MM.").optional().nullable(),
         observaciones: z.string().trim().max(500, "Las observaciones no pueden exceder 500 caracteres.").optional().nullable(),
         detalles: z.array(pedidoDetalleInputSchema).refine(sinProductosRepetidos, "Hay productos repetidos en el pedido."),
-        enviar: z.boolean().default(false)
+        finalizar: z.boolean().default(false)
     })
     .superRefine((data, ctx) => {
         if (data.tipo === "MENSUAL" && !data.periodo) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe indicar el período del pedido mensual.", path: ["periodo"] });
         }
-        if (data.enviar && !data.detalles.some((d) => d.cantidadSolicitada > 0)) {
+        if (data.finalizar && !data.detalles.some((d) => d.cantidadSolicitada > 0)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Debe solicitar al menos un producto con cantidad mayor a 0.",

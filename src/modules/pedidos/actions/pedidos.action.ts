@@ -108,7 +108,7 @@ export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<Ac
     try {
         const user = await requerirGestor();
         const parsed = guardarPedidoSchema.parse(input);
-        const estado = parsed.enviar ? "ENVIADO" : "BORRADOR";
+        const estado = parsed.finalizar ? "FINALIZADO" : "BORRADOR";
         const periodo = parsed.tipo === "MENSUAL" ? parsed.periodo ?? null : null;
         const observaciones = parsed.observaciones || null;
 
@@ -138,7 +138,7 @@ export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<Ac
                         periodo,
                         observaciones,
                         estado,
-                        ...(parsed.enviar ? { fechaEnvio: new Date() } : {})
+                        ...(parsed.finalizar ? { fechaFinalizacion: new Date() } : {})
                     }
                 });
                 if (actualizado.count !== 1) {
@@ -163,7 +163,7 @@ export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<Ac
             revalidarPedido(existente.id);
             return {
                 ok: true,
-                message: parsed.enviar ? `Pedido ${existente.numero} enviado.` : `Borrador ${existente.numero} guardado.`,
+                message: parsed.finalizar ? `Pedido ${existente.numero} finalizado.` : `Borrador ${existente.numero} guardado.`,
                 pedidoId: existente.id
             };
         }
@@ -186,7 +186,7 @@ export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<Ac
                             bodegaId: parsed.bodegaId || null,
                             usuarioSolicitanteId: user.id,
                             observaciones,
-                            fechaEnvio: parsed.enviar ? new Date() : null
+                            fechaFinalizacion: parsed.finalizar ? new Date() : null
                         },
                         select: { id: true, numero: true }
                     });
@@ -219,7 +219,7 @@ export async function guardarPedidoAction(input: GuardarPedidoInput): Promise<Ac
         revalidarPedido(pedido.id);
         return {
             ok: true,
-            message: parsed.enviar ? `Pedido ${pedido.numero} enviado.` : `Borrador ${pedido.numero} guardado.`,
+            message: parsed.finalizar ? `Pedido ${pedido.numero} finalizado.` : `Borrador ${pedido.numero} guardado.`,
             pedidoId: pedido.id
         };
     } catch (error: unknown) {
@@ -242,7 +242,7 @@ export async function anularPedidoAction(pedidoId: string, motivo: string): Prom
         await validarCentroPedido(pedido.centroId);
 
         const anulado = await prisma.pedido.updateMany({
-            where: { id: pedido.id, estado: { in: ["BORRADOR", "ENVIADO"] } },
+            where: { id: pedido.id, estado: { in: ["BORRADOR", "FINALIZADO"] } },
             data: { estado: "ANULADO", motivoAnulacion: parsed.motivo, fechaAnulacion: new Date() }
         });
         if (anulado.count !== 1) {

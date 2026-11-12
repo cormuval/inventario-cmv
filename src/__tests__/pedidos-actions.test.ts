@@ -113,13 +113,13 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
         });
     });
 
-    describe("crear y enviar", () => {
+    describe("crear y finalizar", () => {
         it("crea un borrador solo con filas mayores a 0 y la foto del stock", async () => {
             const res = await guardarPedidoAction(pedidoNuevo);
 
             expect(res).toMatchObject({ ok: true, pedidoId: "ped-1", message: "Borrador PED-2026-0001 guardado." });
             expect(prisma.pedido.create).toHaveBeenCalledWith(
-                expect.objectContaining({ data: expect.objectContaining({ estado: "BORRADOR", fechaEnvio: null, usuarioSolicitanteId: "user-R02" }) })
+                expect.objectContaining({ data: expect.objectContaining({ estado: "BORRADOR", fechaFinalizacion: null, usuarioSolicitanteId: "user-R02" }) })
             );
             expect(prisma.pedidoDetalle.createMany).toHaveBeenCalledWith({
                 data: [{ productoId: 1, cantidadSolicitada: 12, stockActualMomento: 3, pedidoId: "ped-1" }]
@@ -147,13 +147,13 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
                 numero: "PED-2026-0002"
             } as never);
 
-            const res = await guardarPedidoAction({ ...pedidoNuevo, enviar: true });
+            const res = await guardarPedidoAction({ ...pedidoNuevo, finalizar: true });
 
-            expect(res).toMatchObject({ ok: true, pedidoId: "ped-2", message: "Pedido PED-2026-0002 enviado." });
+            expect(res).toMatchObject({ ok: true, pedidoId: "ped-2", message: "Pedido PED-2026-0002 finalizado." });
             expect(prisma.pedido.create).toHaveBeenCalledTimes(2);
         });
 
-        it("enviar un borrador existente lo actualiza, sin crear otro pedido", async () => {
+        it("finalizar un borrador existente lo actualiza, sin crear otro pedido", async () => {
             vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
                 id: "ped-1",
                 numero: "PED-2026-0001",
@@ -163,13 +163,13 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
             } as never);
             vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 1 } as never);
 
-            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", enviar: true });
+            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", finalizar: true });
 
-            expect(res).toMatchObject({ ok: true, message: "Pedido PED-2026-0001 enviado." });
+            expect(res).toMatchObject({ ok: true, message: "Pedido PED-2026-0001 finalizado." });
             expect(prisma.pedido.create).not.toHaveBeenCalled();
             expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
                 where: { id: "ped-1", estado: "BORRADOR" },
-                data: expect.objectContaining({ estado: "ENVIADO", fechaEnvio: expect.any(Date) })
+                data: expect.objectContaining({ estado: "FINALIZADO", fechaFinalizacion: expect.any(Date) })
             });
         });
 
@@ -188,7 +188,7 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
             expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
         });
 
-        it("no pisa un borrador que otro usuario envió entretanto", async () => {
+        it("no pisa un borrador que otro usuario finalizó entretanto", async () => {
             vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
                 id: "ped-1",
                 numero: "PED-2026-0001",
@@ -198,7 +198,7 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
             } as never);
             vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 0 } as never);
 
-            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", enviar: true });
+            const res = await guardarPedidoAction({ ...pedidoNuevo, pedidoId: "ped-1", finalizar: true });
 
             expect(res).toMatchObject({ ok: false, message: "El pedido ya no está en borrador. Recarga la página." });
             expect(prisma.pedidoDetalle.deleteMany).not.toHaveBeenCalled();
@@ -210,20 +210,20 @@ describe("pedidos.action (INV-18 a INV-23)", () => {
             vi.mocked(prisma.pedido.findUnique).mockResolvedValue({
                 id: "ped-1",
                 numero: "PED-2026-0001",
-                estado: "ENVIADO",
+                estado: "FINALIZADO",
                 centroId: "c1",
                 bodegaId: null
             } as never);
         });
 
-        it("anula un pedido enviado con su motivo", async () => {
+        it("anula un pedido finalizado con su motivo", async () => {
             vi.mocked(prisma.pedido.updateMany).mockResolvedValue({ count: 1 } as never);
 
             const res = await anularPedidoAction("ped-1", "Pedido duplicado");
 
             expect(res.ok).toBe(true);
             expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
-                where: { id: "ped-1", estado: { in: ["BORRADOR", "ENVIADO"] } },
+                where: { id: "ped-1", estado: { in: ["BORRADOR", "FINALIZADO"] } },
                 data: expect.objectContaining({ estado: "ANULADO", motivoAnulacion: "Pedido duplicado" })
             });
         });

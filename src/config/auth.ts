@@ -15,7 +15,7 @@ export const ROL_VISUALIZADOR_DROGUERIA = "R08";
 export const ROLES_OPERAN_ENTRADA = ["R01", "R03", "R06", "R07"] as const;
 export const ROLES_OPERAN_SALIDA = ["R01", "R03", "R07"] as const;
 
-/** Roles que arman, envian y anulan pedidos de aseo de su centro. El resto solo los consulta. */
+/** Roles que arman, finalizan y anulan pedidos de aseo de su centro. El resto solo los consulta. */
 export const ROLES_GESTIONAN_PEDIDOS = ["R01", "R02", "R03"] as const;
 
 /** Ruta del formulario de inicio de sesion. */

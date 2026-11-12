@@ -11,7 +11,7 @@ export interface PedidoExcelData {
     estado: string;
     periodo?: string | null;
     fechaSolicitud: Date;
-    fechaEnvio?: Date | null;
+    fechaFinalizacion?: Date | null;
     observaciones?: string | null;
     motivoAnulacion?: string | null;
     centro: { nombre: string };
@@ -40,7 +40,7 @@ export async function construirExcelPedido(pedido: PedidoExcelData): Promise<Buf
     hoja.addRow([]);
     hoja.addRow(["Centro:", pedido.centro.nombre, "Estado:", pedido.estado]);
     hoja.addRow(["Bodega:", pedido.bodega?.nombre ?? "Todas las bodegas del centro", "Período:", pedido.periodo || "Suplementario"]);
-    hoja.addRow(["Fecha:", fechaHoyChile(pedido.fechaEnvio ?? pedido.fechaSolicitud), "Solicitante:", solicitante]);
+    hoja.addRow(["Fecha:", fechaHoyChile(pedido.fechaFinalizacion ?? pedido.fechaSolicitud), "Solicitante:", solicitante]);
     if (pedido.observaciones) {
         hoja.addRow(["Observaciones:", pedido.observaciones]);
     }

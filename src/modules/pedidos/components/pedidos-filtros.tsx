@@ -90,7 +90,7 @@ export function PedidosFiltros({
                 <Select name="estado" defaultValue={estado}>
                     <option value="">Todos los estados</option>
                     <option value="BORRADOR">Borrador</option>
-                    <option value="ENVIADO">Enviado</option>
+                    <option value="FINALIZADO">Finalizado</option>
                     <option value="ANULADO">Anulado</option>
                 </Select>
             </label>

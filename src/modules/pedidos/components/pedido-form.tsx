@@ -170,12 +170,12 @@ export function PedidoForm({
         });
     }
 
-    function guardar(enviar: boolean): void {
+    function guardar(finalizar: boolean): void {
         const detalles = Object.entries(cantidades)
             .map(([pid, cant]) => ({ productoId: Number(pid), cantidadSolicitada: cant }))
             .filter((d) => d.cantidadSolicitada > 0);
 
-        if (enviar && detalles.length === 0) {
+        if (finalizar && detalles.length === 0) {
             toast.error("Debe solicitar al menos un producto de aseo con cantidad mayor a 0.");
             return;
         }
@@ -190,7 +190,7 @@ export function PedidoForm({
                     periodo: tipo === "MENSUAL" ? periodo : null,
                     observaciones: observaciones || null,
                     detalles,
-                    enviar
+                    finalizar
                 });
 
                 if (res.ok) {
@@ -412,7 +412,7 @@ export function PedidoForm({
                     disabled={isPending || cargandoCatalogo}
                 >
                     {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                    Enviar pedido
+                    Finalizar pedido
                 </Button>
             </div>
         </div>

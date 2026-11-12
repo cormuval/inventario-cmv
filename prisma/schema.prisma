@@ -260,7 +260,7 @@ model Pedido {
     usuarioSolicitanteId  String          @map("ID_Usuario_Solicitante") @db.VarChar(255)
     fechaSolicitud        DateTime        @default(now()) @map("Fecha_Solicitud")
     observaciones         String?         @map("Observaciones") @db.VarChar(500)
-    fechaEnvio            DateTime?       @map("Fecha_Envio")
+    fechaFinalizacion     DateTime?       @map("Fecha_Finalizacion")
     fechaAnulacion        DateTime?       @map("Fecha_Anulacion")
     motivoAnulacion       String?         @map("Motivo_Anulacion") @db.VarChar(255)
 

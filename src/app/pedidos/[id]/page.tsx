@@ -30,8 +30,8 @@ function renderBadgeEstado(estado: string): React.ReactElement {
     switch (estado) {
         case "BORRADOR":
             return <Badge tone="default">Borrador</Badge>;
-        case "ENVIADO":
-            return <Badge tone="success">Enviado</Badge>;
+        case "FINALIZADO":
+            return <Badge tone="success">Finalizado</Badge>;
         case "ANULADO":
             return <Badge tone="danger">Anulado</Badge>;
         default:
@@ -104,16 +104,16 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
                             <p className="font-semibold text-sm mt-0.5">
                                 {pedido.estado === "ANULADO"
                                     ? "Anulado"
-                                    : pedido.estado === "ENVIADO"
-                                      ? "Enviado"
+                                    : pedido.estado === "FINALIZADO"
+                                      ? "Finalizado"
                                       : "Borrador"}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 {pedido.estado === "ANULADO" && pedido.fechaAnulacion
                                     ? `Fecha: ${formatDate(pedido.fechaAnulacion)}`
-                                    : pedido.fechaEnvio
-                                      ? `Enviado el ${formatDate(pedido.fechaEnvio)}`
-                                      : "Aún no enviado"}
+                                    : pedido.fechaFinalizacion
+                                      ? `Finalizado el ${formatDate(pedido.fechaFinalizacion)}`
+                                      : "Aún no finalizado"}
                             </p>
                         </CardContent>
                     </Card>
