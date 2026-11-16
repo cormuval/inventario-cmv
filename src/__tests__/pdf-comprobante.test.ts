@@ -164,6 +164,26 @@ describe("generarComprobanteSalidaPDF", () => {
         expect(text).not.toContain("Código Salida:");
     });
 
+    it("trunca con elipsis los lotes largos sin desbordar ni superponerse con las filas siguientes o los totales", async () => {
+        const ordenConLoteLargo = crearMockOrden(4);
+        ordenConLoteLargo.detalles[0].lote = "LOTE-SUMAMENTE-LARGO-QUE-EXCEDE-LOS-74-PUNTOS-DE-ANCHO-123456789";
+        ordenConLoteLargo.detalles[1].lote = "LOTE-NORMAL-1";
+        ordenConLoteLargo.detalles[2].lote = "LOTE-EXTENSO-CON-PALABRAS-ESPACIADAS-MUY-LARGAS-LOTE-2026-VALPARAISO";
+
+        const buffer = await generarComprobanteSalidaPDF(ordenConLoteLargo);
+        const text = extraerTextoPDF(buffer);
+
+        // Se mantiene en 1 sola página sin desbordar la tabla ni los totales
+        const paginas = contarPaginasPDF(buffer);
+        expect(paginas).toBe(1);
+
+        // Los totales y firmas siguen intactos y legibles
+        expect(text).toContain("TOTAL GENERAL:");
+        expect(text).toContain("Total líneas: 4");
+        expect(text).toContain("ENTREGADO POR");
+        expect(text).toContain("RECIBIDO CONFORME");
+    });
+
     it("maneja paginación correctamente en un caso multipágina con 80 detalles, repitiendo encabezados y firmas al final", async () => {
         const ordenLarga = crearMockOrden(80, {
             tipoSalida: "A Otros Centros",

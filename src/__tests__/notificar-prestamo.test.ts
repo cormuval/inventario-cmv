@@ -123,6 +123,20 @@ describe("construirCorreoNotificacionPrestamo", () => {
 
         expect(correo.responderA).toBe("maria.gonzalez@cmvalparaiso.cl");
     });
+
+    it("incluye el comprobante PDF adjunto con el nombre correcto si se proporciona", () => {
+        const dummyPdf = Buffer.from("%PDF-1.3-DUMMY");
+        const correo = construirCorreoNotificacionPrestamo({
+            ...datosBase,
+            pdf: dummyPdf
+        });
+
+        expect(correo.adjuntos).toHaveLength(1);
+        expect(correo.adjuntos?.[0]).toEqual({
+            nombre: "comprobante-salida-ord-12345.pdf",
+            contenido: dummyPdf
+        });
+    });
 });
 
 describe("resolverDestinatariosPrestamo", () => {
@@ -162,7 +176,10 @@ describe("resolverDestinatariosPrestamo", () => {
 
         expect(correos).toEqual(["bodeguero@cmvalparaiso.cl"]);
         expect(prisma.encargadosBodega.findMany).toHaveBeenCalledWith({
-            where: { bodegaId: "bodega-destino-1" },
+            where: {
+                bodegaId: "bodega-destino-1",
+                usuario: { estado: true }
+            },
             select: { email: true }
         });
     });
@@ -178,6 +195,50 @@ describe("resolverDestinatariosPrestamo", () => {
         });
 
         expect(correos).toEqual(["jefe.bodega@cmvalparaiso.cl"]);
+        expect(prisma.encargadosBodega.findMany).toHaveBeenNthCalledWith(1, {
+            where: {
+                bodegaId: "bodega-destino-1",
+                usuario: { estado: true }
+            },
+            select: { email: true }
+        });
+        expect(prisma.encargadosBodega.findMany).toHaveBeenNthCalledWith(2, {
+            where: {
+                centroId: "centro-2",
+                usuario: { estado: true }
+            },
+            select: { email: true }
+        });
+    });
+
+    it("ignora encargados con usuario inactivo (estado=false) y realiza fallback a usuarios activos del centro", async () => {
+        // En la BD la consulta filtra usuario: { estado: true }, por lo que no devuelve encargados inactivos
+        vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.usuario.findMany).mockResolvedValueOnce([
+            { email: "subrogante.activo@cmvalparaiso.cl" } as never
+        ]);
+
+        const correos = await resolverDestinatariosPrestamo({
+            centroDestinoId: "centro-2",
+            bodegaDestinoId: "bodega-destino-1"
+        });
+
+        expect(correos).toEqual(["subrogante.activo@cmvalparaiso.cl"]);
+        expect(prisma.encargadosBodega.findMany).toHaveBeenCalledWith({
+            where: {
+                bodegaId: "bodega-destino-1",
+                usuario: { estado: true }
+            },
+            select: { email: true }
+        });
+        expect(prisma.usuario.findMany).toHaveBeenCalledWith({
+            where: {
+                centroId: "centro-2",
+                estado: true,
+                rolId: { in: ["R01", "R02", "R03", "R06", "R07"] }
+            },
+            select: { email: true }
+        });
     });
 
     it("resuelve usuarios activos autorizados del centro si no hay encargados registrados", async () => {
@@ -236,7 +297,7 @@ describe("notificarPrestamoEnviado", () => {
         ]
     };
 
-    it("envía exitosamente el correo con el código de 7 caracteres y registra auditoría", async () => {
+    it("envía exitosamente el correo con el código de 7 caracteres, comprobante PDF adjunto y registra auditoría", async () => {
         vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue(ordenEjemplo as never);
         vi.mocked(correoLib.enviarCorreo).mockResolvedValue({ ok: true, id: "email-resend-123" });
         vi.mocked(prisma.ordenSalida.update).mockResolvedValue({} as never);
@@ -248,7 +309,13 @@ describe("notificarPrestamoEnviado", () => {
             expect.objectContaining({
                 para: "receptor@cmvalparaiso.cl",
                 asunto: expect.stringContaining("R99J2Q8"),
-                html: expect.stringContaining("R99J2Q8")
+                html: expect.stringContaining("R99J2Q8"),
+                adjuntos: [
+                    expect.objectContaining({
+                        nombre: "comprobante-salida-ord-prestamo-1.pdf",
+                        contenido: expect.any(Buffer)
+                    })
+                ]
             })
         );
         expect(prisma.ordenSalida.update).toHaveBeenCalledWith({
@@ -266,6 +333,30 @@ describe("notificarPrestamoEnviado", () => {
                 detalle: expect.objectContaining({
                     codigoRecepcion: "R99J2Q8",
                     resultadoEnvio: "enviado"
+                })
+            })
+        );
+    });
+
+    it("aísla fallo de AuditLogger.log devolviendo el resultado real exitoso del correo cuando Resend tuvo éxito", async () => {
+        vi.mocked(prisma.ordenSalida.findUnique).mockResolvedValue(ordenEjemplo as never);
+        vi.mocked(correoLib.enviarCorreo).mockResolvedValue({ ok: true, id: "email-resend-789" });
+        vi.mocked(prisma.ordenSalida.update).mockResolvedValue({} as never);
+        vi.mocked(AuditLogger.log).mockRejectedValueOnce(new Error("Conexión perdida con el servicio de auditoría"));
+
+        const res = await notificarPrestamoEnviado("ord-prestamo-1");
+
+        // El envío por correo ya se realizó y el fallo posterior del logger no debe provocar que se informe como fallido
+        expect(res.ok).toBe(true);
+        if (res.ok) {
+            expect(res.id).toBe("email-resend-789");
+        }
+        expect(correoLib.enviarCorreo).toHaveBeenCalled();
+        expect(prisma.ordenSalida.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    enviarCorreo: true,
+                    errorEnvioCorreo: null
                 })
             })
         );

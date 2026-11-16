@@ -9,6 +9,7 @@ import { prisma } from "@/shared/lib/prisma";
 
 // utils
 import { construirCorreoNotificacionPrestamo } from "@/modules/orden-salida/utils/correo-notificacion-prestamo";
+import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-comprobante";
 
 const LARGO_MAXIMO_ERROR = 500;
 
@@ -37,11 +38,14 @@ export async function resolverDestinatariosPrestamo(params: ParametrosResolucion
         return [];
     }
 
-    // 2. Encargados de la bodega destino si fue seleccionada
+    // 2. Encargados activos de la bodega destino si fue seleccionada
     if (params.bodegaDestinoId) {
         try {
             const encargadosBodega = await prisma.encargadosBodega.findMany({
-                where: { bodegaId: params.bodegaDestinoId },
+                where: {
+                    bodegaId: params.bodegaDestinoId,
+                    usuario: { estado: true }
+                },
                 select: { email: true }
             });
             const correos = encargadosBodega
@@ -55,10 +59,13 @@ export async function resolverDestinatariosPrestamo(params: ParametrosResolucion
         }
     }
 
-    // 3. Encargados de cualquier bodega en el centro de destino
+    // 3. Encargados activos de cualquier bodega en el centro de destino
     try {
         const encargadosCentro = await prisma.encargadosBodega.findMany({
-            where: { centroId: params.centroDestinoId },
+            where: {
+                centroId: params.centroDestinoId,
+                usuario: { estado: true }
+            },
             select: { email: true }
         });
         const correosCentro = encargadosCentro
@@ -139,26 +146,30 @@ export async function notificarPrestamoEnviado(ordenSalidaId: string): Promise<R
                 ? `El correo de destino "${orden.correoDestino}" no tiene un formato válido`
                 : "No se encontró un destinatario de correo válido para el centro de destino";
 
-            await AuditLogger.log({
-                usuarioId: orden.usuarioId,
-                centroId: orden.centroDestinoId,
-                bodegaId: orden.bodegaDestinoId ?? null,
-                accion: "notificar",
-                entidad: "OrdenSalida",
-                entidadId: orden.id,
-                detalle: {
-                    tipoSalida: orden.tipoSalida,
-                    centroOrigenId: orden.centroId,
-                    centroOrigenNombre: orden.centro.nombre,
-                    centroDestinoId: orden.centroDestinoId,
-                    centroDestinoNombre: orden.centroDestino?.nombre,
-                    codigoRecepcion: orden.codigoRecepcion,
-                    totalItems: orden.detalles.length,
-                    resultadoEnvio: "fallido",
-                    error: errorMsg,
-                    mensaje: `Fallo al notificar préstamo: ${errorMsg}`
-                }
-            });
+            try {
+                await AuditLogger.log({
+                    usuarioId: orden.usuarioId,
+                    centroId: orden.centroDestinoId,
+                    bodegaId: orden.bodegaDestinoId ?? null,
+                    accion: "notificar",
+                    entidad: "OrdenSalida",
+                    entidadId: orden.id,
+                    detalle: {
+                        tipoSalida: orden.tipoSalida,
+                        centroOrigenId: orden.centroId,
+                        centroOrigenNombre: orden.centro.nombre,
+                        centroDestinoId: orden.centroDestinoId,
+                        centroDestinoNombre: orden.centroDestino?.nombre,
+                        codigoRecepcion: orden.codigoRecepcion,
+                        totalItems: orden.detalles.length,
+                        resultadoEnvio: "fallido",
+                        error: errorMsg,
+                        mensaje: `Fallo al notificar préstamo: ${errorMsg}`
+                    }
+                });
+            } catch {
+                // Fail-safe
+            }
 
             try {
                 await prisma.ordenSalida.update({
@@ -178,6 +189,13 @@ export async function notificarPrestamoEnviado(ordenSalidaId: string): Promise<R
 
         const fechaLimite = orden.fechaLimiteRecepcion ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+        let pdfBuffer: Buffer | undefined;
+        try {
+            pdfBuffer = await generarComprobanteSalidaPDF(orden);
+        } catch {
+            // Si la generación del PDF falla, el correo con el código igual se envía
+        }
+
         const correoInput = construirCorreoNotificacionPrestamo({
             ordenId: orden.id,
             codigoRecepcion: orden.codigoRecepcion,
@@ -195,7 +213,8 @@ export async function notificarPrestamoEnviado(ordenSalidaId: string): Promise<R
                 lote: d.lote,
                 fechaCaducidad: d.fechaCaducidad
             })),
-            para: destinatarios.length === 1 ? destinatarios[0] : destinatarios
+            para: destinatarios.length === 1 ? destinatarios[0] : destinatarios,
+            pdf: pdfBuffer
         });
 
         const resultado = await enviarCorreo(correoInput);
@@ -222,31 +241,35 @@ export async function notificarPrestamoEnviado(ordenSalidaId: string): Promise<R
             }
         }
 
-        await AuditLogger.log({
-            usuarioId: orden.usuarioId,
-            centroId: orden.centroDestinoId,
-            bodegaId: orden.bodegaDestinoId ?? null,
-            accion: "notificar",
-            entidad: "OrdenSalida",
-            entidadId: orden.id,
-            detalle: {
-                tipoSalida: orden.tipoSalida,
-                centroOrigenId: orden.centroId,
-                centroOrigenNombre: orden.centro.nombre,
-                centroDestinoId: orden.centroDestinoId,
-                centroDestinoNombre: orden.centroDestino?.nombre,
-                codigoRecepcion: orden.codigoRecepcion,
-                totalItems: orden.detalles.length,
-                destinatarios: destinatarios.join(", "),
-                resultadoEnvio: resultado.ok ? "enviado" : (resultado.omitido ? "omitido" : "fallido"),
-                ...(resultado.ok ? { emailId: resultado.id } : { error: resultado.error }),
-                mensaje: resultado.ok
-                    ? `Notificación de préstamo enviada exitosamente a ${destinatarios.join(", ")}`
-                    : (resultado.omitido
-                        ? "Envío de notificación omitido (sin servicio de correo configurado)"
-                        : `Fallo al enviar notificación de préstamo por correo: ${resultado.error}`)
-            }
-        });
+        try {
+            await AuditLogger.log({
+                usuarioId: orden.usuarioId,
+                centroId: orden.centroDestinoId,
+                bodegaId: orden.bodegaDestinoId ?? null,
+                accion: "notificar",
+                entidad: "OrdenSalida",
+                entidadId: orden.id,
+                detalle: {
+                    tipoSalida: orden.tipoSalida,
+                    centroOrigenId: orden.centroId,
+                    centroOrigenNombre: orden.centro.nombre,
+                    centroDestinoId: orden.centroDestinoId,
+                    centroDestinoNombre: orden.centroDestino?.nombre,
+                    codigoRecepcion: orden.codigoRecepcion,
+                    totalItems: orden.detalles.length,
+                    destinatarios: destinatarios.join(", "),
+                    resultadoEnvio: resultado.ok ? "enviado" : (resultado.omitido ? "omitido" : "fallido"),
+                    ...(resultado.ok ? { emailId: resultado.id } : { error: resultado.error }),
+                    mensaje: resultado.ok
+                        ? `Notificación de préstamo enviada exitosamente a ${destinatarios.join(", ")}`
+                        : (resultado.omitido
+                            ? "Envío de notificación omitido (sin servicio de correo configurado)"
+                            : `Fallo al enviar notificación de préstamo por correo: ${resultado.error}`)
+                }
+            });
+        } catch {
+            // Se ignora: el fallo de auditoría no altera el resultado del envío
+        }
 
         return resultado;
     } catch (error) {

@@ -32,6 +32,7 @@ export interface DatosCorreoNotificacionPrestamo {
     emisorEmail: string;
     detalles: ItemPrestamoNotificacion[];
     para: string | string[];
+    pdf?: Buffer;
 }
 
 /**
@@ -161,6 +162,16 @@ export function construirCorreoNotificacionPrestamo(datos: DatosCorreoNotificaci
         asunto: `Préstamo intercentros entrante: Código ${datos.codigoRecepcion} — ${datos.centroOrigen}`,
         html,
         texto: lineasTexto.join("\n"),
-        responderA: datos.emisorEmail
+        responderA: datos.emisorEmail,
+        ...(datos.pdf
+            ? {
+                  adjuntos: [
+                      {
+                          nombre: `comprobante-salida-${datos.ordenId}.pdf`,
+                          contenido: datos.pdf
+                      }
+                  ]
+              }
+            : {})
     };
 }

@@ -247,13 +247,13 @@ export function generarComprobanteSalidaPDF(
                 const unidad = det.unidad ?? det.producto.unidad ?? "un.";
 
                 doc.font("Helvetica").fontSize(8).fillColor(primaryColor);
-                doc.text(String(idx + 1), colItem + 4, currentY + 5);
-                doc.text(codProd, colCod, currentY + 5, { width: 38, ellipsis: true });
-                doc.text(det.producto.descripcion, colDesc, currentY + 5, { width: 204, height: 12, ellipsis: true });
-                doc.text(det.lote, colLote, currentY + 5, { width: 74, ellipsis: true });
-                doc.text(formatDate(det.fechaCaducidad), colVenc, currentY + 5);
-                doc.text(unidad, colUnidad, currentY + 5, { width: 44, align: "center" });
-                doc.text(formatNumber(det.cantidad), colCant, currentY + 5, { width: 68, align: "right" });
+                doc.text(String(idx + 1), colItem + 4, currentY + 5, { width: 18, lineBreak: false });
+                doc.text(codProd, colCod, currentY + 5, { width: 38, height: 12, ellipsis: true, lineBreak: false });
+                doc.text(det.producto.descripcion, colDesc, currentY + 5, { width: 204, height: 12, ellipsis: true, lineBreak: false });
+                doc.text(det.lote, colLote, currentY + 5, { width: 74, height: 12, ellipsis: true, lineBreak: false });
+                doc.text(formatDate(det.fechaCaducidad), colVenc, currentY + 5, { width: 60, lineBreak: false });
+                doc.text(unidad, colUnidad, currentY + 5, { width: 44, align: "center", lineBreak: false });
+                doc.text(formatNumber(det.cantidad), colCant, currentY + 5, { width: 68, align: "right", lineBreak: false });
 
                 totalUnidades += det.cantidad;
                 currentY += rowHeight;
