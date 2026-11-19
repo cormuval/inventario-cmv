@@ -13,6 +13,10 @@ import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-co
 
 const LARGO_MAXIMO_ERROR = 500;
 
+// Respaldo cuando no hay encargados: roles del centro que reciben o supervisan.
+// Se excluye R01 (administrador global) para no notificar a toda la administración.
+const ROLES_NOTIFICADOS_PRESTAMO = ["R02", "R03", "R06", "R07"];
+
 export interface ParametrosResolucionDestinatario {
     correoDestino?: string | null;
     centroDestinoId: string;
@@ -25,7 +29,7 @@ export interface ParametrosResolucionDestinatario {
  * 1. Correo explícito ingresado en la orden (`correoDestino`), previa validación de formato.
  * 2. Si no hay correo explícito, encargados de la bodega destino (`EncargadosBodega`).
  * 3. Encargados de cualquier bodega del centro destino (`EncargadosBodega`).
- * 4. Usuarios activos del centro destino con roles autorizados para operar o supervisar (`Usuario`).
+ * 4. Usuarios activos del centro destino con roles R02, R03, R06 o R07 (`Usuario`).
  */
 export async function resolverDestinatariosPrestamo(params: ParametrosResolucionDestinatario): Promise<string[]> {
     if (params.correoDestino && params.correoDestino.trim().length > 0) {
@@ -84,7 +88,7 @@ export async function resolverDestinatariosPrestamo(params: ParametrosResolucion
             where: {
                 centroId: params.centroDestinoId,
                 estado: true,
-                rolId: { in: ["R01", "R02", "R03", "R06", "R07"] }
+                rolId: { in: ROLES_NOTIFICADOS_PRESTAMO }
             },
             select: { email: true }
         });
@@ -274,6 +278,20 @@ export async function notificarPrestamoEnviado(ordenSalidaId: string): Promise<R
         return resultado;
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Error inesperado al notificar el préstamo";
+        try {
+            await AuditLogger.log({
+                accion: "notificar",
+                entidad: "OrdenSalida",
+                entidadId: ordenSalidaId,
+                detalle: {
+                    resultadoEnvio: "fallido",
+                    error: errorMsg.slice(0, LARGO_MAXIMO_ERROR),
+                    mensaje: "Error inesperado al notificar el préstamo"
+                }
+            });
+        } catch {
+            // Fail-safe
+        }
         return { ok: false, error: errorMsg };
     }
 }

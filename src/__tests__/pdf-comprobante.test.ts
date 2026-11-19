@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import zlib from "zlib";
-import { generarComprobanteSalidaPDF, type OrdenSalidaPDFData } from "@/modules/orden-salida/utils/pdf-comprobante";
+import { generarComprobanteSalidaPDF as generarPDF, type OrdenSalidaPDFData } from "@/modules/orden-salida/utils/pdf-comprobante";
+
+// Sin compresión para poder leer el texto del PDF en las aserciones
+function generarComprobanteSalidaPDF(orden: OrdenSalidaPDFData): Promise<Buffer> {
+    return generarPDF(orden, { compress: false });
+}
 
 function extraerTextoPDF(buffer: Buffer): string {
     const raw = buffer.toString("latin1");
@@ -69,7 +74,6 @@ describe("generarComprobanteSalidaPDF", () => {
                 cantidad: 10 + i,
                 lote: `LOT-2026-${i + 1}`,
                 fechaCaducidad: new Date("2027-05-15"),
-                unidad: "un.",
                 producto: {
                     id: 100 + (i % 5),
                     descripcion: `Producto farmacéutico de prueba ítem ${(i % 5) + 1}`,
@@ -106,7 +110,7 @@ describe("generarComprobanteSalidaPDF", () => {
         expect(text).toContain("Productos únicos:");
     });
 
-    it("incluye código de producto, unidad, total de productos únicos y fecha/hora de generación", async () => {
+    it("incluye código de producto, total de productos únicos y fecha/hora de generación", async () => {
         const orden = crearMockOrden(5, {
             fechaGeneracion: new Date("2026-10-27T15:45:00Z")
         });
@@ -115,12 +119,11 @@ describe("generarComprobanteSalidaPDF", () => {
 
         // Columnas del detalle
         expect(text).toContain("Código");
-        expect(text).toContain("Unidad");
+        expect(text).not.toContain("Unidad");
         expect(text).toContain("F. Venc.");
 
         // Códigos de producto numéricos e insumos
         expect(text).toContain("100");
-        expect(text).toContain("un.");
 
         // Fila de totales con productos únicos
         expect(text).toContain("Total líneas:");

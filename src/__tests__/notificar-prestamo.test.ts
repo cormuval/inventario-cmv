@@ -235,7 +235,7 @@ describe("resolverDestinatariosPrestamo", () => {
             where: {
                 centroId: "centro-2",
                 estado: true,
-                rolId: { in: ["R01", "R02", "R03", "R06", "R07"] }
+                rolId: { in: ["R02", "R03", "R06", "R07"] }
             },
             select: { email: true }
         });
@@ -256,7 +256,7 @@ describe("resolverDestinatariosPrestamo", () => {
             where: {
                 centroId: "centro-2",
                 estado: true,
-                rolId: { in: ["R01", "R02", "R03", "R06", "R07"] }
+                rolId: { in: ["R02", "R03", "R06", "R07"] }
             },
             select: { email: true }
         });

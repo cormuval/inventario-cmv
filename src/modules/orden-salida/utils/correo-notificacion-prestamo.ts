@@ -2,7 +2,7 @@
 import type { CorreoInput } from "@/shared/lib/correo";
 
 // utils
-import { formatDate } from "@/shared/utils/format";
+import { formatDate, formatFechaCalendario } from "@/shared/utils/format";
 
 function escaparHtml(texto: string): string {
     return texto
@@ -42,7 +42,7 @@ export interface DatosCorreoNotificacionPrestamo {
  */
 export function construirCorreoNotificacionPrestamo(datos: DatosCorreoNotificacionPrestamo): CorreoInput {
     const fechaLimiteStr = formatDate(datos.fechaLimiteRecepcion);
-    const fechaEmisionStr = formatDate(datos.fecha);
+    const fechaEmisionStr = formatFechaCalendario(datos.fecha);
     const bodegaDestinoStr = datos.bodegaDestino?.trim()
         ? datos.bodegaDestino.trim()
         : "Por asignar al momento de recepcionar";
@@ -74,7 +74,7 @@ export function construirCorreoNotificacionPrestamo(datos: DatosCorreoNotificaci
 
     for (const item of datos.detalles) {
         lineasTexto.push(
-            `• ${item.productoDescripcion} | Cantidad: ${item.cantidad} | Lote: ${item.lote} | Vence: ${formatDate(item.fechaCaducidad)}`
+            `• ${item.productoDescripcion} | Cantidad: ${item.cantidad} | Lote: ${item.lote} | Vence: ${formatFechaCalendario(item.fechaCaducidad)}`
         );
     }
 
@@ -94,7 +94,7 @@ export function construirCorreoNotificacionPrestamo(datos: DatosCorreoNotificaci
             <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">${escaparHtml(item.productoDescripcion)}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center; font-weight: bold;">${item.cantidad}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">${escaparHtml(item.lote)}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">${escaparHtml(formatDate(item.fechaCaducidad))}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">${escaparHtml(formatFechaCalendario(item.fechaCaducidad))}</td>
         </tr>`
         )
         .join("");

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 // utils
-import { formatDate, formatDateTime, formatNumber } from "@/shared/utils/format";
+import { formatDateTime, formatFechaCalendario, formatNumber } from "@/shared/utils/format";
 
 export interface OrdenSalidaPDFData {
     id: string;
@@ -26,12 +26,10 @@ export interface OrdenSalidaPDFData {
         cantidad: number;
         lote: string;
         fechaCaducidad: Date;
-        unidad?: string;
         producto: {
             id?: number;
             descripcion: string;
             linea?: string;
-            unidad?: string;
         };
     }>;
 }
@@ -41,42 +39,22 @@ export interface OpcionesGeneracionPDF {
     compress?: boolean;
 }
 
+const RUTA_LOGO_INSTITUCIONAL = path.join(process.cwd(), "public", "logo-cmv.png");
+
 /**
- * Renderiza el logo institucional en el encabezado.
- * Si existe un archivo de logo en disco (public/logo-cmv.png o public/logo.png), lo incrusta.
- * En caso contrario, dibuja un emblema institucional vectorial nativo de CMV (Área de Salud)
- * para garantizar fidelidad gráfica tanto en desarrollo como en contenedores de producción.
+ * Incrusta el logo oficial si existe en `public/logo-cmv.png`.
+ * Devuelve true si se dibujó; sin archivo, el encabezado queda solo con texto.
  */
-function dibujarLogoInstitucional(doc: PDFKit.PDFDocument, x: number, y: number): void {
-    const posiblesRutas = [
-        path.join(process.cwd(), "public", "logo-cmv.png"),
-        path.join(process.cwd(), "public", "logo.png"),
-        path.join(process.cwd(), "public", "images", "logo.png")
-    ];
-
-    for (const ruta of posiblesRutas) {
-        if (fs.existsSync(ruta)) {
-            try {
-                doc.image(ruta, x, y, { width: 44, height: 44, fit: [44, 44] });
-                return;
-            } catch {
-                // Fallback a dibujo vectorial si la imagen no se puede decodificar
-            }
-        }
+function dibujarLogoInstitucional(doc: PDFKit.PDFDocument, x: number, y: number): boolean {
+    if (!fs.existsSync(RUTA_LOGO_INSTITUCIONAL)) {
+        return false;
     }
-
-    // Emblema institucional vectorial CMV (Área de Salud)
-    doc.save();
-    // Escudo base en verde azulado institucional
-    doc.roundedRect(x, y, 44, 44, 6).fillColor("#0f766e").fill();
-    // Cruz de salud blanca
-    doc.rect(x + 18, y + 8, 8, 22).fillColor("#ffffff").fill();
-    doc.rect(x + 11, y + 15, 22, 8).fillColor("#ffffff").fill();
-    // Franja inferior con siglas CMV
-    doc.rect(x, y + 33, 44, 11).fillColor("#094f49").fill();
-    doc.fontSize(6.5).font("Helvetica-Bold").fillColor("#ffffff")
-        .text("CMV", x, y + 35, { width: 44, align: "center", lineBreak: false });
-    doc.restore();
+    try {
+        doc.image(RUTA_LOGO_INSTITUCIONAL, x, y, { fit: [44, 44] });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export function generarComprobanteSalidaPDF(
@@ -91,7 +69,7 @@ export function generarComprobanteSalidaPDF(
                 size: "LETTER",
                 margin: 40,
                 bufferPages: true,
-                compress: opciones?.compress ?? false,
+                compress: opciones?.compress ?? true,
                 info: {
                     Title: `Comprobante de Salida - ${orden.id}`,
                     Author: "Corporación Municipal de Valparaíso"
@@ -114,11 +92,10 @@ export function generarComprobanteSalidaPDF(
             const tableX = 40;
             const colItem = 40;     // # (ancho 22)
             const colCod = 62;      // Código producto (ancho 40)
-            const colDesc = 104;    // Descripción (ancho 206)
-            const colLote = 312;    // Lote (ancho 76)
-            const colVenc = 390;    // F. Vencimiento (ancho 60)
-            const colUnidad = 452;  // Unidad (ancho 46)
-            const colCant = 500;    // Cantidad (ancho 72)
+            const colDesc = 104;    // Descripción (ancho 236)
+            const colLote = 344;    // Lote (ancho 86)
+            const colVenc = 432;    // F. Vencimiento (ancho 60)
+            const colCant = 494;    // Cantidad (ancho 78)
 
             function dibujarEncabezadoTabla(y: number): number {
                 doc.rect(tableX, y, 532, 18).fillColor("#f1f5f9").fill();
@@ -128,20 +105,18 @@ export function generarComprobanteSalidaPDF(
                 doc.text("Producto / Descripción", colDesc, y + 5);
                 doc.text("Lote", colLote, y + 5);
                 doc.text("F. Venc.", colVenc, y + 5);
-                doc.text("Unidad", colUnidad, y + 5, { width: 44, align: "center" });
-                doc.text("Cantidad", colCant, y + 5, { width: 68, align: "right" });
+                doc.text("Cantidad", colCant, y + 5, { width: 74, align: "right" });
                 return y + 18;
             }
 
             // 1. Encabezado institucional con Logo (Página 1)
-            dibujarLogoInstitucional(doc, 40, 36);
+            const conLogo = dibujarLogoInstitucional(doc, 40, 36);
+            const textoEncabezadoX = conLogo ? 92 : 40;
 
-            doc.fontSize(11.5).font("Helvetica-Bold").fillColor(primaryColor)
-                .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", 92, 40);
-            doc.fontSize(8.5).font("Helvetica").fillColor(secondaryColor)
-                .text("Área de Salud · Sistema de Control y Trazabilidad de Inventario APS", 92, 54);
-            doc.fontSize(7.5).font("Helvetica-Oblique").fillColor("#64748b")
-                .text("Dirección del Área de Salud · Respaldo Oficial de Despacho", 92, 67);
+            doc.fontSize(conLogo ? 11.5 : 13).font("Helvetica-Bold").fillColor(primaryColor)
+                .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", textoEncabezadoX, 40);
+            doc.fontSize(9).font("Helvetica").fillColor(secondaryColor)
+                .text("Área de Salud · Sistema de Inventario y Farmacia APS", textoEncabezadoX, 56);
 
             // Folio, fecha de salida y fecha/hora visible de generación
             const boxFolioY = 34;
@@ -152,7 +127,7 @@ export function generarComprobanteSalidaPDF(
             doc.fontSize(8.5).font("Helvetica-Bold").fillColor(secondaryColor)
                 .text(`N°: ${orden.id}`, 385, boxFolioY + 18, { width: 182, align: "center" });
             doc.fontSize(7.5).font("Helvetica").fillColor(secondaryColor)
-                .text(`Fecha salida: ${formatDate(orden.fecha)}`, 385, boxFolioY + 29, { width: 182, align: "center" });
+                .text(`Fecha salida: ${formatFechaCalendario(orden.fecha)}`, 385, boxFolioY + 29, { width: 182, align: "center" });
             doc.fontSize(7).font("Helvetica").fillColor("#64748b")
                 .text(`Generado: ${formatDateTime(fechaGeneracion)}`, 385, boxFolioY + 39, { width: 182, align: "center" });
 
@@ -184,12 +159,13 @@ export function generarComprobanteSalidaPDF(
             doc.font("Helvetica").fillColor(primaryColor).text(orden.bodega.nombre, leftX + 80, row2Y);
 
             doc.font("Helvetica-Bold").fillColor(secondaryColor).text("Funcionario:", leftX, row3Y);
-            doc.font("Helvetica").fillColor(primaryColor).text(
+            doc.fontSize(7.5).font("Helvetica").fillColor(primaryColor).text(
                 `${orden.usuario.nombre} ${orden.usuario.apPaterno || ""} (${orden.usuario.email})`,
                 leftX + 80,
-                row3Y,
-                { width: 175, height: 12, ellipsis: true }
+                row3Y + 1,
+                { width: 178, height: 10, ellipsis: true, lineBreak: false }
             );
+            doc.fontSize(8.5);
 
             doc.font("Helvetica-Bold").fillColor(secondaryColor).text("Tipo Salida:", midX, row1Y);
             doc.font("Helvetica").fillColor(primaryColor).text(orden.tipoSalida, midX + 80, row1Y);
@@ -217,7 +193,7 @@ export function generarComprobanteSalidaPDF(
                 doc.font("Helvetica-Bold").fillColor("#0f766e").text(orden.codigoRecepcion, midX + 80, row3Y);
             }
 
-            // 3. Tabla de Insumos con Código y Unidad
+            // 3. Tabla de Insumos con código de producto
             currentY += boxDatosHeight + 14;
             doc.fontSize(9).font("Helvetica-Bold").fillColor(primaryColor)
                 .text("DETALLE DE INSUMOS Y MEDICAMENTOS ENTREGADOS", 40, currentY);
@@ -244,16 +220,14 @@ export function generarComprobanteSalidaPDF(
                 }
 
                 const codProd = det.producto.id != null ? String(det.producto.id) : "-";
-                const unidad = det.unidad ?? det.producto.unidad ?? "un.";
 
                 doc.font("Helvetica").fontSize(8).fillColor(primaryColor);
                 doc.text(String(idx + 1), colItem + 4, currentY + 5, { width: 18, lineBreak: false });
                 doc.text(codProd, colCod, currentY + 5, { width: 38, height: 12, ellipsis: true, lineBreak: false });
-                doc.text(det.producto.descripcion, colDesc, currentY + 5, { width: 204, height: 12, ellipsis: true, lineBreak: false });
-                doc.text(det.lote, colLote, currentY + 5, { width: 74, height: 12, ellipsis: true, lineBreak: false });
-                doc.text(formatDate(det.fechaCaducidad), colVenc, currentY + 5, { width: 60, lineBreak: false });
-                doc.text(unidad, colUnidad, currentY + 5, { width: 44, align: "center", lineBreak: false });
-                doc.text(formatNumber(det.cantidad), colCant, currentY + 5, { width: 68, align: "right", lineBreak: false });
+                doc.text(det.producto.descripcion, colDesc, currentY + 5, { width: 234, height: 12, ellipsis: true, lineBreak: false });
+                doc.text(det.lote, colLote, currentY + 5, { width: 84, height: 12, ellipsis: true, lineBreak: false });
+                doc.text(formatFechaCalendario(det.fechaCaducidad), colVenc, currentY + 5, { width: 60, lineBreak: false });
+                doc.text(formatNumber(det.cantidad), colCant, currentY + 5, { width: 74, align: "right", lineBreak: false });
 
                 totalUnidades += det.cantidad;
                 currentY += rowHeight;
@@ -280,8 +254,8 @@ export function generarComprobanteSalidaPDF(
             );
 
             doc.font("Helvetica-Bold").fontSize(8).fillColor(primaryColor);
-            doc.text("TOTAL GENERAL:", colUnidad - 60, currentY + 5, { width: 100, align: "right" });
-            doc.text(formatNumber(totalUnidades), colCant, currentY + 5, { width: 68, align: "right" });
+            doc.text("TOTAL GENERAL:", colVenc - 40, currentY + 5, { width: 100, align: "right" });
+            doc.text(formatNumber(totalUnidades), colCant, currentY + 5, { width: 74, align: "right" });
             currentY += 18;
 
             // 5. Recuadros de Firma Física (indivisibles en la última página)
@@ -318,7 +292,7 @@ export function generarComprobanteSalidaPDF(
                 doc.page.margins.bottom = 0;
 
                 doc.fontSize(7).font("Helvetica").fillColor("#94a3b8").text(
-                    `Documento generado el ${fechaGenStr} · Sistema de Inventario APS CMV · Respaldo físico oficial de entrega y recepción.`,
+                    `Generado el ${fechaGenStr} por el Sistema de Inventario CMV · Respaldo físico interno de entrega y recepción de insumos.`,
                     40,
                     735,
                     { width: 532, align: "center", lineBreak: false }
