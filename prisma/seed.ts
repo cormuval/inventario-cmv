@@ -78,17 +78,24 @@ async function main(): Promise<void> {
         }
     });
 
-    await prisma.unidad.upsert({
-        where: { descripcion: "Caja" },
-        update: {},
-        create: { descripcion: "Caja" }
-    });
+    // Unidad mezcla servicios (Consumo Interno) y causales de merma (ver UNIDADES_MERMA).
+    const unidadesBase = [
+        "Box",
+        "Dental",
+        "Farmacia",
+        "SAPU",
+        "Vacunatorio",
+        "Regularización de Bodega",
+        "REAS"
+    ];
 
-    await prisma.unidad.upsert({
-        where: { descripcion: "Unidad" },
-        update: {},
-        create: { descripcion: "Unidad" }
-    });
+    for (const descripcion of unidadesBase) {
+        await prisma.unidad.upsert({
+            where: { descripcion },
+            update: {},
+            create: { descripcion }
+        });
+    }
 
     const guantes = await prisma.producto.upsert({
         where: { id: 1 },
