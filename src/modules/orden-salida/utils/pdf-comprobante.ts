@@ -40,9 +40,10 @@ export interface OpcionesGeneracionPDF {
 }
 
 const RUTA_LOGO_INSTITUCIONAL = path.join(process.cwd(), "public", "logo-cmv.png");
+const ANCHO_LOGO = 108;
 
 /**
- * Incrusta el logo oficial si existe en `public/logo-cmv.png`.
+ * Incrusta el logo oficial (horizontal, Municipalidad y CMV) si existe en `public/logo-cmv.png`.
  * Devuelve true si se dibujó; sin archivo, el encabezado queda solo con texto.
  */
 function dibujarLogoInstitucional(doc: PDFKit.PDFDocument, x: number, y: number): boolean {
@@ -50,7 +51,7 @@ function dibujarLogoInstitucional(doc: PDFKit.PDFDocument, x: number, y: number)
         return false;
     }
     try {
-        doc.image(RUTA_LOGO_INSTITUCIONAL, x, y, { fit: [44, 44] });
+        doc.image(RUTA_LOGO_INSTITUCIONAL, x, y, { fit: [ANCHO_LOGO, 50], valign: "center" });
         return true;
     } catch {
         return false;
@@ -110,13 +111,22 @@ export function generarComprobanteSalidaPDF(
             }
 
             // 1. Encabezado institucional con Logo (Página 1)
-            const conLogo = dibujarLogoInstitucional(doc, 40, 36);
-            const textoEncabezadoX = conLogo ? 92 : 40;
+            const conLogo = dibujarLogoInstitucional(doc, 40, 35);
 
-            doc.fontSize(conLogo ? 11.5 : 13).font("Helvetica-Bold").fillColor(primaryColor)
-                .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", textoEncabezadoX, 40);
-            doc.fontSize(9).font("Helvetica").fillColor(secondaryColor)
-                .text("Área de Salud · Sistema de Inventario y Farmacia APS", textoEncabezadoX, 56);
+            if (conLogo) {
+                // El logo ya muestra a la Corporación; el texto queda como bajada a su derecha
+                const textoX = 40 + ANCHO_LOGO + 12;
+                doc.fontSize(9.5).font("Helvetica-Bold").fillColor(primaryColor)
+                    .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", textoX, 44, { width: 375 - textoX, lineBreak: false });
+                doc.fontSize(8.5).font("Helvetica").fillColor(secondaryColor)
+                    .text("Área de Salud", textoX, 57)
+                    .text("Sistema de Inventario y Farmacia APS", textoX, 68);
+            } else {
+                doc.fontSize(13).font("Helvetica-Bold").fillColor(primaryColor)
+                    .text("CORPORACIÓN MUNICIPAL DE VALPARAÍSO", 40, 40);
+                doc.fontSize(9).font("Helvetica").fillColor(secondaryColor)
+                    .text("Área de Salud · Sistema de Inventario y Farmacia APS", 40, 56);
+            }
 
             // Folio, fecha de salida y fecha/hora visible de generación
             const boxFolioY = 34;
