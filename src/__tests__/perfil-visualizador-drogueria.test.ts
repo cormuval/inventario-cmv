@@ -232,7 +232,7 @@ describe("Perfil de Visualización Global Droguería (R08)", () => {
             const formDataUsuario = new FormData();
             formDataUsuario.set("nombre", "Juan");
             formDataUsuario.set("apPaterno", "Pérez");
-            formDataUsuario.set("email", "jperez@cmvalparaiso.cl");
+            formDataUsuario.set("email", "nuevo.usuario@cmvalparaiso.cl");
             formDataUsuario.set("rolId", "R07");
             formDataUsuario.set("centroId", "centro-1");
             const resUsuario = await crearUsuario({ ok: false, message: "" }, formDataUsuario);

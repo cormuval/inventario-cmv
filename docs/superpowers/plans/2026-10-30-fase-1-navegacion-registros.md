@@ -2698,7 +2698,7 @@ Expected: TTFB < 1 s y tamaño < 200 KB en cada una.
 
 - [ ] **Step 2: Confirmar que pm2 no reinicia**
 
-Run (en server-das): `pm2 jlist | node -e "const a=JSON.parse(require('fs').readFileSync(0));const p=a.find(x=>x.name==='inventario-cmv');console.log('restarts', p.pm2_env.restart_time, 'mem', Math.round(p.monit.memory/1e6)+'MB')"` antes y después de navegar 5 minutos por las rutas.
+Run (en el servidor de producción): `pm2 jlist | node -e "const a=JSON.parse(require('fs').readFileSync(0));const p=a.find(x=>x.name==='inventario-cmv');console.log('restarts', p.pm2_env.restart_time, 'mem', Math.round(p.monit.memory/1e6)+'MB')"` antes y después de navegar 5 minutos por las rutas.
 Expected: el contador `restarts` no sube y la memoria queda bajo 500 MB.
 
 - [ ] **Step 3: Registrar el resultado**

@@ -11,6 +11,9 @@ import { AuditLogger } from "@/shared/lib/logger";
 import type { ResultadoCorreo } from "@/shared/lib/correo";
 import { prisma } from "@/shared/lib/prisma";
 
+// constants
+import { esUnidadMerma } from "@/modules/orden-salida/constants/destinos";
+
 // schemas
 import { crearOrdenSalidaSchema, ordenSalidaDetalleSchema, reenvioComprobanteSchema } from "@/modules/orden-salida/schemas/orden-salida.schema";
 
@@ -114,20 +117,39 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
             parsed.destino = centroDestino.nombre;
 
-            if (parsed.bodegaDestinoId && parsed.bodegaDestinoId.trim() !== "") {
-                const bodegaDest = await prisma.bodega.findUnique({
-                    where: { id: parsed.bodegaDestinoId }
-                });
-                if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
-                    return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
-                }
-                bodegaDestinoId = bodegaDest.id;
+            if (!parsed.bodegaDestinoId || parsed.bodegaDestinoId.trim() === "") {
+                return { ok: false, message: "Debe seleccionar la bodega destino del centro receptor." };
             }
+
+            const bodegaDest = await prisma.bodega.findUnique({
+                where: { id: parsed.bodegaDestinoId }
+            });
+            if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
+                return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
+            }
+            bodegaDestinoId = bodegaDest.id;
 
             codigoRecepcion = generarCodigoRecepcion();
             estadoPrestamo = "EN_TRANSITO";
             // Plazo de 1 semana (7 días)
             fechaLimiteRecepcion = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+
+        // Consumo Interno y Merma toman su destino de la tabla Unidad (ver UNIDADES_MERMA).
+        const tipoNormalizado = parsed.tipoSalida.trim().toLowerCase();
+        const esMerma = tipoNormalizado === "merma";
+        if (esMerma || tipoNormalizado === "consumo interno") {
+            const unidad = await prisma.unidad.findFirst({
+                where: { descripcion: parsed.destino.trim() }
+            });
+            if (!unidad || esUnidadMerma(unidad.descripcion) !== esMerma) {
+                return {
+                    ok: false,
+                    message: esMerma
+                        ? "La causal de merma seleccionada no es válida."
+                        : "El servicio o unidad clínica seleccionada no es válida."
+                };
+            }
         }
 
         let orden: { id: string } | null = null;
@@ -222,14 +244,19 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             }
         });
 
+        let notificacionPrestamo: ResultadoCorreo | undefined;
         if (esAOtroCentro && orden) {
-            // Fail-safe: notificación interna
-            // TODO correo: se conecta en el PR de integración Resend.
-            await notificarPrestamoEnviado(orden.id);
+            notificacionPrestamo = await notificarPrestamoEnviado(orden.id).catch(
+                (error: unknown): ResultadoCorreo => ({
+                    ok: false,
+                    error: error instanceof Error ? error.message : "Error inesperado al notificar el préstamo"
+                })
+            );
         }
 
-        // El envío del comprobante nunca debe revertir ni ocultar la salida ya registrada
-        const envio = parsed.correoDestino
+        // El envío del comprobante regular aplica solo a salidas que no sean préstamos intercentros
+        // (los préstamos se notifican con su propio correo institucional que incluye el código de recepción)
+        const envio = !esAOtroCentro && parsed.correoDestino
             ? await enviarComprobanteSalida({
                   ordenId: orden.id,
                   usuarioId: user.id,
@@ -249,12 +276,18 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         revalidatePath("/reporte");
 
         if (esAOtroCentro && codigoRecepcion) {
+            const advertencia =
+                notificacionPrestamo && !notificacionPrestamo.ok && !notificacionPrestamo.omitido
+                    ? `No se pudo enviar el correo con el código de recepción: ${notificacionPrestamo.error}. Por favor comunique el código manualmente al centro destinatario.`
+                    : undefined;
+
             return {
                 ok: true,
                 message: `Préstamo intercentros registrado exitosamente. Código de recepción: ${codigoRecepcion}`,
                 id: orden.id,
                 ordenId: orden.id,
-                codigoRecepcion
+                codigoRecepcion,
+                ...(advertencia ? { advertencia } : {})
             };
         }
 

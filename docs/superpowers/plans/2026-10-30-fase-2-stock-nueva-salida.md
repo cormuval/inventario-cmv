@@ -1130,5 +1130,5 @@ git commit -m "feat(stock): paginación en SQL y filtros de línea, bajo mínimo
 ### Task 5: Verificación de rendimiento en producción (después del merge)
 
 - [ ] **Step 1:** Con un administrador, medir `/stock` (páginas 1 y 20, con y sin filtros) y `/salidas/nueva` (cambiando de bodega 3 veces): TTFB < 1 s y respuesta < 200 KB; la action de lotes responde en < 500 ms.
-- [ ] **Step 2:** Confirmar en server-das que `restart_time` de `inventario-cmv` no sube (mismo comando que la fase 1, Task 9).
+- [ ] **Step 2:** Confirmar en el servidor de producción que `restart_time` de `inventario-cmv` no sube (mismo comando que la fase 1, Task 9).
 - [ ] **Step 3:** Anotar los resultados en el PR de la fase 2.

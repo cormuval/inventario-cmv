@@ -111,12 +111,7 @@ y los helpers `puedeAdministrar` / `puedeOperarEntrada` / `puedeOperarSalida`.
 
 ## 7. Datos iniciales
 
-`prisma/seed.ts` deja habilitados con rol `R01` (Administrador, todos los privilegios):
-
-| Correo | Nombre | Rol | Centro | Bodega |
-| --- | --- | --- | --- | --- |
-| `rvergara@cmvalparaiso.cl` | Renzo Vergara | R01 | `centro-cmv-valparaiso` | `bodega-clinica` |
-| `dsantibanez@cmvalparaiso.cl` | Daniel Santibanez | R01 | `centro-cmv-valparaiso` | `bodega-clinica` |
+`prisma/seed.ts` deja habilitados con rol `R01` (Administrador, todos los privilegios) a los correos definidos en la variable `SEED_ADMINISTRADORES` (formato `correo|Nombre|Apellido`, separados por `;`). Los correos reales no se versionan.
 
 El upsert usa `email` como clave, por lo que re-ejecutar la siembra es idempotente.
 
@@ -171,8 +166,8 @@ Con credenciales reales cargadas en `.env` (2026-08-10):
 | CP-1d | Google acepta el cliente | Llega a la pantalla de login, sin `redirect_uri_mismatch` ni `invalid_client` | OK |
 | CP-1e | Mensajes de rechazo renderizados en `/auth/login?error=...` | Texto correcto para dominio, no registrado e inactivo | OK |
 | CP-1f | Siembra en MySQL | Los dos correos con `Rol = R01` y `Estado = 1` | OK |
-| CP-2 | Login con `rvergara@cmvalparaiso.cl` | Entra a `/`, header muestra nombre y rol `R01` | OK (manual) |
-| CP-3 | Login con `dsantibanez@cmvalparaiso.cl` | Igual que CP-2 | OK (manual) |
+| CP-2 | Login con `funcionario@cmvalparaiso.cl` | Entra a `/`, header muestra nombre y rol `R01` | OK (manual) |
+| CP-3 | Login con `admin.ejemplo@cmvalparaiso.cl` | Igual que CP-2 | OK (manual) |
 | CP-4 | Login con una cuenta `@gmail.com` | Vuelve al login con el mensaje de dominio no autorizado | OK (manual) |
 | CP-5 | Login con un `@cmvalparaiso.cl` no sembrado | Mensaje "no esta registrado como funcionario" | OK (manual) |
 | CP-6 | Usuario con `Estado = false` | Mensaje "cuenta inactiva" | **No ejecutado** |

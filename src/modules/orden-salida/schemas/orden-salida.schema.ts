@@ -63,6 +63,14 @@ export const crearOrdenSalidaSchema = z.object({
             });
         }
 
+        if (!data.bodegaDestinoId || data.bodegaDestinoId.trim() === "") {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Debe seleccionar la bodega destino del centro receptor.",
+                path: ["bodegaDestinoId"]
+            });
+        }
+
         // Advertencia consultiva sanitaria de 1 semana
         const tieneLoteProximo = data.detalles.some((d) => esLoteCaducidadProximaSieteDias(d.fechaCaducidad));
         if (tieneLoteProximo && !data.advertenciaCaducidadAceptada) {
@@ -74,15 +82,7 @@ export const crearOrdenSalidaSchema = z.object({
         }
     }
 
-    if (esMerma) {
-        if (data.destino.trim().length < 5) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Para registrar una salida por Merma se requiere una justificación detallada de al menos 5 caracteres.",
-                path: ["destino"]
-            });
-        }
-    } else {
+    if (!esMerma) {
         data.detalles.forEach((detalle, index) => {
             if (esLoteCaducado(detalle.fechaCaducidad)) {
                 ctx.addIssue({

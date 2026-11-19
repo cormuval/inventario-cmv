@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Unidad` ADD COLUMN `Estado` BOOLEAN NOT NULL DEFAULT true;

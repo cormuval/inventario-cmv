@@ -78,10 +78,10 @@ describe("reglas de usuarios", () => {
 
     it("el email existente en el destino se evalúa antes que rol y centro", () => {
         const r = transformarUsuarios(
-            [usuario({ ID_User: "x9", Email: " DSantibanez@cmvalparaiso.cl", Rol: "dac3497d", ID_Centro: "3d3f9a13" })],
-            contexto({ usuariosDestino: [{ id: "usuario-admin-dsantibanez", email: "dsantibanez@cmvalparaiso.cl" }] })
+            [usuario({ ID_User: "x9", Email: " Admin.Ejemplo@cmvalparaiso.cl", Rol: "dac3497d", ID_Centro: "3d3f9a13" })],
+            contexto({ usuariosDestino: [{ id: "usuario-admin-ejemplo", email: "admin.ejemplo@cmvalparaiso.cl" }] })
         );
-        expect(r.reasignaciones.get("x9")).toBe("usuario-admin-dsantibanez");
+        expect(r.reasignaciones.get("x9")).toBe("usuario-admin-ejemplo");
         expect(r.tabla.rechazos).toEqual([]);
         expect(r.tabla.advertencias.map((a) => a.regla)).toEqual(["email_existente_destino"]);
         expect(r.tabla.aceptados.map((u) => u.id)).toEqual(["migracion-appsheet"]);
@@ -96,8 +96,8 @@ describe("reglas de usuarios", () => {
     it("email duplicado: gana el usuario con más órdenes y el otro se reasigna", () => {
         const r = transformarUsuarios(
             [
-                usuario({ ID_User: "d4", Email: "ccastillos@cmvalparaiso.cl" }),
-                usuario({ ID_User: "1f", Email: "CCastillos@cmvalparaiso.cl" })
+                usuario({ ID_User: "d4", Email: "repetido@cmvalparaiso.cl" }),
+                usuario({ ID_User: "1f", Email: "Repetido@cmvalparaiso.cl" })
             ],
             contexto({ ordenesPorUsuario: new Map([["d4", 2], ["1f", 9]]) })
         );
@@ -109,8 +109,8 @@ describe("reglas de usuarios", () => {
     it("email duplicado: si el ganador es rechazado, gana el siguiente candidato sin reasignaciones", () => {
         const r = transformarUsuarios(
             [
-                usuario({ ID_User: "d4", Email: "ccastillos@cmvalparaiso.cl" }),
-                usuario({ ID_User: "1f", Email: "CCastillos@cmvalparaiso.cl", Rol: "dac3497d" })
+                usuario({ ID_User: "d4", Email: "repetido@cmvalparaiso.cl" }),
+                usuario({ ID_User: "1f", Email: "Repetido@cmvalparaiso.cl", Rol: "dac3497d" })
             ],
             contexto({ ordenesPorUsuario: new Map([["d4", 2], ["1f", 9]]) })
         );
