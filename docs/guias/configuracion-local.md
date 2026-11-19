@@ -98,9 +98,8 @@ npm run db:seed:ref
 ```
 
 > **Usuarios administradores precargados**:
-> El seed crea automáticamente con rol `R01` (Administrador):
-> - `rvergara@cmvalparaiso.cl`
-> - `dsantibanez@cmvalparaiso.cl`
+> El seed crea con rol `R01` (Administrador) los correos definidos en `SEED_ADMINISTRADORES` del `.env`
+> (formato `correo|Nombre|Apellido`, separados por `;`). Sin esa variable no se crean administradores.
 
 ---
 

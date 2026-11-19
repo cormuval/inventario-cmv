@@ -21,20 +21,24 @@ const SIN_LOTES: LotesDisponiblesResultado = { ok: true, message: "", lotes: [] 
 export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
     const alcance = await obtenerAlcanceInventario();
     const puedeRegistrar = puedeOperarSalida(alcance.usuario.rol);
-    const centrosDisponiblesIds = alcance.centros.map((centro) => centro.id);
     const centroInicial = alcance.centroId ?? alcance.centros[0]?.id ?? null;
     const bodegaInicial = alcance.bodegaId ?? alcance.bodegas.find((bodega) => bodega.centroId === centroInicial)?.id ?? null;
-    const [lotesIniciales, bodegasDestino] = puedeRegistrar
+    const [lotesIniciales, bodegasDestino, todosCentros, unidades] = puedeRegistrar
         ? await Promise.all([
               bodegaInicial ? listarLotesDisponibles(bodegaInicial) : Promise.resolve(SIN_LOTES),
-              centrosDisponiblesIds.length > 0
-                  ? prisma.bodega.findMany({
-                        where: { centroId: { in: centrosDisponiblesIds }, estado: true },
-                        orderBy: { nombre: "asc" }
-                    })
-                  : Promise.resolve([])
+              prisma.bodega.findMany({
+                  where: { estado: true },
+                  orderBy: { nombre: "asc" }
+              }),
+              prisma.centro.findMany({
+                  where: { estado: true },
+                  orderBy: { nombre: "asc" }
+              }),
+              prisma.unidad.findMany({
+                  orderBy: { descripcion: "asc" }
+              })
           ])
-        : [SIN_LOTES, []];
+        : [SIN_LOTES, [], [], []];
 
     return (
         <AppLayout>
@@ -51,8 +55,10 @@ export default async function NuevaSalidaPage(): Promise<React.ReactElement> {
                         <CardContent>
                             <OrdenSalidaForm
                                 centros={alcance.centros}
+                                todosCentros={todosCentros}
                                 bodegas={alcance.bodegas}
                                 bodegasDestino={bodegasDestino}
+                                unidades={unidades}
                                 stocks={lotesIniciales.lotes}
                                 errorLotes={lotesIniciales.ok ? undefined : lotesIniciales.message}
                                 centroId={centroInicial}

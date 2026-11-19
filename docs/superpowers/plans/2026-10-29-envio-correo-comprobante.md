@@ -294,7 +294,7 @@ const orden: OrdenSalidaPDFData = {
     centro: { nombre: "CESFAM Barón" },
     bodega: { nombre: "Bodega Farmacia" },
     bodegaDestino: null,
-    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "crojas@cmvalparaiso.cl" },
+    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "solicitante.demo@cmvalparaiso.cl" },
     detalles: [
         { id: "d1", cantidad: 5, lote: "L1", fechaCaducidad: new Date("2027-01-01"), producto: { descripcion: "Paracetamol" } },
         { id: "d2", cantidad: 2, lote: "L2", fechaCaducidad: new Date("2027-01-01"), producto: { descripcion: "Gasa" } }
@@ -309,7 +309,7 @@ describe("construirCorreoComprobante", () => {
 
         expect(correo.para).toBe("destino@cmvalparaiso.cl");
         expect(correo.asunto).toBe("Comprobante de salida N° sal-1 — CESFAM Barón");
-        expect(correo.responderA).toBe("crojas@cmvalparaiso.cl");
+        expect(correo.responderA).toBe("solicitante.demo@cmvalparaiso.cl");
         expect(correo.adjuntos).toEqual([{ nombre: "comprobante-salida-sal-1.pdf", contenido: pdf }]);
     });
 
@@ -501,7 +501,7 @@ const ordenCompleta = {
     centro: { nombre: "CESFAM Barón" },
     bodega: { nombre: "Bodega Farmacia" },
     bodegaDestino: null,
-    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "crojas@cmvalparaiso.cl" },
+    usuario: { nombre: "Carla", apPaterno: "Rojas", email: "solicitante.demo@cmvalparaiso.cl" },
     detalles: []
 };
 
@@ -1599,7 +1599,7 @@ Expected: sin errores de tipos, todos los tests en verde y build exitoso.
 - [ ] **Step 3: Prueba manual con envío real**
 
 1. Con `RESEND_API_KEY` y `CORREO_REMITENTE` en el `.env` local, ejecutar `npm run dev`.
-2. Registrar una salida con `correoDestino` = correo del responsable (rvergara@cmvalparaiso.cl). Debe aparecer "Comprobante enviado a …" y llegar el correo con el PDF adjunto.
+2. Registrar una salida con `correoDestino` = correo del responsable (funcionario@cmvalparaiso.cl). Debe aparecer "Comprobante enviado a …" y llegar el correo con el PDF adjunto.
 3. En el historial, el badge muestra "Enviado". Usar "Enviar" con otro correo y verificar el toast y el nuevo correo.
 4. Forzar un fallo (por ejemplo, con `CORREO_REMITENTE` de un dominio no verificado) y comprobar tres cosas: la salida se registra, aparece la advertencia ámbar y el badge muestra "Falló" con el motivo.
 5. En `/auditoria`, filtrar por la acción "Enviar correo" y ver los intentos.
@@ -1614,7 +1614,7 @@ Script `scratchpad/actualizar-env-produccion.sh` (bash):
 set -euo pipefail
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
-ssh informesdiarios 'cat /var/www/inventario-aps/actions-runner/_work/inventario-cmv/inventario-cmv/.env' \
+ssh <servidor-produccion> 'cat <directorio-del-runner>/_work/inventario-cmv/inventario-cmv/.env' \
     | grep -v -e '^RESEND_API_KEY=' -e '^CORREO_REMITENTE=' > "$TMP"
 grep -e '^RESEND_API_KEY=' -e '^CORREO_REMITENTE=' /Users/usuario/Projects/InventarioCMV/.env >> "$TMP"
 gh secret set ENV_PRODUCTION --env produccion --repo cormuval/inventario-cmv < "$TMP"

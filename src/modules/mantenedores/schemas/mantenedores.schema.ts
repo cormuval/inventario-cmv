@@ -7,18 +7,38 @@ import { DOMINIO_INSTITUCIONAL } from "@/config/auth";
 import { esCorreoInstitucional, normalizarEmail } from "@/modules/auth/utils/dominio";
 
 export const centroSchema = z.object({
-    nombre: z.string().min(3),
+    nombre: z.string().min(3, "El nombre del centro debe tener al menos 3 caracteres."),
+    estado: z.coerce.boolean().default(true)
+});
+
+export const editarCentroSchema = z.object({
+    id: z.string().min(1, "ID de centro requerido."),
+    nombre: z.string().min(3, "El nombre del centro debe tener al menos 3 caracteres."),
     estado: z.coerce.boolean().default(true)
 });
 
 export const bodegaSchema = z.object({
-    nombre: z.string().min(3),
-    centroId: z.string().min(1),
+    nombre: z.string().min(3, "El nombre de la bodega debe tener al menos 3 caracteres."),
+    centroId: z.string().min(1, "Debe seleccionar un centro de salud."),
+    estado: z.coerce.boolean().default(true)
+});
+
+export const editarBodegaSchema = z.object({
+    id: z.string().min(1, "ID de bodega requerido."),
+    nombre: z.string().min(3, "El nombre de la bodega debe tener al menos 3 caracteres."),
+    centroId: z.string().min(1, "Debe seleccionar un centro de salud."),
     estado: z.coerce.boolean().default(true)
 });
 
 export const unidadSchema = z.object({
-    descripcion: z.string().min(2)
+    descripcion: z.string().min(2, "La descripción debe tener al menos 2 caracteres."),
+    estado: z.coerce.boolean().default(true)
+});
+
+export const editarUnidadSchema = z.object({
+    id: z.string().min(1, "ID de unidad requerido."),
+    descripcion: z.string().min(2, "La descripción debe tener al menos 2 caracteres."),
+    estado: z.coerce.boolean().default(true)
 });
 
 export const usuarioSchema = z.object({
