@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authLib from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 
+// utils
+import { fechaHoyChile } from "@/shared/utils/filtros-registros";
+
 // actions
 import { crearOrdenSalida } from "@/modules/orden-salida/actions/orden-salida.action";
 
@@ -76,7 +79,7 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
     describe("Consumo Interno — Validación contra tabla Unidad", () => {
         function crearFormDataConsumo(destino: string): FormData {
             const fd = new FormData();
-            fd.append("fecha", "2026-11-10");
+            fd.append("fecha", fechaHoyChile());
             fd.append("centroId", "centro-1");
             fd.append("bodegaId", "b1");
             fd.append("tipoSalida", "Consumo Interno");
@@ -146,7 +149,7 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
     describe("Merma — Solo causales de UNIDADES_MERMA", () => {
         function crearFormDataMerma(destino: string): FormData {
             const fd = new FormData();
-            fd.append("fecha", "2026-11-10");
+            fd.append("fecha", fechaHoyChile());
             fd.append("centroId", "centro-1");
             fd.append("bodegaId", "b1");
             fd.append("tipoSalida", "Merma");
@@ -191,7 +194,7 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
     describe("A Otros Centros — Validación de Bodega Destino Obligatoria", () => {
         function crearFormDataIntercentro(bodegaDestinoId?: string): FormData {
             const fd = new FormData();
-            fd.append("fecha", "2026-11-10");
+            fd.append("fecha", fechaHoyChile());
             fd.append("centroId", "centro-1");
             fd.append("bodegaId", "b1");
             fd.append("tipoSalida", "A Otros Centros");

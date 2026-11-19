@@ -28,7 +28,7 @@ export async function cargarOrdenParaComprobante(ordenId: string) {
             usuario: { select: { nombre: true, apPaterno: true, email: true } },
             detalles: {
                 include: {
-                    producto: { select: { descripcion: true } }
+                    producto: { select: { id: true, descripcion: true, linea: true } }
                 }
             }
         }
