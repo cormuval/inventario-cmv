@@ -18,7 +18,7 @@ import type { ProductosFiltros } from "@/modules/productos/utils/productos-filtr
 // utils
 import { calcularPaginacion, type Paginacion } from "@/shared/utils/paginacion";
 
-export const TAMANO_PAGINA_PRODUCTOS = 100;
+const TAMANO_PAGINA_PRODUCTOS = 100;
 
 export interface ListarProductosResult {
     productos: Producto[];
