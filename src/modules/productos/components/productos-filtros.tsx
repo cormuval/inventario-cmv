@@ -49,7 +49,7 @@ export function ProductosFiltros({ filtros, lineas }: ProductosFiltrosProps): Re
                 </button>
                 <Link
                     href="/productos"
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-teal-300 bg-white px-4 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                    className="inline-flex items-center justify-center rounded-md border border-teal-300 bg-white px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
                 >
                     Limpiar
                 </Link>
