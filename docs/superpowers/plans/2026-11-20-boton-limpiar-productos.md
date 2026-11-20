@@ -47,7 +47,7 @@
 
 - [ ] **Step 3: Aplicar el estilo aprobado**
 
-  Actualizar únicamente `className` del `Link` en `productos-filtros.tsx` con contenedor inline-flex, altura 10, padding horizontal 4, borde turquesa, fondo blanco, texto turquesa, radio, peso medio y hover turquesa suave.
+  Actualizar únicamente `className` del `Link` en `productos-filtros.tsx` con contenedor inline-flex, altura `h-9` (36 px, igual a `Buscar`), padding horizontal 4, borde turquesa, fondo blanco, texto turquesa, radio, peso medio y hover turquesa suave. No usar padding vertical porque el borde ya forma parte de la altura total.
 
 - [ ] **Step 4: Verificar GREEN y regresión**
 
