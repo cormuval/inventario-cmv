@@ -13,14 +13,27 @@ export function seleccionarAlertasResumen<T extends AlertaResumenFiltrable>(item
         .slice(0, limite);
 }
 
-function tieneAlertaOperativa(item: AlertaResumenFiltrable): boolean {
-    return item.alerta === "stock_minimo" || tieneAlertaCaducidad(item);
+export function esAlertaCaducidadResumen(item: AlertaResumenFiltrable): boolean {
+    return item.tramoCaducidad !== null
+        || item.alerta === "caducado"
+        || item.alerta === "caducidad_proxima"
+        || (item.alerta === "sin_stock" && item.diasCaducidad <= 0);
 }
 
-function tieneAlertaCaducidad(item: AlertaResumenFiltrable): boolean {
-    return item.tramoCaducidad !== null || item.alerta === "caducado" || item.alerta === "caducidad_proxima";
+export function obtenerEtiquetaAlertaResumen(item: AlertaResumenFiltrable): string {
+    if (item.diasCaducidad <= 0) {
+        return "Caducado";
+    }
+
+    return esAlertaCaducidadResumen(item)
+        ? `Caducidad <= ${item.tramoCaducidad ?? item.diasCaducidad} dias`
+        : "Stock minimo";
+}
+
+function tieneAlertaOperativa(item: AlertaResumenFiltrable): boolean {
+    return item.alerta === "stock_minimo" || esAlertaCaducidadResumen(item);
 }
 
 function pesoAlertaResumen(item: AlertaResumenFiltrable): number {
-    return tieneAlertaCaducidad(item) ? 0 : 1;
+    return esAlertaCaducidadResumen(item) ? 0 : 1;
 }

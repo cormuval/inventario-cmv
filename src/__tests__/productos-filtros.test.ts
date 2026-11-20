@@ -42,7 +42,28 @@ describe("leerFiltrosProductos", () => {
 
         expect(filtros.id).toBeNull();
         expect(filtros.advertencias).toEqual([
-            "El ID del producto debe ser un entero mayor que cero; se ignora el filtro."
+            "El ID del producto debe ser un entero entre 1 y 2147483647; se ignora el filtro."
+        ]);
+    });
+
+    it("acepta el mayor ID decimal representable por la base de datos", () => {
+        const filtros = leerFiltrosProductos({ id: "2147483647" });
+
+        expect(filtros.id).toBe(2147483647);
+        expect(filtros.advertencias).toEqual([]);
+    });
+
+    it.each([
+        "2147483648",
+        "1e3",
+        "1.0",
+        "9999999999999999999999999999999999999999"
+    ])("neutraliza el ID no decimal o fuera de rango %s y registra una advertencia", (id) => {
+        const filtros = leerFiltrosProductos({ id });
+
+        expect(filtros.id).toBeNull();
+        expect(filtros.advertencias).toEqual([
+            "El ID del producto debe ser un entero entre 1 y 2147483647; se ignora el filtro."
         ]);
     });
 

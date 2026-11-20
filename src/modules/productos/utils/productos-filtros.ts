@@ -2,6 +2,9 @@
 import { leerPagina, obtenerParametro, type ParametrosUrl } from "@/shared/utils/filtros-registros";
 
 export type EstadoProductoFiltro = "todos" | "activo" | "inactivo";
+export const PRODUCTO_ID_MAXIMO = 2147483647;
+
+const ADVERTENCIA_ID_INVALIDO = "El ID del producto debe ser un entero entre 1 y 2147483647; se ignora el filtro.";
 
 export interface ProductosFiltros {
     id: number | null;
@@ -21,11 +24,12 @@ export function leerFiltrosProductos(
     let id: number | null = null;
 
     if (idTexto !== undefined) {
-        const idLeido = Number(idTexto);
-        if (Number.isInteger(idLeido) && idLeido >= 1) {
+        const esDecimal = /^\d+$/.test(idTexto) && idTexto.length <= String(PRODUCTO_ID_MAXIMO).length;
+        const idLeido = esDecimal ? Number(idTexto) : Number.NaN;
+        if (Number.isSafeInteger(idLeido) && idLeido >= 1 && idLeido <= PRODUCTO_ID_MAXIMO) {
             id = idLeido;
         } else {
-            advertencias.push("El ID del producto debe ser un entero mayor que cero; se ignora el filtro.");
+            advertencias.push(ADVERTENCIA_ID_INVALIDO);
         }
     }
 

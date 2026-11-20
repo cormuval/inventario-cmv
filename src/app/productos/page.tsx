@@ -105,7 +105,12 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
                                 ) : null}
                             </tbody>
                         </Table>
-                        <Paginacion ruta="/productos" parametros={parametrosProductos(filtros)} paginacion={resultado.paginacion} />
+                        <Paginacion
+                            ruta="/productos"
+                            parametros={parametrosProductos(filtros)}
+                            paginacion={resultado.paginacion}
+                            textoSinResultados="0 resultados"
+                        />
                     </CardContent>
                 </Card>
             </div>

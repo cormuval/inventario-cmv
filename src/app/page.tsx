@@ -13,7 +13,11 @@ import { prisma } from "@/shared/lib/prisma";
 
 // utils
 import { formatDate, formatNumber } from "@/shared/utils/format";
-import { seleccionarAlertasResumen } from "@/modules/stock/utils/resumen-alertas";
+import {
+    esAlertaCaducidadResumen,
+    obtenerEtiquetaAlertaResumen,
+    seleccionarAlertasResumen
+} from "@/modules/stock/utils/resumen-alertas";
 import {
     calcularStockMinimo,
     evaluarAlertaStock,
@@ -109,7 +113,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                             </thead>
                             <tbody>
                                 {alertasFiltradas.map((stock) => (
-                                    <tr key={stock.id} className={stock.tramoCaducidad !== null || stock.alerta === "caducado" ? "bg-red-50" : undefined}>
+                                    <tr key={stock.id} className={esAlertaCaducidadResumen(stock) ? "bg-red-50" : undefined}>
                                         <Td>{stock.productoDescripcion}</Td>
                                         <Td>{stock.centroNombre} - {stock.bodegaNombre}</Td>
                                         <Td>{formatNumber(stock.lotes)}</Td>
@@ -117,9 +121,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                                         <Td>{formatDate(stock.fechaCaducidad)}</Td>
                                         <Td>
                                             <Badge tone="warning">
-                                                {stock.tramoCaducidad !== null || stock.alerta === "caducado" || stock.alerta === "caducidad_proxima"
-                                                    ? `Caducidad <= ${stock.tramoCaducidad ?? stock.diasCaducidad} dias`
-                                                    : "Stock minimo"}
+                                                {obtenerEtiquetaAlertaResumen(stock)}
                                             </Badge>
                                         </Td>
                                     </tr>

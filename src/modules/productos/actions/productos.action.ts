@@ -10,6 +10,7 @@ import { prisma } from "@/shared/lib/prisma";
 
 // schemas
 import { productoSchema } from "@/modules/productos/schemas/producto.schema";
+import { productosFiltrosSchema } from "@/modules/productos/schemas/productos-filtros.schema";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
@@ -26,12 +27,16 @@ export interface ListarProductosResult {
 }
 
 export async function listarProductos() {
+    await requireSessionUser();
+
     return prisma.producto.findMany({
         orderBy: [{ linea: "asc" }, { descripcion: "asc" }]
     });
 }
 
 export async function listarProductosActivos() {
+    await requireSessionUser();
+
     return prisma.producto.findMany({
         where: { estado: true },
         orderBy: [{ linea: "asc" }, { descripcion: "asc" }]
@@ -39,6 +44,8 @@ export async function listarProductosActivos() {
 }
 
 export async function listarLineasProductos(): Promise<string[]> {
+    await requireSessionUser();
+
     const productos = await prisma.producto.findMany({
         distinct: ["linea"],
         select: { linea: true },
@@ -49,24 +56,26 @@ export async function listarLineasProductos(): Promise<string[]> {
 }
 
 export async function listarProductosPaginados(filtros: ProductosFiltros): Promise<ListarProductosResult> {
+    await requireSessionUser();
+    const filtrosValidados = productosFiltrosSchema.parse(filtros);
     const where: Prisma.ProductoWhereInput = {};
-    const descripcion = filtros.descripcion.trim();
+    const descripcion = filtrosValidados.descripcion.trim();
 
-    if (filtros.id !== null) {
-        where.id = filtros.id;
+    if (filtrosValidados.id !== null) {
+        where.id = filtrosValidados.id;
     }
-    if (filtros.linea !== "") {
-        where.linea = filtros.linea;
+    if (filtrosValidados.linea !== "") {
+        where.linea = filtrosValidados.linea;
     }
-    if (filtros.estado !== "todos") {
-        where.estado = filtros.estado === "activo";
+    if (filtrosValidados.estado !== "todos") {
+        where.estado = filtrosValidados.estado === "activo";
     }
     if (descripcion !== "") {
         where.descripcion = { contains: descripcion };
     }
 
     const total = await prisma.producto.count({ where });
-    const paginacion = calcularPaginacion(filtros.pagina, total, TAMANO_PAGINA_PRODUCTOS);
+    const paginacion = calcularPaginacion(filtrosValidados.pagina, total, TAMANO_PAGINA_PRODUCTOS);
     const productos = await prisma.producto.findMany({
         where,
         orderBy: [{ linea: "asc" }, { descripcion: "asc" }, { id: "asc" }],

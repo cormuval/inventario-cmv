@@ -121,6 +121,8 @@ describe("ProductosPage", () => {
 
         expect(screen.getByText("La línea del producto no es válida; se muestran todas las líneas.")).toBeInTheDocument();
         expect(screen.getByText("No se encontraron productos con los filtros seleccionados.")).toBeInTheDocument();
+        expect(screen.getByText("0 resultados", { exact: true })).toBeInTheDocument();
+        expect(screen.queryByText("Sin resultados", { exact: true })).not.toBeInTheDocument();
     });
 
     it("conserva todos los filtros al navegar entre páginas", async () => {

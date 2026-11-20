@@ -21,6 +21,19 @@ function alerta(
 }
 
 describe("seleccionarAlertasResumen", () => {
+    it("incluye sin stock vencido hoy y en el pasado, pero excluye stock cero futuro sin alerta de caducidad", () => {
+        const resultado = seleccionarAlertasResumen([
+            alerta("sin-stock-vencido-hoy", { alerta: "sin_stock", diasCaducidad: 0 }),
+            alerta("sin-stock-vencido-ayer", { alerta: "sin_stock", diasCaducidad: -1 }),
+            alerta("sin-stock-futuro", { alerta: "sin_stock", diasCaducidad: 120 })
+        ]);
+
+        expect(resultado.map((item) => item.id)).toEqual([
+            "sin-stock-vencido-ayer",
+            "sin-stock-vencido-hoy"
+        ]);
+    });
+
     it("incluye alertas de stock y caducidad, pero excluye estados sin una alerta operativa", () => {
         const resultado = seleccionarAlertasResumen([
             alerta("ok-sin-tramo"),
