@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// constants
+import { ORIGENES_ORDEN_ENTRADA } from "@/modules/orden-entrada/constants/origenes-orden-entrada";
+
 // utils
 import { validarFechaOrdenEntrada } from "@/modules/stock/utils/movimientos";
 
@@ -27,7 +30,10 @@ export const crearOrdenEntradaSchema = z.object({
     fecha: z.coerce.date().refine((fecha) => validarFechaOrdenEntrada(fecha), {
         message: "La fecha de entrada debe estar entre hoy y los ultimos 7 dias."
     }),
-    origen: z.string().min(1, "El origen es requerido."),
+    origen: z.enum(ORIGENES_ORDEN_ENTRADA, {
+        required_error: "El origen es requerido.",
+        invalid_type_error: "El origen no es válido."
+    }),
     guiaDespacho: z.string().optional(),
     centroId: z.string().min(1),
     bodegaId: z.string().min(1),
