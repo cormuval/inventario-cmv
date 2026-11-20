@@ -70,4 +70,3 @@ Se incorporará un catálogo compartido en el módulo de orden de entrada con es
 
 - El nombre exacto del archivo de prueba nuevo, siguiendo la convención de `src/__tests__`.
 - Si los dos valores nuevos se ejercitan en casos independientes o parametrizados, siempre que ambos queden cubiertos.
-

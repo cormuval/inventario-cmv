@@ -71,7 +71,7 @@ export function OrdenEntradaForm({
         setGuiaDespacho("");
         setCodigoRecepcion("");
         setResetKey((actual) => actual + 1);
-    }, [state.ok, state.message]);
+    }, [state]);
 
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-3">

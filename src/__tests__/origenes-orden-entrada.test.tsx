@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // actions
@@ -121,5 +121,38 @@ describe("OrdenEntradaForm — selector de origen", () => {
         fireEvent.submit(selectorOrigen.closest("form") as HTMLFormElement);
 
         await waitFor(() => expect(selectorOrigen).toHaveValue("Drogueria"));
+    });
+
+    it("restablece el origen tras cada uno de dos registros exitosos consecutivos", async () => {
+        const resultadoExitoso = {
+            ok: true,
+            message: "Orden de entrada registrada."
+        };
+        const resolverResultados: Array<(resultado: typeof resultadoExitoso) => void> = [];
+        vi.mocked(crearOrdenEntrada).mockImplementation(() => new Promise((resolve) => {
+            resolverResultados.push(resolve);
+        }));
+        renderizarFormulario();
+
+        const formulario = screen.getByLabelText("Origen").closest("form") as HTMLFormElement;
+        const selectorBodega = screen.getByLabelText("Bodega");
+        const selectorOrigen = screen.getByLabelText("Origen");
+
+        fireEvent.change(selectorOrigen, { target: { value: "Bodega Central" } });
+        fireEvent.submit(formulario);
+        await waitFor(() => expect(resolverResultados).toHaveLength(1));
+        await act(async () => resolverResultados[0]({ ...resultadoExitoso }));
+        await waitFor(() => expect(selectorOrigen).toHaveValue("Drogueria"));
+
+        fireEvent.change(selectorBodega, { target: { value: "bodega-1" } });
+        fireEvent.change(selectorOrigen, { target: { value: "Bodega Central" } });
+        expect(selectorOrigen).toHaveValue("Bodega Central");
+        fireEvent.submit(formulario);
+        await waitFor(() => expect(resolverResultados).toHaveLength(2));
+        await act(async () => resolverResultados[1]({ ...resultadoExitoso }));
+        fireEvent.change(screen.getByLabelText("Guia despacho"), { target: { value: "GD-002" } });
+
+        await waitFor(() => expect(selectorOrigen).toHaveValue("Drogueria"));
+        expect(crearOrdenEntrada).toHaveBeenCalledTimes(2);
     });
 });

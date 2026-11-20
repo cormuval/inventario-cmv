@@ -101,4 +101,17 @@ describe("crearOrdenEntrada — persistencia de orígenes", () => {
             }));
         }
     );
+
+    it("rechaza un origen fuera del catálogo antes de abrir una transacción", async () => {
+        prepararDependencias();
+        const formData = crearFormulario("Bodega Central");
+        formData.set("origen", "Bodega inventada");
+
+        const resultado = await crearOrdenEntrada({ ok: false, message: "" }, formData);
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("Invalid enum value");
+        expect(resultado.message).toContain("Bodega inventada");
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
 });
