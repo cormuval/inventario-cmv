@@ -1,25 +1,38 @@
 import type * as React from "react";
 
 // actions
-import { listarProductos } from "@/modules/productos/actions/productos.action";
+import { listarLineasProductos, listarProductosPaginados } from "@/modules/productos/actions/productos.action";
 
 // lib
 import { puedeAdministrar, requireSessionUser } from "@/shared/lib/auth";
 
 // components
 import { ProductoForm } from "@/modules/productos/components/producto-form";
+import { ProductosFiltros } from "@/modules/productos/components/productos-filtros";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Paginacion } from "@/shared/components/inventario/paginacion";
 import { Td, Th, Table } from "@/shared/components/ui/table";
 import { AppLayout } from "@/shared/components/layout/app-layout";
 
+// utils
+import { leerFiltrosProductos, parametrosProductos } from "@/modules/productos/utils/productos-filtros";
+import type { ParametrosUrl } from "@/shared/utils/filtros-registros";
+
 export const dynamic = "force-dynamic";
 
-export default async function ProductosPage(): Promise<React.ReactElement> {
-    const [productos, sessionUser] = await Promise.all([
-        listarProductos(),
+interface ProductosPageProps {
+    searchParams?: Promise<ParametrosUrl>;
+}
+
+export default async function ProductosPage({ searchParams }: ProductosPageProps): Promise<React.ReactElement> {
+    const params = await searchParams;
+    const [lineas, sessionUser] = await Promise.all([
+        listarLineasProductos(),
         requireSessionUser()
     ]);
+    const filtros = leerFiltrosProductos(params, lineas);
+    const resultado = await listarProductosPaginados(filtros);
     const puedeCrear = puedeAdministrar(sessionUser.rol);
 
     return (
@@ -41,6 +54,23 @@ export default async function ProductosPage(): Promise<React.ReactElement> {
                 ) : null}
                 <Card>
                     <CardHeader>
+                        <CardTitle>Filtros</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ProductosFiltros filtros={filtros} lineas={lineas} />
+                    </CardContent>
+                </Card>
+                {filtros.advertencias.length > 0 ? (
+                    <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <ul className="list-disc space-y-1 pl-5">
+                            {filtros.advertencias.map((advertencia) => (
+                                <li key={advertencia}>{advertencia}</li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
+                <Card>
+                    <CardHeader>
                         <CardTitle>Productos registrados</CardTitle>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
@@ -54,7 +84,7 @@ export default async function ProductosPage(): Promise<React.ReactElement> {
                                 </tr>
                             </thead>
                             <tbody>
-                                {productos.map((producto) => (
+                                {resultado.productos.map((producto) => (
                                     <tr key={producto.id}>
                                         <Td>{producto.id}</Td>
                                         <Td>{producto.linea}</Td>
@@ -66,8 +96,16 @@ export default async function ProductosPage(): Promise<React.ReactElement> {
                                         </Td>
                                     </tr>
                                 ))}
+                                {resultado.productos.length === 0 ? (
+                                    <tr>
+                                        <Td colSpan={4} className="text-center text-muted-foreground">
+                                            No se encontraron productos con los filtros seleccionados.
+                                        </Td>
+                                    </tr>
+                                ) : null}
                             </tbody>
                         </Table>
+                        <Paginacion ruta="/productos" parametros={parametrosProductos(filtros)} paginacion={resultado.paginacion} />
                     </CardContent>
                 </Card>
             </div>
