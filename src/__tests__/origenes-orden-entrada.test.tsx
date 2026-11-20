@@ -98,6 +98,18 @@ describe("OrdenEntradaForm — selector de origen", () => {
         expect(selectorOrigen).toHaveValue("Drogueria");
     });
 
+    it("conserva el origen válido cuando recibe un valor ajeno al catálogo", () => {
+        renderizarFormulario();
+
+        const selectorOrigen = screen.getByLabelText("Origen");
+        fireEvent.change(selectorOrigen, { target: { value: "Bodega Central" } });
+        expect(selectorOrigen).toHaveValue("Bodega Central");
+
+        fireEvent.change(selectorOrigen, { target: { value: "Origen no permitido" } });
+
+        expect(selectorOrigen).toHaveValue("Bodega Central");
+    });
+
     it("restablece el origen a Drogueria tras registrar exitosamente una entrada", async () => {
         vi.mocked(crearOrdenEntrada).mockResolvedValue({ ok: true, message: "Orden de entrada registrada." });
         renderizarFormulario();

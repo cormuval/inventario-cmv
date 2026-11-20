@@ -118,7 +118,17 @@ export function OrdenEntradaForm({
             </label>
             <label className="space-y-1 text-sm">
                 <span>Origen</span>
-                <Select name="origen" required value={origen} onChange={(event) => setOrigen(event.currentTarget.value as OrigenOrdenEntrada)}>
+                <Select
+                    name="origen"
+                    required
+                    value={origen}
+                    onChange={(event) => {
+                        const origenSeleccionado = event.currentTarget.value;
+                        if (esOrigenOrdenEntrada(origenSeleccionado)) {
+                            setOrigen(origenSeleccionado);
+                        }
+                    }}
+                >
                     {ORIGENES_ORDEN_ENTRADA.map((origenDisponible) => (
                         <option key={origenDisponible} value={origenDisponible}>
                             {origenDisponible}
@@ -166,4 +176,8 @@ function crearFechaMinimaEntrada(): Date {
     const fecha = new Date();
     fecha.setDate(fecha.getDate() - 7);
     return fecha;
+}
+
+function esOrigenOrdenEntrada(value: string): value is OrigenOrdenEntrada {
+    return ORIGENES_ORDEN_ENTRADA.some((origenDisponible) => origenDisponible === value);
 }
