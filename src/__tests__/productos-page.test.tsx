@@ -111,6 +111,8 @@ describe("ProductosPage", () => {
 
         const limpiar = screen.getByRole("link", { name: "Limpiar" });
         expect(limpiar).toHaveAttribute("href", "/productos");
+        expect(limpiar).toHaveClass("h-9");
+        expect(limpiar).not.toHaveClass("py-2");
         expect(limpiar).not.toHaveClass("h-10");
         expect(limpiar).toHaveClass(
             "inline-flex",
@@ -121,7 +123,6 @@ describe("ProductosPage", () => {
             "border-teal-300",
             "bg-white",
             "px-4",
-            "py-2",
             "text-sm",
             "font-medium",
             "text-teal-700",
