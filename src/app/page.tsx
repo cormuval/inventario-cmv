@@ -13,6 +13,7 @@ import { prisma } from "@/shared/lib/prisma";
 
 // utils
 import { formatDate, formatNumber } from "@/shared/utils/format";
+import { seleccionarAlertasResumen } from "@/modules/stock/utils/resumen-alertas";
 import {
     calcularStockMinimo,
     evaluarAlertaStock,
@@ -60,10 +61,7 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
     const stocksConsolidados = consolidarResumenStock(stocksVisibles, hoy);
     const stockTotal = stocksConsolidados.reduce((total, stock) => total + stock.cantidadDisponible, 0);
     const productosActivos = stocksConsolidados.filter((stock) => stock.cantidadDisponible > 0 && stock.fechaCaducidad >= hoy).length;
-    const alertasFiltradas = stocksConsolidados
-        .filter((item) => item.alerta !== "ok" || item.tramoCaducidad !== null)
-        .sort((a, b) => alertaPeso(a.alerta) - alertaPeso(b.alerta) || (a.diasCaducidad - b.diasCaducidad))
-        .slice(0, 12);
+    const alertasFiltradas = seleccionarAlertasResumen(stocksConsolidados);
 
     return (
         <AppLayout>
@@ -111,15 +109,17 @@ export default async function HomePage({ searchParams }: HomePageProps): Promise
                             </thead>
                             <tbody>
                                 {alertasFiltradas.map((stock) => (
-                                    <tr key={stock.id} className={stock.alerta === "caducidad_proxima" ? "bg-red-50" : undefined}>
+                                    <tr key={stock.id} className={stock.tramoCaducidad !== null || stock.alerta === "caducado" ? "bg-red-50" : undefined}>
                                         <Td>{stock.productoDescripcion}</Td>
                                         <Td>{stock.centroNombre} - {stock.bodegaNombre}</Td>
                                         <Td>{formatNumber(stock.lotes)}</Td>
                                         <Td>{formatNumber(stock.cantidadDisponible)}</Td>
                                         <Td>{formatDate(stock.fechaCaducidad)}</Td>
                                         <Td>
-                                            <Badge tone={stock.alerta === "sin_stock" ? "danger" : "warning"}>
-                                                {stock.alerta === "sin_stock" ? "Sin stock" : stock.alerta === "stock_minimo" ? "Stock minimo" : `Caducidad <= ${stock.tramoCaducidad ?? stock.diasCaducidad} dias`}
+                                            <Badge tone="warning">
+                                                {stock.tramoCaducidad !== null || stock.alerta === "caducado" || stock.alerta === "caducidad_proxima"
+                                                    ? `Caducidad <= ${stock.tramoCaducidad ?? stock.diasCaducidad} dias`
+                                                    : "Stock minimo"}
                                             </Badge>
                                         </Td>
                                     </tr>
@@ -222,17 +222,6 @@ function consolidarResumenStock(stocks: ResumenStockBase[], hoy: Date): ResumenS
 function obtenerParam(params: Record<string, string | string[] | undefined> | undefined, key: string): string | undefined {
     const value = params?.[key];
     return Array.isArray(value) ? value[0] : value;
-}
-
-function alertaPeso(alerta: string): number {
-    const pesos: Record<string, number> = {
-        caducidad_proxima: 0,
-        sin_stock: 1,
-        stock_minimo: 2,
-        ok: 3
-    };
-
-    return pesos[alerta] ?? 3;
 }
 
 function Metric({ title, value }: { title: string; value: string }): React.ReactElement {
