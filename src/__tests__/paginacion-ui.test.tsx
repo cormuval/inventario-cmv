@@ -36,6 +36,12 @@ describe("Paginacion", () => {
         expect(screen.queryByRole("link", { name: "Anterior" })).not.toBeInTheDocument();
         expect(screen.getByText("Anterior")).toHaveAttribute("aria-disabled", "true");
     });
+
+    it("mantiene Sin resultados como texto predeterminado cuando el total es cero", () => {
+        render(<Paginacion ruta="/stock" parametros={{}} paginacion={calcularPaginacion(1, 0)} />);
+
+        expect(screen.getByText("Sin resultados", { exact: true })).toBeInTheDocument();
+    });
 });
 
 describe("InventarioFiltros con rango de fechas", () => {
