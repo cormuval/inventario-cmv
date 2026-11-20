@@ -47,7 +47,10 @@ export function ProductosFiltros({ filtros, lineas }: ProductosFiltrosProps): Re
                 <button type="submit" className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">
                     Buscar
                 </button>
-                <Link href="/productos" className="text-sm text-teal-700 hover:underline">
+                <Link
+                    href="/productos"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-teal-300 bg-white px-4 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                >
                     Limpiar
                 </Link>
             </div>

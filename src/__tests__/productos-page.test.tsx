@@ -108,6 +108,24 @@ describe("ProductosPage", () => {
         expect(screen.getByLabelText("Descripción")).toHaveValue("guantes");
         expect(formulario.querySelector('[name="pagina"]')).toBeNull();
         expect(screen.getByRole("cell", { name: "Guantes de procedimiento" })).toBeInTheDocument();
+
+        const limpiar = screen.getByRole("link", { name: "Limpiar" });
+        expect(limpiar).toHaveAttribute("href", "/productos");
+        expect(limpiar).toHaveClass(
+            "inline-flex",
+            "h-10",
+            "items-center",
+            "justify-center",
+            "rounded-md",
+            "border",
+            "border-teal-300",
+            "bg-white",
+            "px-4",
+            "text-sm",
+            "font-medium",
+            "text-teal-700",
+            "hover:bg-teal-50"
+        );
     });
 
     it("muestra advertencias y un estado vacío cuando los filtros no tienen coincidencias", async () => {
