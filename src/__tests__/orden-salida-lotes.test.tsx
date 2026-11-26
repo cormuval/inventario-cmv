@@ -21,8 +21,8 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const centro = { id: "c1", nombre: "CESFAM Barón", estado: true };
 const bodegas = [
-    { id: "b1", nombre: "Farmacia", centroId: "c1", estado: true },
-    { id: "b2", nombre: "Dental", centroId: "c1", estado: true }
+    { id: "b1", nombre: "Farmacia", centroId: "c1", tipo: "CLINICA" as const, estado: true },
+    { id: "b2", nombre: "Dental", centroId: "c1", tipo: "CLINICA" as const, estado: true }
 ];
 
 describe("OrdenSalidaForm — lotes por bodega", () => {

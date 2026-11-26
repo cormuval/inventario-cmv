@@ -30,7 +30,7 @@ describe("Integración UI de Comprobante PDF", () => {
 
     it("renderiza OrdenSalidaForm con soporte para comprobante tras guardar", () => {
         const mockCentros = [{ id: "c-1", nombre: "CESFAM Centro", estado: true, createdAt: new Date(), updatedAt: new Date() }];
-        const mockBodegas = [{ id: "b-1", nombre: "Farmacia", centroId: "c-1", estado: true, createdAt: new Date(), updatedAt: new Date() }];
+        const mockBodegas = [{ id: "b-1", nombre: "Farmacia", centroId: "c-1", tipo: "CLINICA" as const, estado: true, createdAt: new Date(), updatedAt: new Date() }];
 
         render(
             <OrdenSalidaForm

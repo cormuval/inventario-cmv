@@ -18,7 +18,7 @@ vi.mock("@/modules/orden-entrada/actions/orden-entrada.action", () => ({
 }));
 
 const centro = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
-const bodega = { id: "bodega-1", nombre: "Farmacia", centroId: "centro-1", estado: true };
+const bodega = { id: "bodega-1", nombre: "Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
 const producto = { id: 1, linea: "Medicamentos", descripcion: "Paracetamol", estado: true };
 
 function renderizarFormulario(): void {
