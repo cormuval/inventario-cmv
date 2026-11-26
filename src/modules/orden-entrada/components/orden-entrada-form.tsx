@@ -7,6 +7,10 @@ import type { Bodega, Centro, Producto } from "@prisma/client";
 // actions
 import { crearOrdenEntrada } from "@/modules/orden-entrada/actions/orden-entrada.action";
 
+// constants
+import { ORIGENES_ORDEN_ENTRADA } from "@/modules/orden-entrada/constants/origenes-orden-entrada";
+import type { OrigenOrdenEntrada } from "@/modules/orden-entrada/constants/origenes-orden-entrada";
+
 // components
 import { OrdenEntradaDetallesField } from "@/modules/orden-entrada/components/orden-entrada-detalles-field";
 import { ActionMessage } from "@/shared/components/ui/action-message";
@@ -39,7 +43,7 @@ export function OrdenEntradaForm({
     const [fecha, setFecha] = useState(toDateInputValue());
     const [centroSeleccionado, setCentroSeleccionado] = useState(centroId ?? centros[0]?.id ?? "");
     const [bodegaSeleccionada, setBodegaSeleccionada] = useState(bodegaId ?? "");
-    const [origen, setOrigen] = useState("Drogueria");
+    const [origen, setOrigen] = useState<OrigenOrdenEntrada>("Drogueria");
     const [guiaDespacho, setGuiaDespacho] = useState("");
     const [codigoRecepcion, setCodigoRecepcion] = useState("");
     const [resetKey, setResetKey] = useState(0);
@@ -67,7 +71,7 @@ export function OrdenEntradaForm({
         setGuiaDespacho("");
         setCodigoRecepcion("");
         setResetKey((actual) => actual + 1);
-    }, [state.ok, state.message]);
+    }, [state]);
 
     return (
         <form action={formAction} className="grid gap-3 md:grid-cols-3">
@@ -114,10 +118,22 @@ export function OrdenEntradaForm({
             </label>
             <label className="space-y-1 text-sm">
                 <span>Origen</span>
-                <Select name="origen" required value={origen} onChange={(event) => setOrigen(event.currentTarget.value)}>
-                    <option value="Drogueria">Drogueria</option>
-                    <option value="Desde Otros Centros">Desde Otros Centros</option>
-                    <option value="Otros Servicios">Otros Servicios</option>
+                <Select
+                    name="origen"
+                    required
+                    value={origen}
+                    onChange={(event) => {
+                        const origenSeleccionado = event.currentTarget.value;
+                        if (esOrigenOrdenEntrada(origenSeleccionado)) {
+                            setOrigen(origenSeleccionado);
+                        }
+                    }}
+                >
+                    {ORIGENES_ORDEN_ENTRADA.map((origenDisponible) => (
+                        <option key={origenDisponible} value={origenDisponible}>
+                            {origenDisponible}
+                        </option>
+                    ))}
                 </Select>
             </label>
             <label className="space-y-1 text-sm">
@@ -160,4 +176,8 @@ function crearFechaMinimaEntrada(): Date {
     const fecha = new Date();
     fecha.setDate(fecha.getDate() - 7);
     return fecha;
+}
+
+function esOrigenOrdenEntrada(value: string): value is OrigenOrdenEntrada {
+    return ORIGENES_ORDEN_ENTRADA.some((origenDisponible) => origenDisponible === value);
 }

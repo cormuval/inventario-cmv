@@ -1,3 +1,5 @@
+import { render, screen } from "@testing-library/react";
+import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // lib
@@ -6,6 +8,9 @@ import { prisma } from "@/shared/lib/prisma";
 
 // actions
 import { listarRegistrosEntrada, obtenerDetalleOrdenEntrada } from "@/modules/orden-entrada/actions/registros-entrada.action";
+
+// components
+import { RegistrosEntradaTabla } from "@/modules/orden-entrada/components/registros-entrada-tabla";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
@@ -81,6 +86,32 @@ describe("listarRegistrosEntrada", () => {
             unidades: 400
         });
     });
+
+    it.each(["Bodega Central", "Fondo Global Menor"] as const)(
+        "devuelve y muestra literalmente el origen %s almacenado",
+        async (origen) => {
+            sesionAdministrador();
+            vi.mocked(prisma.ordenEntrada.count).mockResolvedValue(1);
+            vi.mocked(prisma.ordenEntrada.findMany).mockResolvedValue([
+                {
+                    id: "e-origen",
+                    fecha: new Date("2026-10-15T00:00:00.000Z"),
+                    origen,
+                    bodega: { nombre: "Bodega Farmacia" },
+                    usuario: { nombre: "Luis", apPaterno: null }
+                }
+            ] as never);
+            vi.mocked(prisma.ordenEntradaDetalle.groupBy).mockResolvedValue([
+                { ordenEntradaId: "e-origen", _count: { _all: 1 }, _sum: { cantidad: 8 } }
+            ] as never);
+
+            const resultado = await listarRegistrosEntrada({ ...FILTROS, bodegaId: "b1" });
+
+            expect(resultado.filas[0].origen).toBe(origen);
+            render(createElement(RegistrosEntradaTabla, { filas: resultado.filas }));
+            expect(screen.getByRole("cell", { name: origen })).toBeInTheDocument();
+        }
+    );
 });
 
 describe("obtenerDetalleOrdenEntrada", () => {
