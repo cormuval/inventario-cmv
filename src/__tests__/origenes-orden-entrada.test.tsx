@@ -18,15 +18,20 @@ vi.mock("@/modules/orden-entrada/actions/orden-entrada.action", () => ({
 }));
 
 const centro = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
-const bodega = { id: "bodega-1", nombre: "Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
-const producto = { id: 1, linea: "Medicamentos", descripcion: "Paracetamol", estado: true };
+const bodegaClinica = { id: "bodega-1", nombre: "Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
+const bodegaAseo = { id: "bodega-2", nombre: "Aseo", centroId: "centro-1", tipo: "ASEO" as const, estado: true };
+const productos = [
+    { id: 1, linea: "ASEO", descripcion: "Detergente", estado: true },
+    { id: 2, linea: "CLINICO", descripcion: "Guantes", estado: true },
+    { id: 3, linea: "MEDICAMENTOS", descripcion: "Paracetamol", estado: true }
+];
 
 function renderizarFormulario(): void {
     render(
         <OrdenEntradaForm
             centros={[centro]}
-            bodegas={[bodega]}
-            productos={[producto]}
+            bodegas={[bodegaClinica, bodegaAseo]}
+            productos={productos}
             centroId="centro-1"
             bodegaId="bodega-1"
             puedeFiltrarCentro
@@ -154,5 +159,42 @@ describe("OrdenEntradaForm — selector de origen", () => {
 
         await waitFor(() => expect(selectorOrigen).toHaveValue("Drogueria"));
         expect(crearOrdenEntrada).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("OrdenEntradaForm — compatibilidad entre bodega y producto", () => {
+    it("muestra solo productos de aseo al seleccionar una bodega de aseo", () => {
+        renderizarFormulario();
+
+        fireEvent.change(screen.getByLabelText("Bodega"), { target: { value: "bodega-2" } });
+        fireEvent.click(screen.getByRole("combobox", { name: "Producto" }));
+
+        expect(screen.getByText("Detergente — ASEO (#1)")).toBeInTheDocument();
+        expect(screen.queryByText("Guantes — CLINICO (#2)")).not.toBeInTheDocument();
+        expect(screen.queryByText("Paracetamol — MEDICAMENTOS (#3)")).not.toBeInTheDocument();
+    });
+
+    it("excluye solo la línea exacta ASEO en una bodega clínica", () => {
+        renderizarFormulario();
+
+        fireEvent.click(screen.getByRole("combobox", { name: "Producto" }));
+
+        expect(screen.queryByText("Detergente — ASEO (#1)")).not.toBeInTheDocument();
+        expect(screen.getByText("Guantes — CLINICO (#2)")).toBeInTheDocument();
+        expect(screen.getByText("Paracetamol — MEDICAMENTOS (#3)")).toBeInTheDocument();
+    });
+
+    it("elimina el producto enviado al cambiar a una bodega de distinto tipo", () => {
+        renderizarFormulario();
+
+        fireEvent.click(screen.getByRole("combobox", { name: "Producto" }));
+        fireEvent.click(screen.getByText("Guantes — CLINICO (#2)"));
+        const productoId = document.querySelector<HTMLInputElement>("input[name='productoId']");
+        expect(productoId).toHaveValue("2");
+
+        fireEvent.change(screen.getByLabelText("Bodega"), { target: { value: "bodega-2" } });
+
+        expect(document.querySelector<HTMLInputElement>("input[name='productoId']")).toHaveValue("");
+        expect(screen.getByRole("combobox", { name: "Producto" })).toHaveTextContent("Seleccione producto del catálogo...");
     });
 });

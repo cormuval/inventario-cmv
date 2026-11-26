@@ -53,11 +53,25 @@ export function OrdenEntradaForm({
         () => bodegas.filter((bodega) => bodega.centroId === centroSeleccionado),
         [bodegas, centroSeleccionado]
     );
+    const bodegaSeleccionadaInfo = useMemo(
+        () => bodegas.find((bodega) => bodega.id === bodegaSeleccionada),
+        [bodegas, bodegaSeleccionada]
+    );
     const detalleHabilitado = fecha.length > 0 && centroSeleccionado.length > 0 && bodegaSeleccionada.length > 0 && origen.length > 0;
 
     function cambiarCentro(value: string): void {
         setCentroSeleccionado(value);
         setBodegaSeleccionada("");
+    }
+
+    function cambiarBodega(value: string): void {
+        const nuevaBodega = bodegas.find((bodega) => bodega.id === value);
+
+        if (bodegaSeleccionadaInfo?.tipo !== nuevaBodega?.tipo) {
+            setResetKey((actual) => actual + 1);
+        }
+
+        setBodegaSeleccionada(value);
     }
 
     useEffect(() => {
@@ -107,7 +121,7 @@ export function OrdenEntradaForm({
             </label>
             <label className="space-y-1 text-sm">
                 <span>Bodega</span>
-                <Select name="bodegaId" value={bodegaSeleccionada} onChange={(event) => setBodegaSeleccionada(event.currentTarget.value)} required>
+                <Select name="bodegaId" value={bodegaSeleccionada} onChange={(event) => cambiarBodega(event.currentTarget.value)} required>
                     <option value="">Seleccione bodega</option>
                     {bodegasFiltradas.map((bodega) => (
                         <option key={bodega.id} value={bodega.id}>
@@ -156,8 +170,8 @@ export function OrdenEntradaForm({
             </label>
             <div className="border-t pt-3 md:col-span-3">
                 <p className="mb-3 text-sm font-medium">Detalle</p>
-                {detalleHabilitado ? (
-                    <OrdenEntradaDetallesField key={resetKey} productos={productos} />
+                {detalleHabilitado && bodegaSeleccionadaInfo ? (
+                    <OrdenEntradaDetallesField key={resetKey} productos={productos} tipoBodega={bodegaSeleccionadaInfo.tipo} />
                 ) : (
                     <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
                         Complete fecha, centro, bodega y origen para agregar productos.

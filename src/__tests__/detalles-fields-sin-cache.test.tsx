@@ -215,7 +215,7 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
 
         it("no renderiza ningún elemento <datalist> ni atributos list en inputs", () => {
             const { container } = render(
-                <OrdenEntradaDetallesField productos={mockProductos} />
+                <OrdenEntradaDetallesField productos={mockProductos} tipoBodega="CLINICA" />
             );
 
             expect(container.querySelector("datalist")).toBeNull();
@@ -223,7 +223,7 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
         });
 
         it("permite buscar y filtrar por nombre, línea o ID en el catálogo", () => {
-            render(<OrdenEntradaDetallesField productos={mockProductos} />);
+            render(<OrdenEntradaDetallesField productos={mockProductos} tipoBodega="CLINICA" />);
 
             const trigger = screen.getByRole("combobox");
             expect(trigger).toHaveTextContent("Seleccione producto del catálogo...");
@@ -241,7 +241,7 @@ describe("Estandarización de Selectores y Erradicación de Datalist / Caché", 
 
         it("al seleccionar un producto, actualiza el input oculto productoId y el indicador de categoría", () => {
             const { container } = render(
-                <OrdenEntradaDetallesField productos={mockProductos} />
+                <OrdenEntradaDetallesField productos={mockProductos} tipoBodega="CLINICA" />
             );
 
             const trigger = screen.getByRole("combobox");

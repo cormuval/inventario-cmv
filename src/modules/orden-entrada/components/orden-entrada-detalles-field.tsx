@@ -2,7 +2,7 @@
 
 import type * as React from "react";
 import { useMemo, useState } from "react";
-import type { Producto } from "@prisma/client";
+import type { Producto, TipoBodega } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 
 // components
@@ -11,6 +11,7 @@ import { Combobox } from "@/shared/components/ui/combobox";
 import { Input } from "@/shared/components/ui/input";
 
 // utils
+import { filtrarProductosCompatibles } from "@/modules/orden-entrada/utils/compatibilidad-bodega-producto";
 import { toDateInputValue } from "@/shared/utils/format";
 
 interface DetalleEntradaRow {
@@ -19,17 +20,30 @@ interface DetalleEntradaRow {
     linea: string;
 }
 
-export function OrdenEntradaDetallesField({ productos }: { productos: Producto[] }): React.ReactElement {
+export function OrdenEntradaDetallesField({
+    productos,
+    tipoBodega
+}: {
+    productos: Producto[];
+    tipoBodega: TipoBodega;
+}): React.ReactElement {
     const [nextId, setNextId] = useState(2);
     const [detalles, setDetalles] = useState<DetalleEntradaRow[]>([crearDetalleInicial(1)]);
-    const productosPorId = useMemo(() => new Map(productos.map((producto) => [String(producto.id), producto])), [productos]);
+    const productosCompatibles = useMemo(
+        () => filtrarProductosCompatibles(tipoBodega, productos),
+        [productos, tipoBodega]
+    );
+    const productosPorId = useMemo(
+        () => new Map(productosCompatibles.map((producto) => [String(producto.id), producto])),
+        [productosCompatibles]
+    );
     const fechaMinima = toDateInputValue();
 
-    const opciones = useMemo(() => productos.map((producto) => ({
+    const opciones = useMemo(() => productosCompatibles.map((producto) => ({
         value: String(producto.id),
         label: crearProductoLabel(producto),
         keywords: [producto.descripcion, producto.linea, String(producto.id)]
-    })), [productos]);
+    })), [productosCompatibles]);
 
     function agregarDetalle(): void {
         setDetalles((actuales) => [...actuales, crearDetalleInicial(nextId)]);
