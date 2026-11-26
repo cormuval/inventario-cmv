@@ -1,7 +1,6 @@
 "use server";
 
 // lib
-import { ROL_ENCARGADO_BODEGA } from "@/config/auth";
 import { obtenerAlcanceInventario } from "@/shared/lib/inventario-alcance";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -63,7 +62,6 @@ export interface ListarStockResult {
     lineas: string[];
     bajoMinimo: boolean;
     sinStock: boolean;
-    puedeFiltrarSinStock: boolean;
     porCaducar: boolean;
     sort: StockSortKey;
     direction: SortDirection;
@@ -95,8 +93,7 @@ export async function listarStockConsolidado(input: ListarStockInput = {}): Prom
     const linea = input.linea?.trim() ?? "";
     const sort = input.sort ?? "producto";
     const direction = input.direction ?? "asc";
-    const puedeFiltrarSinStock = alcance.usuario.rol === ROL_ENCARGADO_BODEGA;
-    const sinStock = puedeFiltrarSinStock && (input.sinStock ?? false);
+    const sinStock = input.sinStock ?? false;
     const bajoMinimo = sinStock ? false : (input.bajoMinimo ?? false);
     const porCaducar = input.porCaducar ?? false;
     const lineas = (await prisma.producto.findMany({
@@ -115,7 +112,6 @@ export async function listarStockConsolidado(input: ListarStockInput = {}): Prom
         lineas,
         bajoMinimo,
         sinStock,
-        puedeFiltrarSinStock,
         porCaducar,
         sort,
         direction

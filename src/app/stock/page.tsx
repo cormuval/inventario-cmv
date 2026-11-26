@@ -82,12 +82,10 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
                                     <input type="checkbox" name="bajoMinimo" value="1" defaultChecked={data.bajoMinimo} />
                                     Bajo stock mínimo
                                 </label>
-                                {data.puedeFiltrarSinStock ? (
-                                    <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="sinStock" value="1" defaultChecked={data.sinStock} />
-                                        Sin stock
-                                    </label>
-                                ) : null}
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" name="sinStock" value="1" defaultChecked={data.sinStock} />
+                                    Sin stock
+                                </label>
                                 <label className="flex items-center gap-2">
                                     <input type="checkbox" name="porCaducar" value="1" defaultChecked={data.porCaducar} />
                                     Por caducar (30 días)

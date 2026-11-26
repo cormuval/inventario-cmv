@@ -71,7 +71,7 @@ describe("listarStockConsolidado paginado", () => {
         }));
     });
 
-    it("autoriza sin stock para R03 y le da prioridad sobre bajo mínimo", async () => {
+    it("aplica sin stock para R03 y le da prioridad sobre bajo mínimo", async () => {
         vi.mocked(authLib.requireSessionUser).mockResolvedValue({
             id: "user-bodega",
             nombre: "Encargado",
@@ -88,11 +88,11 @@ describe("listarStockConsolidado paginado", () => {
 
         const resultado = await listarStockConsolidado({ sinStock: true, bajoMinimo: true });
 
-        expect(resultado).toMatchObject({ puedeFiltrarSinStock: true, sinStock: true, bajoMinimo: false });
+        expect(resultado).toMatchObject({ sinStock: true, bajoMinimo: false });
         expect((vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as { sql: string }).sql).toContain("g.cantidad = 0");
     });
 
-    it("normaliza sin stock a falso para roles distintos de R03", async () => {
+    it("aplica sin stock para el rol administrador", async () => {
         vi.mocked(prisma.$queryRaw)
             .mockResolvedValueOnce([{ total: BigInt(0) }] as never)
             .mockResolvedValueOnce([] as never);
@@ -100,7 +100,7 @@ describe("listarStockConsolidado paginado", () => {
 
         const resultado = await listarStockConsolidado({ sinStock: true });
 
-        expect(resultado).toMatchObject({ puedeFiltrarSinStock: false, sinStock: false });
-        expect((vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as { sql: string }).sql).not.toContain("g.cantidad = 0");
+        expect(resultado).toMatchObject({ sinStock: true });
+        expect((vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as { sql: string }).sql).toContain("g.cantidad = 0");
     });
 });

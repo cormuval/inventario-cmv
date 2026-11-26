@@ -16,7 +16,7 @@
 - La línea de aseo se reconoce únicamente mediante igualdad exacta con `ASEO`.
 - Todo cambio en `prisma/schema.prisma` incluye una migración versionada; no usar `db:push`.
 - La compatibilidad debe validarse en el servidor antes de abrir la transacción que crea la orden o modifica stock.
-- `sinStock=1` solo se acepta para el rol `R03`; otros roles lo normalizan a `false`.
+- `sinStock=1` está disponible para todos los roles con acceso a `/stock` y respeta su alcance de inventario.
 - **Sin Stock** tiene prioridad sobre **Bajo stock mínimo** cuando ambos parámetros llegan activos.
 - Las consultas SQL de listado y conteo deben aplicar exactamente los mismos filtros.
 
@@ -25,7 +25,7 @@
 - Una bodega existente con “aseo” en cualquier combinación de mayúsculas se migra a `ASEO`; cualquier otro nombre queda `CLINICA`: prueba de migración/estructura en Task 1.
 - Cambiar entre bodegas de tipos distintos no deja productos incompatibles ocultos en inputs del formulario: prueba de interacción en Task 3.
 - Una petición manual con producto incompatible se rechaza antes de `prisma.$transaction`: prueba de acción en Task 3.
-- Un usuario no `R03` que envía `sinStock=1` no altera resultados ni conserva el parámetro: prueba de acción y página en Task 4.
+- Un usuario de cualquier rol con acceso a `/stock` puede activar y conservar `sinStock=1`: prueba de acción y página en Task 4.
 - Grupos con varios lotes agotados aparecen con **Sin Stock**, pero productos sin ningún registro de Stock no se inventan: prueba SQL en Task 4.
 
 ---
@@ -196,7 +196,7 @@
   git commit -m "feat: restringir productos por tipo de bodega"
   ```
 
-### Task 4: Agregar Sin Stock para Encargado de Bodega
+### Task 4: Agregar Sin Stock para todos los roles
 
 **Files:**
 - Modify: `src/config/auth.ts`
@@ -208,9 +208,8 @@
 - Create: `src/__tests__/stock-page.test.tsx`
 
 **Interfaces:**
-- Produces: `export const ROL_ENCARGADO_BODEGA = "R03"` en configuración de auth.
 - Extends: `ListarStockInput.sinStock?: boolean`.
-- Extends: `ListarStockResult.sinStock: boolean` y `ListarStockResult.puedeFiltrarSinStock: boolean`.
+- Extends: `ListarStockResult.sinStock: boolean`.
 - Extends: `FiltrosConsultaStock.sinStock: boolean`.
 - Consumes: `InventarioAlcance.usuario.rol` para autorizar el filtro.
 
@@ -225,15 +224,14 @@
 
 - [ ] **Step 2: Escribir pruebas fallidas de autorización y normalización**
 
-  En `stock-paginado.test.ts`, parametrizar la sesión. Para `R03` con `sinStock: true`, afirmar `resultado.sinStock === true`, `puedeFiltrarSinStock === true` y que ambas consultas reciben el filtro. Para `R01` con el mismo input, afirmar ambos valores `false`. Para `R03` con `sinStock` y `bajoMinimo`, afirmar `sinStock === true` y `bajoMinimo === false`.
+  En `stock-paginado.test.ts`, comprobar que `R03` y `R01` aceptan `sinStock: true` y que ambas consultas reciben el filtro. Para cualquier rol con `sinStock` y `bajoMinimo`, afirmar `sinStock === true` y `bajoMinimo === false`.
 
 - [ ] **Step 3: Escribir pruebas fallidas de la página**
 
   Crear `stock-page.test.tsx` con mock de `listarStockConsolidado`. Probar que:
 
-  - `R03` renderiza el checkbox **Sin Stock** y refleja `defaultChecked`.
-  - Otro rol no lo renderiza cuando `puedeFiltrarSinStock` es `false`.
-  - `sinStock=1` se envía a la acción y se conserva en los parámetros de tabla/paginación únicamente cuando la acción lo autoriza.
+  - Todos los roles renderizan el checkbox **Sin Stock** y reflejan `defaultChecked`.
+  - `sinStock=1` se envía a la acción y se conserva en los parámetros de tabla/paginación.
 
 - [ ] **Step 4: Ejecutar pruebas y confirmar los fallos**
 
@@ -247,11 +245,11 @@
 
 - [ ] **Step 6: Normalizar el filtro por rol en la acción**
 
-  Agregar `ROL_ENCARGADO_BODEGA` en `src/config/auth.ts`. En `listarStockConsolidado`, calcular `puedeFiltrarSinStock = alcance.usuario.rol === ROL_ENCARGADO_BODEGA`, `sinStock = puedeFiltrarSinStock && (input.sinStock ?? false)` y `bajoMinimo = sinStock ? false : (input.bajoMinimo ?? false)`. Incluir los valores normalizados tanto en `base` como en `filtros`.
+  En `listarStockConsolidado`, calcular `sinStock = input.sinStock ?? false` y `bajoMinimo = sinStock ? false : (input.bajoMinimo ?? false)`. Incluir los valores normalizados tanto en `base` como en `filtros`, conservando el alcance de inventario resuelto para el rol.
 
 - [ ] **Step 7: Incorporar el checkbox y preservar la URL**
 
-  En `src/app/stock/page.tsx`, leer `sinStock=1`, pasarlo a la acción y agregarlo a `parametros` solo si el resultado autorizado está activo. Renderizar el checkbox junto a los existentes únicamente con `data.puedeFiltrarSinStock`. Cuando esté marcado, deshabilitar visualmente **Bajo stock mínimo** o dejar que el envío sea normalizado; las pruebas deben fijar que el resultado servidor siempre prioriza **Sin Stock**.
+  En `src/app/stock/page.tsx`, leer `sinStock=1`, pasarlo a la acción y agregarlo a `parametros` cuando esté activo. Renderizar el checkbox junto a los existentes para todos los roles. Las pruebas deben fijar que el resultado servidor siempre prioriza **Sin Stock** sobre **Bajo stock mínimo**.
 
 - [ ] **Step 8: Ejecutar pruebas focalizadas**
 
@@ -311,4 +309,3 @@
   git add <solo-archivos-corregidos>
   git commit -m "test: verificar actualización de entrada y stock"
   ```
-

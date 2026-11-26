@@ -2,7 +2,7 @@
 
 ## Intención
 
-Evitar que una orden de entrada mezcle productos clínicos y de aseo en bodegas incompatibles, y permitir que el **Encargado de Bodega** identifique rápidamente las existencias agotadas desde la vista `/stock`.
+Evitar que una orden de entrada mezcle productos clínicos y de aseo en bodegas incompatibles, y permitir que todos los roles con acceso a `/stock` identifiquen rápidamente las existencias agotadas.
 
 ## Objetivos
 
@@ -10,7 +10,7 @@ Evitar que una orden de entrada mezcle productos clínicos y de aseo en bodegas 
 - En `/entradas/nueva`, ofrecer únicamente productos de línea `ASEO` cuando la bodega receptora sea de tipo `ASEO`.
 - En `/entradas/nueva`, excluir los productos de línea `ASEO` cuando la bodega receptora sea de tipo `CLINICA`.
 - Validar la compatibilidad entre bodega y producto en el servidor antes de crear la orden o modificar el stock.
-- Incorporar el checkbox **Sin Stock** en `/stock` para usuarios con rol **Encargado de Bodega** (`R03`).
+- Incorporar el checkbox **Sin Stock** en `/stock` para todos los roles con acceso a la vista.
 - Permitir combinar **Sin Stock** con los demás filtros y conservarlo al ordenar o paginar.
 
 ## Fuera de alcance
@@ -20,7 +20,6 @@ Evitar que una orden de entrada mezcle productos clínicos y de aseo en bodegas 
 - Impedir consultas o reportes históricos de combinaciones incompatibles existentes.
 - Aplicar en esta entrega la compatibilidad de líneas a órdenes de salida, traspasos o recepción de préstamos.
 - Crear existencias en cero para productos que nunca han tenido un registro de stock en una bodega.
-- Mostrar el filtro **Sin Stock** a roles distintos de `R03`.
 
 ## Restricciones
 
@@ -73,9 +72,7 @@ La misma validación se aplicará al editar un detalle existente mediante `actua
 
 ### Filtro Sin Stock
 
-`/stock` leerá el parámetro `sinStock=1`. El checkbox **Sin Stock** se mostrará en el mismo bloque de los checkbox **Bajo stock mínimo** y **Por caducar (30 días)** únicamente cuando el usuario autenticado tenga rol `R03`.
-
-La Server Action determinará el rol desde la sesión obtenida por el alcance de inventario. Solo para `R03` aceptará el filtro; para otros roles normalizará `sinStock` a `false`, aunque se envíe manualmente en la URL.
+`/stock` leerá el parámetro `sinStock=1`. El checkbox **Sin Stock** se mostrará en el mismo bloque de los checkbox **Bajo stock mínimo** y **Por caducar (30 días)** para todos los roles con acceso a la vista. La consulta conservará el alcance de centros y bodegas correspondiente al usuario autenticado.
 
 Cuando esté activo, la consulta devolverá únicamente combinaciones producto–bodega que:
 
@@ -105,8 +102,8 @@ El filtro incluirá combinaciones con uno o varios lotes agotados. No inventará
 7. `crearOrdenEntrada` rechaza una combinación incompatible antes de abrir la transacción o modificar stock.
 8. `actualizarDetalleEntrada` rechaza un producto incompatible con la bodega de la orden original.
 9. Una combinación compatible conserva el comportamiento actual de creación, auditoría y actualización de stock.
-10. Un usuario `R03` ve el checkbox **Sin Stock** junto a los checkbox existentes en `/stock`.
-11. Un usuario de otro rol no ve el checkbox y no puede activar el filtro agregando `sinStock=1` a la URL.
+10. Todos los roles con acceso a `/stock` ven el checkbox **Sin Stock** junto a los checkbox existentes.
+11. El filtro respeta el alcance de centros y bodegas de cada rol.
 12. **Sin Stock** devuelve grupos existentes cuya cantidad consolidada es exactamente cero, incluidos los que tienen varios lotes agotados.
 13. El filtro se combina con búsqueda, línea y alcance de inventario, y se conserva al paginar u ordenar.
 14. Si **Sin Stock** y **Bajo stock mínimo** llegan activos, se aplica **Sin Stock** y **Bajo stock mínimo** queda desactivado.
@@ -117,4 +114,3 @@ El filtro incluirá combinaciones con uno o varios lotes agotados. No inventará
 - El nombre exacto del enum Prisma y de la utilidad de compatibilidad, respetando las convenciones existentes.
 - La disposición exacta de la nueva columna **Tipo** en el listado del mantenedor de bodegas.
 - El texto breve del estado vacío cuando la bodega seleccionada no tenga productos compatibles.
-

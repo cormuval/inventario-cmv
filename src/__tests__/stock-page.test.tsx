@@ -23,7 +23,6 @@ function resultadoStock(overrides: Record<string, unknown> = {}) {
         centroId: null,
         bodegaId: null,
         puedeFiltrarCentro: false,
-        puedeFiltrarSinStock: true,
         busqueda: "",
         linea: "",
         lineas: [],
@@ -43,7 +42,7 @@ describe("StockPage", () => {
         vi.clearAllMocks();
     });
 
-    it("envía sinStock a la acción y lo preserva para R03 en filtro, orden y paginación", async () => {
+    it("envía y preserva sinStock en filtro, orden y paginación", async () => {
         vi.mocked(listarStockConsolidado).mockResolvedValue(resultadoStock() as never);
 
         render(await StockPage({ searchParams: Promise.resolve({ sinStock: "1", bajoMinimo: "1" }) }));
@@ -54,14 +53,14 @@ describe("StockPage", () => {
         expect(screen.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", expect.stringContaining("sinStock=1"));
     });
 
-    it("oculta sin stock y no lo preserva cuando la acción lo normaliza para otro rol", async () => {
-        vi.mocked(listarStockConsolidado).mockResolvedValue(resultadoStock({ puedeFiltrarSinStock: false, sinStock: false }) as never);
+    it("muestra y preserva sin stock para cualquier rol con acceso a la vista", async () => {
+        vi.mocked(listarStockConsolidado).mockResolvedValue(resultadoStock() as never);
 
         render(await StockPage({ searchParams: Promise.resolve({ sinStock: "1" }) }));
 
         expect(listarStockConsolidado).toHaveBeenCalledWith(expect.objectContaining({ sinStock: true }));
-        expect(screen.queryByRole("checkbox", { name: "Sin stock" })).not.toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /Producto/ })).not.toHaveAttribute("href", expect.stringContaining("sinStock=1"));
-        expect(screen.getByRole("link", { name: "Siguiente" })).not.toHaveAttribute("href", expect.stringContaining("sinStock=1"));
+        expect(screen.getByRole("checkbox", { name: "Sin stock" })).toBeChecked();
+        expect(screen.getByRole("link", { name: /Producto/ })).toHaveAttribute("href", expect.stringContaining("sinStock=1"));
+        expect(screen.getByRole("link", { name: "Siguiente" })).toHaveAttribute("href", expect.stringContaining("sinStock=1"));
     });
 });
