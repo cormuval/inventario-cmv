@@ -50,7 +50,13 @@ function crearFormulario(origen: "Bodega Central" | "Fondo Global Menor"): FormD
     return formData;
 }
 
-function prepararDependencias(): { ordenEntrada: { create: ReturnType<typeof vi.fn> } } {
+function prepararDependencias(): {
+    ordenEntrada: { create: ReturnType<typeof vi.fn> };
+    stock: {
+        findUnique: ReturnType<typeof vi.fn>;
+        upsert: ReturnType<typeof vi.fn>;
+    };
+} {
     vi.mocked(authLib.requireSessionUser).mockResolvedValue({
         id: "u1",
         nombre: "Andrea",

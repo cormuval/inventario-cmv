@@ -58,8 +58,9 @@ export function patronLike(texto: string): string {
 
 /**
  * Agrupa lotes por producto × bodega con la regla de `filtrarExistenciasVisibles`:
- * suma y caducidad mínima solo de lotes con existencia; si no hay ninguno, el grupo
- * se muestra únicamente cuando tiene un solo lote (fila en 0).
+ * sin `sinStock`, muestra grupos con existencia o una única fila agotada; con
+ * `sinStock`, incluye todos los grupos agotados, incluidos los de varios lotes.
+ * La suma y la caducidad mínima consideran solo los lotes con existencia.
  * `caducidadProxima` es el primer lote con existencia que aún no vence, sin contar la fecha centinela.
  */
 function agrupado(bodegaIds: string[], hoy: string, sinStock: boolean): Prisma.Sql {
