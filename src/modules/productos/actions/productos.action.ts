@@ -1,5 +1,6 @@
 "use server";
 
+import type { Prisma, Producto } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 // lib
@@ -9,21 +10,80 @@ import { prisma } from "@/shared/lib/prisma";
 
 // schemas
 import { productoSchema } from "@/modules/productos/schemas/producto.schema";
+import { productosFiltrosSchema } from "@/modules/productos/schemas/productos-filtros.schema";
 
 // types
 import type { ActionState } from "@/shared/types/action-state";
+import type { ProductosFiltros } from "@/modules/productos/utils/productos-filtros";
+
+// utils
+import { calcularPaginacion, type Paginacion } from "@/shared/utils/paginacion";
+
+const TAMANO_PAGINA_PRODUCTOS = 100;
+
+export interface ListarProductosResult {
+    productos: Producto[];
+    paginacion: Paginacion;
+}
 
 export async function listarProductos() {
+    await requireSessionUser();
+
     return prisma.producto.findMany({
         orderBy: [{ linea: "asc" }, { descripcion: "asc" }]
     });
 }
 
 export async function listarProductosActivos() {
+    await requireSessionUser();
+
     return prisma.producto.findMany({
         where: { estado: true },
         orderBy: [{ linea: "asc" }, { descripcion: "asc" }]
     });
+}
+
+export async function listarLineasProductos(): Promise<string[]> {
+    await requireSessionUser();
+
+    const productos = await prisma.producto.findMany({
+        distinct: ["linea"],
+        select: { linea: true },
+        orderBy: { linea: "asc" }
+    });
+
+    return productos.map((producto) => producto.linea);
+}
+
+export async function listarProductosPaginados(filtros: ProductosFiltros): Promise<ListarProductosResult> {
+    await requireSessionUser();
+    const filtrosValidados = productosFiltrosSchema.parse(filtros);
+    const where: Prisma.ProductoWhereInput = {};
+    const descripcion = filtrosValidados.descripcion.trim();
+
+    if (filtrosValidados.id !== null) {
+        where.id = filtrosValidados.id;
+    }
+    if (filtrosValidados.linea !== "") {
+        where.linea = filtrosValidados.linea;
+    }
+    if (filtrosValidados.estado !== "todos") {
+        where.estado = filtrosValidados.estado === "activo";
+    }
+    if (descripcion !== "") {
+        where.descripcion = { contains: descripcion };
+    }
+
+    const total = await prisma.producto.count({ where });
+    const paginacion = calcularPaginacion(filtrosValidados.pagina, total, TAMANO_PAGINA_PRODUCTOS);
+    const productos = await prisma.producto.findMany({
+        where,
+        orderBy: [{ linea: "asc" }, { descripcion: "asc" }, { id: "asc" }],
+        skip: paginacion.skip,
+        take: TAMANO_PAGINA_PRODUCTOS
+    });
+
+    return { productos, paginacion };
 }
 
 export async function crearProducto(prevState: ActionState, formData: FormData): Promise<ActionState> {

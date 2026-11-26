@@ -9,6 +9,7 @@ interface PaginacionProps {
     ruta: string;
     parametros: Record<string, ValorParametro>;
     paginacion: DatosPaginacion;
+    textoSinResultados?: string;
 }
 
 interface EnlacePaginacion {
@@ -17,7 +18,12 @@ interface EnlacePaginacion {
     deshabilitado: boolean;
 }
 
-export function Paginacion({ ruta, parametros, paginacion }: PaginacionProps): React.ReactElement {
+export function Paginacion({
+    ruta,
+    parametros,
+    paginacion,
+    textoSinResultados = "Sin resultados"
+}: PaginacionProps): React.ReactElement {
     const { pagina, paginasTotales, total, desde, hasta } = paginacion;
     const enlaces: EnlacePaginacion[] = [
         { etiqueta: "Primera", destino: 1, deshabilitado: pagina === 1 },
@@ -29,7 +35,7 @@ export function Paginacion({ ruta, parametros, paginacion }: PaginacionProps): R
     return (
         <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm">
             <p className="text-muted-foreground">
-                {total === 0 ? "Sin resultados" : `Mostrando ${formatNumber(desde)}–${formatNumber(hasta)} de ${formatNumber(total)}`}
+                {total === 0 ? textoSinResultados : `Mostrando ${formatNumber(desde)}–${formatNumber(hasta)} de ${formatNumber(total)}`}
             </p>
             <div className="flex flex-wrap items-center gap-1">
                 {enlaces.map((enlace) =>
