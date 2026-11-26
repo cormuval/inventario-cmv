@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Clasificar bodegas como `ASEO` o `CLINICA`, impedir entradas de productos incompatibles y agregar el filtro **Sin Stock** exclusivo para Encargados de Bodega.
+**Goal:** Clasificar bodegas como `ASEO` o `CLINICA`, impedir entradas de productos incompatibles y agregar el filtro **Sin Stock** para todos los roles con acceso a la vista.
 
-**Architecture:** Prisma será la fuente de verdad del tipo de bodega. Una utilidad pura del módulo de entradas expresará la regla de compatibilidad y será reutilizada por el formulario y las Server Actions; Stock ampliará su consulta SQL consolidada y normalizará el nuevo filtro según el rol autenticado antes de contar y paginar.
+**Architecture:** Prisma será la fuente de verdad del tipo de bodega. Una utilidad pura del módulo de entradas expresará la regla de compatibilidad y será reutilizada por el formulario y las Server Actions; Stock ampliará su consulta SQL consolidada con el nuevo filtro respetando el alcance de inventario del rol autenticado antes de contar y paginar.
 
 **Tech Stack:** Next.js 15 App Router, React 19, TypeScript strict, Prisma/MySQL, Zod, Vitest y Testing Library.
 
@@ -211,7 +211,7 @@
 - Extends: `ListarStockInput.sinStock?: boolean`.
 - Extends: `ListarStockResult.sinStock: boolean`.
 - Extends: `FiltrosConsultaStock.sinStock: boolean`.
-- Consumes: `InventarioAlcance.usuario.rol` para autorizar el filtro.
+- Consumes: el alcance de centros y bodegas resuelto por `InventarioAlcance`.
 
 - [ ] **Step 1: Escribir pruebas SQL fallidas**
 
@@ -243,7 +243,7 @@
 
   Extender `FiltrosConsultaStock`. Hacer que `agrupado` reciba `sinStock`: cuando sea `true`, no descartar grupos con varios lotes agotados; cuando sea `false`, mantener el `HAVING` actual. En `condiciones`, agregar `g.cantidad = 0` para el filtro. Conservar el origen en `Stock`, por lo que nunca se generan combinaciones producto–bodega inexistentes.
 
-- [ ] **Step 6: Normalizar el filtro por rol en la acción**
+- [ ] **Step 6: Normalizar la combinación de filtros en la acción**
 
   En `listarStockConsolidado`, calcular `sinStock = input.sinStock ?? false` y `bajoMinimo = sinStock ? false : (input.bajoMinimo ?? false)`. Incluir los valores normalizados tanto en `base` como en `filtros`, conservando el alcance de inventario resuelto para el rol.
 
