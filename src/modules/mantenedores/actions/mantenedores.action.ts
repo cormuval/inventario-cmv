@@ -225,6 +225,7 @@ export async function crearBodega(prevState: ActionState, formData: FormData): P
         const parsed = bodegaSchema.parse({
             nombre: formData.get("nombre"),
             centroId: formData.get("centroId"),
+            tipo: formData.get("tipo"),
             estado: formData.get("estado") === "on" || formData.get("estado") === "true"
         });
         const bodega = await prisma.bodega.create({ data: parsed });
@@ -253,6 +254,7 @@ export async function editarBodega(prevState: ActionState, formData: FormData): 
             id: formData.get("id"),
             nombre: formData.get("nombre"),
             centroId: formData.get("centroId"),
+            tipo: formData.get("tipo"),
             estado
         });
 
@@ -283,6 +285,9 @@ export async function editarBodega(prevState: ActionState, formData: FormData): 
         if (previo.centroId !== parsed.centroId) {
             cambios.centroId = { antes: previo.centroId, despues: parsed.centroId };
         }
+        if (previo.tipo !== parsed.tipo) {
+            cambios.tipo = { antes: previo.tipo, despues: parsed.tipo };
+        }
         if (previo.estado !== parsed.estado) {
             cambios.estado = { antes: previo.estado, despues: parsed.estado };
         }
@@ -292,6 +297,7 @@ export async function editarBodega(prevState: ActionState, formData: FormData): 
             data: {
                 nombre: parsed.nombre,
                 centroId: parsed.centroId,
+                tipo: parsed.tipo,
                 estado: parsed.estado
             }
         });

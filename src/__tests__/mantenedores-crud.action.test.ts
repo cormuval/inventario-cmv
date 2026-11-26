@@ -240,22 +240,32 @@ describe("Mantenedores CRUD - Server Actions", () => {
     });
 
     describe("Bodega CRUD", () => {
-        it("crearBodega: crea bodega asociada al centro", async () => {
+        it("crearBodega: persiste una bodega clínica asociada al centro", async () => {
             vi.mocked(prisma.bodega.create).mockResolvedValue({
                 id: "b-nueva",
                 nombre: "Bodega Vacunatorio",
                 centroId: "c-1",
+                tipo: "CLINICA",
                 estado: true
             } as never);
 
             const fd = new FormData();
             fd.set("nombre", "Bodega Vacunatorio");
             fd.set("centroId", "c-1");
+            fd.set("tipo", "CLINICA");
             fd.set("estado", "on");
 
             const res = await crearBodega(initialActionState, fd);
             expect(res.ok).toBe(true);
             expect(res.message).toBe("Bodega creada.");
+            expect(prisma.bodega.create).toHaveBeenCalledWith({
+                data: {
+                    nombre: "Bodega Vacunatorio",
+                    centroId: "c-1",
+                    tipo: "CLINICA",
+                    estado: true
+                }
+            });
             expect(AuditLogger.log).toHaveBeenCalledWith(
                 expect.objectContaining({
                     accion: "crear",
@@ -265,17 +275,19 @@ describe("Mantenedores CRUD - Server Actions", () => {
             );
         });
 
-        it("editarBodega: actualiza datos correctamente", async () => {
+        it("editarBodega: persiste el tipo ASEO y lo audita", async () => {
             vi.mocked(prisma.bodega.findUnique).mockResolvedValue({
                 id: "b-1",
                 nombre: "Bodega Farmacia",
                 centroId: "c-1",
+                tipo: "CLINICA",
                 estado: true
             } as never);
             vi.mocked(prisma.bodega.update).mockResolvedValue({
                 id: "b-1",
                 nombre: "Bodega Farmacia Principal",
                 centroId: "c-1",
+                tipo: "ASEO",
                 estado: true
             } as never);
 
@@ -283,11 +295,44 @@ describe("Mantenedores CRUD - Server Actions", () => {
             fd.set("id", "b-1");
             fd.set("nombre", "Bodega Farmacia Principal");
             fd.set("centroId", "c-1");
+            fd.set("tipo", "ASEO");
             fd.set("estado", "true");
 
             const res = await editarBodega(initialActionState, fd);
             expect(res.ok).toBe(true);
             expect(res.message).toMatch(/actualizada exitosamente/i);
+            expect(prisma.bodega.update).toHaveBeenCalledWith({
+                where: { id: "b-1" },
+                data: {
+                    nombre: "Bodega Farmacia Principal",
+                    centroId: "c-1",
+                    tipo: "ASEO",
+                    estado: true
+                }
+            });
+            expect(AuditLogger.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    detalle: {
+                        cambios: {
+                            nombre: { antes: "Bodega Farmacia", despues: "Bodega Farmacia Principal" },
+                            tipo: { antes: "CLINICA", despues: "ASEO" }
+                        }
+                    }
+                })
+            );
+        });
+
+        it("crearBodega: rechaza un tipo de bodega desconocido", async () => {
+            const fd = new FormData();
+            fd.set("nombre", "Bodega Inválida");
+            fd.set("centroId", "c-1");
+            fd.set("tipo", "OTRO");
+            fd.set("estado", "on");
+
+            const res = await crearBodega(initialActionState, fd);
+
+            expect(res.ok).toBe(false);
+            expect(prisma.bodega.create).not.toHaveBeenCalled();
         });
 
         it("editarBodega: bloquea desactivación si tiene stock disponible positivo (R-03)", async () => {
@@ -307,6 +352,7 @@ describe("Mantenedores CRUD - Server Actions", () => {
             fd.set("id", "b-1");
             fd.set("nombre", "Bodega Farmacia");
             fd.set("centroId", "c-1");
+            fd.set("tipo", "CLINICA");
             // estado desactivado
 
             const res = await editarBodega(initialActionState, fd);

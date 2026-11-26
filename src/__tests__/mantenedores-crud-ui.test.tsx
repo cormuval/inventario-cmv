@@ -38,8 +38,8 @@ describe("Mantenedores CRUD - Componentes UI", () => {
     ];
 
     const mockBodegas = [
-        { id: "b-1", nombre: "Bodega Farmacia Barón", centroId: "c-1", estado: true, centro: mockCentros[0] },
-        { id: "b-2", nombre: "Bodega Periférica Esperanza", centroId: "c-2", estado: false, centro: mockCentros[1] }
+        { id: "b-1", nombre: "Bodega Farmacia Barón", centroId: "c-1", tipo: "CLINICA" as const, estado: true, centro: mockCentros[0] },
+        { id: "b-2", nombre: "Bodega Periférica Esperanza", centroId: "c-2", tipo: "ASEO" as const, estado: false, centro: mockCentros[1] }
     ];
 
     const mockRoles = [
@@ -193,6 +193,22 @@ describe("Mantenedores CRUD - Componentes UI", () => {
 
             expect(screen.getByRole("dialog")).toBeInTheDocument();
             expect(screen.getByRole("heading", { name: "Nueva Bodega" })).toBeInTheDocument();
+            const tipo = screen.getByLabelText(/tipo de bodega/i) as HTMLSelectElement;
+            expect(tipo.value).toBe("CLINICA");
+            expect(screen.getByRole("option", { name: "Clínica" })).toHaveValue("CLINICA");
+            expect(screen.getByRole("option", { name: "Aseo" })).toHaveValue("ASEO");
+        });
+
+        it("muestra el tipo y selecciona el tipo actual al editar una bodega", () => {
+            render(<BodegasTabla bodegas={mockBodegas} centros={mockCentros} />);
+
+            expect(screen.getByText("Clínica")).toBeInTheDocument();
+            expect(screen.getByText("Aseo")).toBeInTheDocument();
+
+            fireEvent.click(screen.getByLabelText("Editar Bodega Farmacia Barón"));
+
+            const tipo = screen.getByLabelText(/tipo de bodega/i) as HTMLSelectElement;
+            expect(tipo.value).toBe("CLINICA");
         });
     });
 

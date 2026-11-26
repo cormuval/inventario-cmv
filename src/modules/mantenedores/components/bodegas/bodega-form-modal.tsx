@@ -116,6 +116,21 @@ export function BodegaFormModal({
                         </Select>
                     </div>
 
+                    <div className="space-y-1 text-sm">
+                        <label htmlFor="tipo-bodega" className="font-medium">
+                            Tipo de bodega *
+                        </label>
+                        <Select
+                            id="tipo-bodega"
+                            name="tipo"
+                            required
+                            defaultValue={bodega?.tipo ?? "CLINICA"}
+                        >
+                            <option value="CLINICA">Clínica</option>
+                            <option value="ASEO">Aseo</option>
+                        </Select>
+                    </div>
+
                     <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                         <input
                             type="checkbox"

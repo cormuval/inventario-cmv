@@ -131,6 +131,7 @@ export function BodegasTabla({ bodegas, centros }: BodegasTablaProps): React.Rea
                         <tr>
                             <Th>Nombre</Th>
                             <Th>Centro de Salud</Th>
+                            <Th className="w-28">Tipo</Th>
                             <Th className="w-32">Estado</Th>
                             <Th className="w-28 text-right">Acciones</Th>
                         </tr>
@@ -138,7 +139,7 @@ export function BodegasTabla({ bodegas, centros }: BodegasTablaProps): React.Rea
                     <tbody>
                         {bodegasFiltradas.length === 0 ? (
                             <tr>
-                                <Td colSpan={4} className="text-center py-8 text-muted-foreground">
+                                <Td colSpan={5} className="text-center py-8 text-muted-foreground">
                                     No se encontraron bodegas registradas.
                                 </Td>
                             </tr>
@@ -148,6 +149,11 @@ export function BodegasTabla({ bodegas, centros }: BodegasTablaProps): React.Rea
                                     <Td className="font-medium">{bodega.nombre}</Td>
                                     <Td className="text-muted-foreground">
                                         {bodega.centro?.nombre ?? "Sin centro asignado"}
+                                    </Td>
+                                    <Td>
+                                        <Badge tone="default">
+                                            {bodega.tipo === "ASEO" ? "Aseo" : "Clínica"}
+                                        </Badge>
                                     </Td>
                                     <Td>
                                         <Badge tone={bodega.estado ? "success" : "muted"}>

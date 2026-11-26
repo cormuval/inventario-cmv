@@ -20,6 +20,7 @@ export const editarCentroSchema = z.object({
 export const bodegaSchema = z.object({
     nombre: z.string().min(3, "El nombre de la bodega debe tener al menos 3 caracteres."),
     centroId: z.string().min(1, "Debe seleccionar un centro de salud."),
+    tipo: z.enum(["ASEO", "CLINICA"]),
     estado: z.coerce.boolean().default(true)
 });
 
@@ -27,6 +28,7 @@ export const editarBodegaSchema = z.object({
     id: z.string().min(1, "ID de bodega requerido."),
     nombre: z.string().min(3, "El nombre de la bodega debe tener al menos 3 caracteres."),
     centroId: z.string().min(1, "Debe seleccionar un centro de salud."),
+    tipo: z.enum(["ASEO", "CLINICA"]),
     estado: z.coerce.boolean().default(true)
 });
 

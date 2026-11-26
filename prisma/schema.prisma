@@ -23,10 +23,16 @@ model Centro {
     @@map("Centro")
 }
 
+enum TipoBodega {
+    ASEO
+    CLINICA
+}
+
 model Bodega {
     id         String             @id @default(cuid()) @map("ID_Bodega") @db.VarChar(255)
     nombre     String             @map("Bodega") @db.VarChar(255)
     centroId   String             @map("ID_Centro") @db.VarChar(255)
+    tipo       TipoBodega         @default(CLINICA) @map("Tipo")
     estado     Boolean            @default(true) @map("Estado")
     centro     Centro             @relation(fields: [centroId], references: [id])
     usuarios   Usuario[]
