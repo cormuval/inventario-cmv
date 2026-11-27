@@ -16,12 +16,13 @@ describe("OrdenSalidaForm - selección de bodegas destino para operadores R07", 
     const bodegaFarmacia = { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
     const bodegaVacunatorio = { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
     const bodegaDental = { id: "b3", nombre: "Bodega Dental", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
+    const bodegaAseo = { id: "b4", nombre: "Bodega Aseo", centroId: "centro-1", tipo: "ASEO" as const, estado: true };
 
     it("permite a un operador R07 con una sola bodega asignada ver las demás bodegas del centro como destino", () => {
         // Para R07, bodegas asignadas contiene únicamente Farmacia (b1)
         const bodegasAsignadas = [bodegaFarmacia];
         // bodegasDestino contiene todas las bodegas activas del centro Barón (b1, b2, b3)
-        const bodegasDelCentro = [bodegaFarmacia, bodegaVacunatorio, bodegaDental];
+        const bodegasDelCentro = [bodegaFarmacia, bodegaVacunatorio, bodegaDental, bodegaAseo];
 
         render(
             <OrdenSalidaForm
@@ -45,5 +46,30 @@ describe("OrdenSalidaForm - selección de bodegas destino para operadores R07", 
         expect(within(bodegaDestinoSelect).getByRole("option", { name: "Bodega Vacunatorio" })).toBeInTheDocument();
         expect(within(bodegaDestinoSelect).getByRole("option", { name: "Bodega Dental" })).toBeInTheDocument();
         expect(within(bodegaDestinoSelect).queryByRole("option", { name: "Bodega Farmacia" })).not.toBeInTheDocument();
+        expect(within(bodegaDestinoSelect).queryByRole("option", { name: "Bodega Aseo" })).not.toBeInTheDocument();
+    });
+
+    it("filtra las bodegas incompatibles del centro receptor en préstamos intercentros", () => {
+        const centroDestino = { id: "centro-2", nombre: "CESFAM Puerto", estado: true };
+        const farmaciaDestino = { id: "b5", nombre: "Farmacia Puerto", centroId: "centro-2", tipo: "CLINICA" as const, estado: true };
+        const aseoDestino = { id: "b6", nombre: "Aseo Puerto", centroId: "centro-2", tipo: "ASEO" as const, estado: true };
+
+        render(
+            <OrdenSalidaForm
+                centros={[centroBaron]}
+                todosCentros={[centroBaron, centroDestino]}
+                bodegas={[bodegaFarmacia]}
+                bodegasDestino={[farmaciaDestino, aseoDestino]}
+                stocks={[]}
+                centroId="centro-1"
+                bodegaId="b1"
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText(/tipo salida/i), { target: { value: "A Otros Centros" } });
+
+        const destino = screen.getByLabelText(/bodega destino \(centro receptor\)/i);
+        expect(within(destino).getByRole("option", { name: "Farmacia Puerto" })).toBeInTheDocument();
+        expect(within(destino).queryByRole("option", { name: "Aseo Puerto" })).not.toBeInTheDocument();
     });
 });

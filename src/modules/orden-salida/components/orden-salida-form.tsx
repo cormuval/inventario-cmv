@@ -25,6 +25,7 @@ import { initialActionState } from "@/shared/types/action-state";
 
 // utils
 import { toDateInputValue } from "@/shared/utils/format";
+import { esProductoCompatibleConBodega, LINEA_ASEO } from "@/shared/utils/compatibilidad-bodega-producto";
 
 // types
 import type { StockDisponible } from "@/modules/orden-salida/types/stock-disponible";
@@ -116,11 +117,19 @@ export function OrdenSalidaForm({
     const esMerma = tipoSalida.trim().toLowerCase() === "merma";
     const esTraspasoBodega = tipoSalida.trim().toLowerCase() === "a otra bodega";
     const esOtrosCentros = tipoSalida.trim().toLowerCase() === "a otros centros";
+    const tipoBodegaOrigen = bodegas.find((bodega) => bodega.id === bodegaId)?.tipo;
+    const lineaRepresentativaOrigen = tipoBodegaOrigen === "ASEO" ? LINEA_ASEO : "CLINICO";
 
     const bodegasDestinoDisponibles = useMemo(() => {
         const pool = bodegasDestino && bodegasDestino.length > 0 ? bodegasDestino : bodegas;
-        return pool.filter((b) => b.centroId === centroSeleccionado && b.id !== bodegaId && b.estado);
-    }, [bodegasDestino, bodegas, centroSeleccionado, bodegaId]);
+        return pool.filter(
+            (b) =>
+                b.centroId === centroSeleccionado &&
+                b.id !== bodegaId &&
+                b.estado &&
+                esProductoCompatibleConBodega(b.tipo, lineaRepresentativaOrigen)
+        );
+    }, [bodegasDestino, bodegas, centroSeleccionado, bodegaId, lineaRepresentativaOrigen]);
     const [bodegaDestinoId, setBodegaDestinoId] = useState(bodegasDestinoDisponibles[0]?.id ?? "");
 
     const poolCentros = todosCentros && todosCentros.length > 0 ? todosCentros : centros;
@@ -131,8 +140,13 @@ export function OrdenSalidaForm({
     const [centroDestinoId, setCentroDestinoId] = useState(otrosCentrosDisponibles[0]?.id ?? "");
 
     const bodegasOtrosCentrosDisponibles = useMemo(() => {
-        return bodegasDestino.filter((b) => b.centroId === centroDestinoId && b.estado);
-    }, [bodegasDestino, centroDestinoId]);
+        return bodegasDestino.filter(
+            (b) =>
+                b.centroId === centroDestinoId &&
+                b.estado &&
+                esProductoCompatibleConBodega(b.tipo, lineaRepresentativaOrigen)
+        );
+    }, [bodegasDestino, centroDestinoId, lineaRepresentativaOrigen]);
     // Sin preseleccion: el usuario debe elegir explicitamente la bodega que recibe el prestamo.
     const [bodegaDestinoOtroCentroId, setBodegaDestinoOtroCentroId] = useState("");
 
