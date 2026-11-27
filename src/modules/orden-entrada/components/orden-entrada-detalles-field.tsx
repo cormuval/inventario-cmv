@@ -11,7 +11,7 @@ import { Combobox } from "@/shared/components/ui/combobox";
 import { Input } from "@/shared/components/ui/input";
 
 // utils
-import { filtrarProductosCompatibles } from "@/modules/orden-entrada/utils/compatibilidad-bodega-producto";
+import { filtrarProductosCompatibles } from "@/shared/utils/compatibilidad-bodega-producto";
 import { toDateInputValue } from "@/shared/utils/format";
 
 interface DetalleEntradaRow {

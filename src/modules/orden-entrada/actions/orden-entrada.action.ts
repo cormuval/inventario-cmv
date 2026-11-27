@@ -16,7 +16,7 @@ import { crearOrdenEntradaSchema, ordenEntradaDetalleFormSchema } from "@/module
 import type { ActionState } from "@/shared/types/action-state";
 
 // utils
-import { esProductoCompatibleConBodega, obtenerMensajeIncompatibilidad } from "@/modules/orden-entrada/utils/compatibilidad-bodega-producto";
+import { esProductoCompatibleConBodega, obtenerMensajeIncompatibilidad } from "@/shared/utils/compatibilidad-bodega-producto";
 import { calcularStockMinimo } from "@/modules/stock/utils/movimientos";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;

@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
     esProductoCompatibleConBodega,
     filtrarProductosCompatibles,
-    obtenerMensajeIncompatibilidad
-} from "@/modules/orden-entrada/utils/compatibilidad-bodega-producto";
+    obtenerMensajeIncompatibilidad,
+    sonProductosCompatiblesConBodega
+} from "@/shared/utils/compatibilidad-bodega-producto";
 
 describe("compatibilidad entre bodega y producto", () => {
     describe("esProductoCompatibleConBodega", () => {
@@ -21,6 +22,15 @@ describe("compatibilidad entre bodega y producto", () => {
             expect(esProductoCompatibleConBodega("CLINICA", "CLINICO")).toBe(true);
             expect(esProductoCompatibleConBodega("CLINICA", "Aseo")).toBe(true);
             expect(esProductoCompatibleConBodega("CLINICA", "FARMACIA")).toBe(true);
+        });
+    });
+
+    describe("sonProductosCompatiblesConBodega", () => {
+        it("exige que todos los productos de la operación sean compatibles", () => {
+            expect(sonProductosCompatiblesConBodega("ASEO", [{ linea: "ASEO" }, { linea: "ASEO" }])).toBe(true);
+            expect(sonProductosCompatiblesConBodega("ASEO", [{ linea: "ASEO" }, { linea: "CLINICO" }])).toBe(false);
+            expect(sonProductosCompatiblesConBodega("CLINICA", [{ linea: "CLINICO" }, { linea: "FARMACIA" }])).toBe(true);
+            expect(sonProductosCompatiblesConBodega("CLINICA", [{ linea: "CLINICO" }, { linea: "ASEO" }])).toBe(false);
         });
     });
 

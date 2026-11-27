@@ -8,6 +8,13 @@ export function esProductoCompatibleConBodega(tipoBodega: TipoBodega, lineaProdu
         : lineaProducto !== LINEA_ASEO;
 }
 
+export function sonProductosCompatiblesConBodega<T extends { linea: string }>(
+    tipoBodega: TipoBodega,
+    productos: readonly T[]
+): boolean {
+    return productos.every((producto) => esProductoCompatibleConBodega(tipoBodega, producto.linea));
+}
+
 export function filtrarProductosCompatibles<T extends { linea: string }>(
     tipoBodega: TipoBodega,
     productos: readonly T[]
