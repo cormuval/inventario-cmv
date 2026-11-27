@@ -32,13 +32,14 @@ vi.mock("@/shared/lib/prisma", () => ({
         encargadosBodega: { findMany: vi.fn() },
         ordenSalida: { findMany: vi.fn(), create: vi.fn() },
         ordenSalidaDetalle: { findMany: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn(), delete: vi.fn() },
+        producto: { findMany: vi.fn() },
         stock: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() }
     }
 }));
 
 const centroBaron = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
 const bodegaFarmacia = { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", estado: true };
-const bodegaVacunatorio = { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", estado: true };
+const bodegaVacunatorio = { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", estado: true, tipo: "CLINICA" };
 
 function sesionOperador(): void {
     vi.mocked(authLib.requireSessionUser).mockResolvedValue({
@@ -82,6 +83,22 @@ function crearFormDataTraspaso(options: {
 describe("traspaso a otra bodega en el mismo centro", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 1, linea: "CLINICO" }] as never);
+    });
+
+    it("rechaza todos los detalles si un producto es incompatible con la bodega destino", async () => {
+        sesionOperador();
+        vi.mocked(prisma.bodega.findUnique).mockResolvedValue(bodegaVacunatorio as never);
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 1, linea: "ASEO" }] as never);
+
+        const resultado = await crearOrdenSalida(
+            { ok: false, message: "" },
+            crearFormDataTraspaso({ bodegaDestinoId: "b2" })
+        );
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("solo pueden ingresarse en bodegas de aseo");
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("ejecuta traspaso atómico descontando en origen e incrementando en destino", async () => {

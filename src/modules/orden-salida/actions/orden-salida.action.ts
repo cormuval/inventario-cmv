@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, TipoBodega } from "@prisma/client";
 
 // lib
 import { requireSessionUser, puedeOperarSalida } from "@/shared/lib/auth";
@@ -26,6 +26,7 @@ import { generarComprobanteSalidaPDF } from "@/modules/orden-salida/utils/pdf-co
 import { cargarOrdenParaComprobante, enviarComprobanteSalida } from "@/modules/orden-salida/utils/envio-comprobante";
 import { generarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
 import { notificarPrestamoEnviado } from "@/modules/orden-salida/utils/notificar-prestamo";
+import { obtenerMensajeIncompatibilidad, sonProductosCompatiblesConBodega } from "@/shared/utils/compatibilidad-bodega-producto";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -34,6 +35,20 @@ interface DetalleSalidaForm {
     cantidad: number;
     lote: string;
     fechaCaducidad: Date;
+}
+
+async function obtenerErrorCompatibilidadDestino(
+    tipoBodega: TipoBodega,
+    detalles: readonly DetalleSalidaForm[]
+): Promise<string | null> {
+    const productos = await prisma.producto.findMany({
+        where: { id: { in: [...new Set(detalles.map((detalle) => detalle.productoId))] } },
+        select: { linea: true }
+    });
+
+    return sonProductosCompatiblesConBodega(tipoBodega, productos)
+        ? null
+        : obtenerMensajeIncompatibilidad(tipoBodega);
 }
 
 
@@ -98,6 +113,10 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             if (!bodegaDestino || !bodegaDestino.estado || bodegaDestino.centroId !== parsed.centroId) {
                 return { ok: false, message: "La bodega destino seleccionada no existe o no pertenece al mismo centro de salud." };
             }
+            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(bodegaDestino.tipo, parsed.detalles);
+            if (errorCompatibilidad) {
+                return { ok: false, message: errorCompatibilidad };
+            }
             parsed.destino = bodegaDestino.nombre;
         }
 
@@ -126,6 +145,10 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             });
             if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
                 return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
+            }
+            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(bodegaDest.tipo, parsed.detalles);
+            if (errorCompatibilidad) {
+                return { ok: false, message: errorCompatibilidad };
             }
             bodegaDestinoId = bodegaDest.id;
 

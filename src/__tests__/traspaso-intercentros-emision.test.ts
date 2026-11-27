@@ -52,6 +52,7 @@ vi.mock("@/shared/lib/prisma", () => ({
             update: vi.fn(),
             delete: vi.fn()
         },
+        producto: { findMany: vi.fn() },
         stock: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() }
     }
 }));
@@ -63,7 +64,7 @@ vi.mock("@/modules/orden-salida/utils/notificar-prestamo", () => ({
 const centroOrigen = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
 const centroDestino = { id: "centro-2", nombre: "CESFAM Playa Ancha", estado: true };
 const bodegaOrigen = { id: "b1", nombre: "Bodega Farmacia Barón", centroId: "centro-1", estado: true };
-const bodegaDestino = { id: "b2", nombre: "Bodega Farmacia Playa Ancha", centroId: "centro-2", estado: true };
+const bodegaDestino = { id: "b2", nombre: "Bodega Farmacia Playa Ancha", centroId: "centro-2", estado: true, tipo: "CLINICA" };
 
 function sesionOperador(): void {
     vi.mocked(authLib.requireSessionUser).mockResolvedValue({
@@ -118,6 +119,7 @@ describe("Emisión y Gestión de Traspaso / Préstamo Intercentros (orden-salida
     beforeEach(() => {
         vi.clearAllMocks();
         sesionOperador();
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 101, linea: "CLINICO" }] as never);
     });
 
     const initialState = { ok: false, message: "" };
@@ -156,6 +158,16 @@ describe("Emisión y Gestión de Traspaso / Préstamo Intercentros (orden-salida
             const res = await crearOrdenSalida(initialState, fd);
             expect(res.ok).toBe(false);
             expect(res.message).toMatch(/no pertenece al centro de destino/i);
+        });
+
+        it("rechaza el préstamo si algún producto es incompatible con la bodega indicada", async () => {
+            vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 101, linea: "ASEO" }] as never);
+
+            const res = await crearOrdenSalida(initialState, crearFormDataIntercentro());
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toContain("solo pueden ingresarse en bodegas de aseo");
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
         it("exige confirmación si un lote vence en <= 7 días (advertencia sanitaria)", async () => {

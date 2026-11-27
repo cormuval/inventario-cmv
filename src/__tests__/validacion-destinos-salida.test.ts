@@ -48,6 +48,7 @@ vi.mock("@/shared/lib/prisma", () => ({
         encargadosBodega: { findMany: vi.fn() },
         ordenSalida: { create: vi.fn() },
         ordenSalidaDetalle: { create: vi.fn() },
+        producto: { findMany: vi.fn() },
         stock: { findUnique: vi.fn(), update: vi.fn() }
     }
 }));
@@ -58,7 +59,7 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
     const centroOrigen = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
     const centroDestino = { id: "centro-2", nombre: "CESFAM Playa Ancha", estado: true };
     const bodegaOrigen = { id: "b1", nombre: "Bodega Barón", centroId: "centro-1", estado: true };
-    const bodegaDestino = { id: "b2", nombre: "Bodega Playa Ancha", centroId: "centro-2", estado: true };
+    const bodegaDestino = { id: "b2", nombre: "Bodega Playa Ancha", centroId: "centro-2", estado: true, tipo: "CLINICA" };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -74,6 +75,7 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
         vi.mocked(prisma.centro.findFirst).mockResolvedValue(centroOrigen as never);
         vi.mocked(prisma.bodega.findFirst).mockResolvedValue(bodegaOrigen as never);
         vi.mocked(prisma.encargadosBodega.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 1, linea: "CLINICO" }] as never);
     });
 
     describe("Consumo Interno — Validación contra tabla Unidad", () => {
