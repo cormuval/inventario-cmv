@@ -45,6 +45,7 @@ vi.mock("@/shared/lib/prisma", () => ({
         $transaction: vi.fn(),
         centro: { findUnique: vi.fn() },
         bodega: { findUnique: vi.fn() },
+        producto: { findMany: vi.fn() },
         encargadosBodega: { findMany: vi.fn() },
         usuario: { findMany: vi.fn() },
         ordenSalida: { findUnique: vi.fn(), update: vi.fn() },
@@ -441,8 +442,10 @@ describe("Integración con crearOrdenSalida al emitir préstamos", () => {
             id: "b2",
             nombre: "Farmacia Playa Ancha",
             centroId: "centro-2",
-            estado: true
+            estado: true,
+            tipo: "CLINICA"
         } as never);
+        vi.mocked(prisma.producto.findMany).mockResolvedValue([{ id: 101, linea: "CLINICO" }] as never);
     });
 
     function crearFormDataPrestamo(correoDestino?: string): FormData {
