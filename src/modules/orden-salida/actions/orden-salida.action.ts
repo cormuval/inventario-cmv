@@ -38,10 +38,11 @@ interface DetalleSalidaForm {
 }
 
 async function obtenerErrorCompatibilidadDestino(
+    cliente: Pick<PrismaClient, "producto">,
     tipoBodega: TipoBodega,
     detalles: readonly DetalleSalidaForm[]
 ): Promise<string | null> {
-    const productos = await prisma.producto.findMany({
+    const productos = await cliente.producto.findMany({
         where: { id: { in: [...new Set(detalles.map((detalle) => detalle.productoId))] } },
         select: { linea: true }
     });
@@ -49,6 +50,21 @@ async function obtenerErrorCompatibilidadDestino(
     return sonProductosCompatiblesConBodega(tipoBodega, productos)
         ? null
         : obtenerMensajeIncompatibilidad(tipoBodega);
+}
+
+async function asegurarCompatibilidadDestino(
+    cliente: Pick<PrismaClient, "bodega" | "producto">,
+    bodegaId: string,
+    detalles: readonly DetalleSalidaForm[]
+): Promise<void> {
+    const bodega = await cliente.bodega.findUnique({ where: { id: bodegaId }, select: { tipo: true } });
+    if (!bodega) {
+        throw new Error("La bodega destino no existe.");
+    }
+    const error = await obtenerErrorCompatibilidadDestino(cliente, bodega.tipo, detalles);
+    if (error) {
+        throw new Error(error);
+    }
 }
 
 
@@ -113,7 +129,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             if (!bodegaDestino || !bodegaDestino.estado || bodegaDestino.centroId !== parsed.centroId) {
                 return { ok: false, message: "La bodega destino seleccionada no existe o no pertenece al mismo centro de salud." };
             }
-            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(bodegaDestino.tipo, parsed.detalles);
+            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(prisma, bodegaDestino.tipo, parsed.detalles);
             if (errorCompatibilidad) {
                 return { ok: false, message: errorCompatibilidad };
             }
@@ -146,7 +162,7 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
             if (!bodegaDest || !bodegaDest.estado || bodegaDest.centroId !== centroDestinoId) {
                 return { ok: false, message: "La bodega de destino seleccionada no pertenece al centro de destino o no está activa." };
             }
-            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(bodegaDest.tipo, parsed.detalles);
+            const errorCompatibilidad = await obtenerErrorCompatibilidadDestino(prisma, bodegaDest.tipo, parsed.detalles);
             if (errorCompatibilidad) {
                 return { ok: false, message: errorCompatibilidad };
             }
@@ -180,6 +196,9 @@ export async function crearOrdenSalida(prevState: ActionState, formData: FormDat
         while (intentos < 3) {
             try {
                 orden = await prisma.$transaction(async (tx) => {
+                    if (bodegaDestinoId && (esTraspasoBodega || esAOtroCentro)) {
+                        await asegurarCompatibilidadDestino(tx, bodegaDestinoId, parsed.detalles);
+                    }
                     const nuevaOrden = await tx.ordenSalida.create({
                         data: {
                             fecha: parsed.fecha,
@@ -360,6 +379,9 @@ export async function actualizarDetalleSalida(detalleId: string, formData: FormD
         }
 
         await prisma.$transaction(async (tx) => {
+            if (esTraspaso && bodegaDestinoId) {
+                await asegurarCompatibilidadDestino(tx, bodegaDestinoId, [parsed]);
+            }
             await devolverStock(tx, {
                 productoId: previo.productoId,
                 bodegaId: previo.ordenSalida.bodegaId,

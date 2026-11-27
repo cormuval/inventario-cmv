@@ -484,6 +484,8 @@ describe("Integración con crearOrdenSalida al emitir préstamos", () => {
 
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             const tx = {
+                bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
                 ordenSalida: { create: vi.fn().mockResolvedValue(ordenCreada) },
                 stock: {
                     findUnique: vi.fn().mockResolvedValue(stockActual),
@@ -554,6 +556,8 @@ describe("Integración con crearOrdenSalida al emitir préstamos", () => {
 
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             const tx = {
+                bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
                 ordenSalida: { create: vi.fn().mockResolvedValue(ordenCreada) },
                 stock: {
                     findUnique: vi.fn().mockResolvedValue(stockActual),

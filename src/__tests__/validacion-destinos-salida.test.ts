@@ -268,8 +268,10 @@ describe("Validación de Destinos y Bodega Destino en Órdenes de Salida", () =>
 
             let createdData: unknown = null;
             vi.mocked(prisma.$transaction).mockImplementation((async (callback: (tx: unknown) => Promise<unknown>) => {
-                const tx = {
-                    ordenSalida: {
+                    const tx = {
+                        bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                        producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
+                        ordenSalida: {
                         create: vi.fn().mockImplementation((args: { data: unknown }) => {
                             createdData = args.data;
                             return Promise.resolve({ id: "ord-prestamo-1" });

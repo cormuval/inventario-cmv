@@ -101,11 +101,35 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it("revalida la compatibilidad dentro de la transacción antes de crear la orden", async () => {
+        sesionOperador();
+        vi.mocked(prisma.bodega.findUnique).mockResolvedValue(bodegaVacunatorio as never);
+        const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "ASEO" }]) },
+            ordenSalida: { create: vi.fn() },
+            stock: { findUnique: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+            ordenSalidaDetalle: { create: vi.fn() }
+        };
+        vi.mocked(prisma.$transaction).mockImplementation((async (fn: (client: unknown) => Promise<unknown>) => fn(tx)) as never);
+
+        const resultado = await crearOrdenSalida(
+            { ok: false, message: "" },
+            crearFormDataTraspaso({ bodegaDestinoId: "b2" })
+        );
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("solo pueden ingresarse en bodegas de aseo");
+        expect(tx.ordenSalida.create).not.toHaveBeenCalled();
+    });
+
     it("ejecuta traspaso atómico descontando en origen e incrementando en destino", async () => {
         sesionOperador();
         vi.mocked(prisma.bodega.findUnique).mockResolvedValue(bodegaVacunatorio as never);
 
         const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
             ordenSalida: {
                 create: vi.fn().mockResolvedValue({ id: "orden-traspaso-1" })
             },
@@ -229,6 +253,8 @@ describe("traspaso a otra bodega en el mismo centro", () => {
 
         const loteVencido = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
         const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
             ordenSalida: { create: vi.fn().mockResolvedValue({ id: "orden-1" }) },
             stock: {
                 findUnique: vi.fn().mockResolvedValue({
@@ -259,6 +285,8 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         vi.mocked(prisma.bodega.findUnique).mockResolvedValue(bodegaVacunatorio as never);
 
         const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
             ordenSalida: { create: vi.fn().mockResolvedValue({ id: "orden-1" }) },
             stock: {
                 findUnique: vi.fn().mockResolvedValue({
@@ -301,6 +329,8 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue(detalleExistente as never);
 
         const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
             stock: {
                 upsert: vi.fn().mockResolvedValue({}),
                 findUnique: vi.fn().mockResolvedValue({
@@ -382,6 +412,8 @@ describe("traspaso a otra bodega en el mismo centro", () => {
         vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue(detallePrevio as never);
 
         const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
             stock: {
                 upsert: vi.fn().mockResolvedValue({}),
                 findUnique: vi.fn().mockResolvedValue({
@@ -420,6 +452,44 @@ describe("traspaso a otra bodega en el mismo centro", () => {
                 entidad: "OrdenSalidaDetalle"
             })
         );
+    });
+
+    it("rechaza editar un traspaso con un producto incompatible antes de tocar stock", async () => {
+        sesionOperador();
+        const fechaLote = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000);
+        vi.mocked(prisma.ordenSalidaDetalle.findUniqueOrThrow).mockResolvedValue({
+            id: "det-traspaso-3",
+            productoId: 1,
+            cantidad: 5,
+            lote: "LOTE-01",
+            fechaCaducidad: fechaLote,
+            ordenSalida: {
+                id: "ord-3",
+                centroId: "centro-1",
+                bodegaId: "b1",
+                bodegaDestinoId: "b2",
+                tipoSalida: "A otra bodega"
+            }
+        } as never);
+        const tx = {
+            bodega: { findUnique: vi.fn().mockResolvedValue({ ...bodegaVacunatorio, tipo: "CLINICA" }) },
+            producto: { findMany: vi.fn().mockResolvedValue([{ id: 2, linea: "ASEO" }]) },
+            stock: { upsert: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+            ordenSalidaDetalle: { update: vi.fn() }
+        };
+        vi.mocked(prisma.$transaction).mockImplementation((async (fn: (client: unknown) => Promise<unknown>) => fn(tx)) as never);
+        const formData = new FormData();
+        formData.set("productoId", "2");
+        formData.set("cantidad", "5");
+        formData.set("lote", "LOTE-ASEO");
+        formData.set("fechaCaducidad", fechaLote.toISOString());
+
+        const resultado = await actualizarDetalleSalida("det-traspaso-3", formData);
+
+        expect(resultado.ok).toBe(false);
+        expect(resultado.message).toContain("solo pueden ingresarse en bodegas de aseo");
+        expect(tx.stock.upsert).not.toHaveBeenCalled();
+        expect(tx.stock.update).not.toHaveBeenCalled();
     });
 
     it("falla si la orden de traspaso carece de bodegaDestinoId registrada al intentar revertir", async () => {

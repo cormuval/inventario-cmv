@@ -142,6 +142,8 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
             bodegaReceptoraActiva();
             const mockOrdenEntradaCreate = vi.fn().mockResolvedValue({ id: "ent-1" });
             vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({
+                bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                producto: { findMany: vi.fn().mockResolvedValue([{ linea: "Farmaco" }]) },
                 ordenSalida: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
                 stock: { upsert: vi.fn().mockResolvedValue({}) },
                 ordenEntrada: { create: mockOrdenEntradaCreate }
@@ -183,6 +185,27 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
             expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
+        it("revalida tipo y líneas dentro de la transacción antes de acreditar stock", async () => {
+            bodegaReceptoraActiva();
+            const stockUpsert = vi.fn();
+            vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({
+                bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                producto: { findMany: vi.fn().mockResolvedValue([{ linea: "ASEO" }]) },
+                ordenSalida: { updateMany: vi.fn() },
+                stock: { upsert: stockUpsert },
+                ordenEntrada: { create: vi.fn() }
+            } as never));
+
+            const res = await confirmarRecepcionPrestamoAction({
+                codigo: "K94J2Q8",
+                bodegaDestinoId: "bodega-pa-1"
+            });
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toContain("solo pueden ingresarse en bodegas de aseo");
+            expect(stockUpsert).not.toHaveBeenCalled();
+        });
+
         it("rechaza la recepción en una bodega fuera del alcance del usuario sin tocar el stock", async () => {
             bodegaReceptoraActiva();
             vi.mocked(validarCentroBodegaEnAlcance).mockRejectedValueOnce(
@@ -211,6 +234,8 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
 
             vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
                 const tx = {
+                    bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                    producto: { findMany: vi.fn().mockResolvedValue([{ linea: "Farmaco" }]) },
                     ordenSalida: { updateMany: mockUpdateMany },
                     stock: { upsert: mockStockUpsert },
                     ordenEntrada: { create: mockOrdenEntradaCreate }
@@ -259,6 +284,8 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
                 // La primera llamada actualiza 1 fila; la segunda (concurrente) no encuentra filas con EN_TRANSITO
                 const count = llamadasUpdateMany === 1 ? 1 : 0;
                 const tx = {
+                    bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                    producto: { findMany: vi.fn().mockResolvedValue([{ linea: "Farmaco" }]) },
                     ordenSalida: {
                         updateMany: vi.fn().mockResolvedValue({ count })
                     },

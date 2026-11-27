@@ -207,6 +207,23 @@ export async function confirmarRecepcionPrestamoAction(
         }
 
         await prisma.$transaction(async (tx) => {
+            const [bodegaDestinoActual, productosActuales] = await Promise.all([
+                tx.bodega.findUnique({
+                    where: { id: parsed.bodegaDestinoId },
+                    select: { tipo: true }
+                }),
+                tx.producto.findMany({
+                    where: { id: { in: orden.detalles.map((detalle) => detalle.productoId) } },
+                    select: { linea: true }
+                })
+            ]);
+            if (!bodegaDestinoActual) {
+                throw new Error("La bodega destino no existe.");
+            }
+            if (!sonProductosCompatiblesConBodega(bodegaDestinoActual.tipo, productosActuales)) {
+                throw new Error(obtenerMensajeIncompatibilidad(bodegaDestinoActual.tipo));
+            }
+
             // 1. Actualización condicional atómica para prevenir race conditions / doble recepción
             const { count } = await tx.ordenSalida.updateMany({
                 where: {

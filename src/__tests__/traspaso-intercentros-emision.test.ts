@@ -197,6 +197,8 @@ describe("Emisión y Gestión de Traspaso / Préstamo Intercentros (orden-salida
 
             vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
                 const tx = {
+                    bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                    producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
                     ordenSalida: { create: vi.fn().mockResolvedValue(ordenCreada) },
                     stock: {
                         findUnique: vi.fn().mockResolvedValue(stockActual),
@@ -235,6 +237,8 @@ describe("Emisión y Gestión de Traspaso / Préstamo Intercentros (orden-salida
                     throw p2002Error;
                 }
                 const tx = {
+                    bodega: { findUnique: vi.fn().mockResolvedValue({ tipo: "CLINICA" }) },
+                    producto: { findMany: vi.fn().mockResolvedValue([{ linea: "CLINICO" }]) },
                     ordenSalida: {
                         create: vi.fn().mockResolvedValue({
                             id: "ord-retry-ok",
