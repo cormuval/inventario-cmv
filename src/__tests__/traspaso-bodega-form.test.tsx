@@ -13,9 +13,9 @@ vi.mock("@/modules/orden-salida/actions/orden-salida.action", () => ({
 
 describe("OrdenSalidaForm - selección de bodegas destino para operadores R07", () => {
     const centroBaron = { id: "centro-1", nombre: "CESFAM Barón", estado: true };
-    const bodegaFarmacia = { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", estado: true };
-    const bodegaVacunatorio = { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", estado: true };
-    const bodegaDental = { id: "b3", nombre: "Bodega Dental", centroId: "centro-1", estado: true };
+    const bodegaFarmacia = { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
+    const bodegaVacunatorio = { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
+    const bodegaDental = { id: "b3", nombre: "Bodega Dental", centroId: "centro-1", tipo: "CLINICA" as const, estado: true };
 
     it("permite a un operador R07 con una sola bodega asignada ver las demás bodegas del centro como destino", () => {
         // Para R07, bodegas asignadas contiene únicamente Farmacia (b1)

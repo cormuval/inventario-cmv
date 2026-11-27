@@ -29,9 +29,9 @@ const mockCentros = [
 ];
 
 const mockBodegas = [
-    { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", estado: true, createdAt: new Date(), updatedAt: new Date() },
-    { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", estado: true, createdAt: new Date(), updatedAt: new Date() },
-    { id: "b3", nombre: "Bodega Playa Ancha", centroId: "centro-2", estado: true, createdAt: new Date(), updatedAt: new Date() }
+    { id: "b1", nombre: "Bodega Farmacia", centroId: "centro-1", tipo: "CLINICA" as const, estado: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: "b2", nombre: "Bodega Vacunatorio", centroId: "centro-1", tipo: "CLINICA" as const, estado: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: "b3", nombre: "Bodega Playa Ancha", centroId: "centro-2", tipo: "CLINICA" as const, estado: true, createdAt: new Date(), updatedAt: new Date() }
 ];
 
 const mockRoles = [

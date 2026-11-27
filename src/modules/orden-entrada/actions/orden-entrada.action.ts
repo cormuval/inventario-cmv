@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, TipoBodega } from "@prisma/client";
 
 // lib
 import { requireSessionUser, puedeOperarEntrada } from "@/shared/lib/auth";
@@ -16,6 +16,7 @@ import { crearOrdenEntradaSchema, ordenEntradaDetalleFormSchema } from "@/module
 import type { ActionState } from "@/shared/types/action-state";
 
 // utils
+import { esProductoCompatibleConBodega, obtenerMensajeIncompatibilidad } from "@/modules/orden-entrada/utils/compatibilidad-bodega-producto";
 import { calcularStockMinimo } from "@/modules/stock/utils/movimientos";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
@@ -46,7 +47,15 @@ export async function crearOrdenEntrada(prevState: ActionState, formData: FormDa
             detalles: leerDetallesEntrada(formData)
         });
         await validarCentroBodegaEnAlcance(parsed.centroId, parsed.bodegaId);
+        const bodega = await obtenerBodegaActiva(parsed.bodegaId);
+        if (!bodega) {
+            return { ok: false, message: "La bodega seleccionada no existe o esta inactiva." };
+        }
         const categoriasPorProducto = await obtenerCategoriasProductos(parsed.detalles.map((detalle) => detalle.productoId));
+        const errorCompatibilidad = validarProductosParaBodega(bodega.tipo, parsed.detalles, categoriasPorProducto);
+        if (errorCompatibilidad) {
+            return { ok: false, message: errorCompatibilidad };
+        }
 
         const orden = await prisma.$transaction(async (tx) => {
             const nuevaOrden = await tx.ordenEntrada.create({
@@ -122,11 +131,18 @@ export async function actualizarDetalleEntrada(detalleId: string, formData: Form
             include: { ordenEntrada: true }
         });
         await validarCentroBodegaEnAlcance(previo.ordenEntrada.centroId, previo.ordenEntrada.bodegaId);
+        const bodega = await obtenerBodegaActiva(previo.ordenEntrada.bodegaId);
+        if (!bodega) {
+            return { ok: false, message: "La bodega seleccionada no existe o esta inactiva." };
+        }
 
         const categoriasPorProducto = await obtenerCategoriasProductos([parsed.productoId]);
         const categoria = categoriasPorProducto.get(parsed.productoId);
         if (!categoria) {
             return { ok: false, message: "El producto seleccionado no existe o esta inactivo." };
+        }
+        if (!esProductoCompatibleConBodega(bodega.tipo, categoria)) {
+            return { ok: false, message: obtenerMensajeIncompatibilidad(bodega.tipo) };
         }
 
         await prisma.$transaction(async (tx) => {
@@ -230,6 +246,40 @@ async function obtenerCategoriasProductos(productoIds: number[]): Promise<Map<nu
     });
 
     return new Map(productos.map((producto) => [producto.id, producto.linea]));
+}
+
+async function obtenerBodegaActiva(bodegaId: string): Promise<{ tipo: TipoBodega } | null> {
+    const bodega = await prisma.bodega.findUnique({
+        where: { id: bodegaId },
+        select: {
+            tipo: true,
+            estado: true
+        }
+    });
+
+    if (!bodega?.estado) {
+        return null;
+    }
+
+    return { tipo: bodega.tipo };
+}
+
+function validarProductosParaBodega(
+    tipoBodega: TipoBodega,
+    detalles: DetalleEntradaForm[],
+    categoriasPorProducto: Map<number, string>
+): string | null {
+    for (const detalle of detalles) {
+        const categoria = categoriasPorProducto.get(detalle.productoId);
+        if (!categoria) {
+            return "Uno de los productos seleccionados no existe o esta inactivo.";
+        }
+        if (!esProductoCompatibleConBodega(tipoBodega, categoria)) {
+            return obtenerMensajeIncompatibilidad(tipoBodega);
+        }
+    }
+
+    return null;
 }
 
 async function aplicarEntradaStock(

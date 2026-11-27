@@ -28,6 +28,7 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
         busqueda: obtenerParametro(params, "q"),
         linea: obtenerParametro(params, "linea"),
         bajoMinimo: obtenerParametro(params, "bajoMinimo") === "1",
+        sinStock: obtenerParametro(params, "sinStock") === "1",
         porCaducar: obtenerParametro(params, "porCaducar") === "1",
         sort: obtenerSort(obtenerParametro(params, "sort")),
         direction: obtenerDirection(obtenerParametro(params, "direction")),
@@ -39,6 +40,7 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
         q: data.busqueda,
         linea: data.linea,
         bajoMinimo: data.bajoMinimo ? "1" : undefined,
+        sinStock: data.sinStock ? "1" : undefined,
         porCaducar: data.porCaducar ? "1" : undefined
     };
 
@@ -79,6 +81,10 @@ export default async function StockPage({ searchParams }: StockPageProps): Promi
                                 <label className="flex items-center gap-2">
                                     <input type="checkbox" name="bajoMinimo" value="1" defaultChecked={data.bajoMinimo} />
                                     Bajo stock mínimo
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" name="sinStock" value="1" defaultChecked={data.sinStock} />
+                                    Sin stock
                                 </label>
                                 <label className="flex items-center gap-2">
                                     <input type="checkbox" name="porCaducar" value="1" defaultChecked={data.porCaducar} />

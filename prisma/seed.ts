@@ -58,22 +58,24 @@ async function main(): Promise<void> {
 
     const bodegaClinica = await prisma.bodega.upsert({
         where: { id: "bodega-clinica" },
-        update: { nombre: "Bodega Clinica", estado: true },
+        update: { nombre: "Bodega Clinica", tipo: "CLINICA", estado: true },
         create: {
             id: "bodega-clinica",
             nombre: "Bodega Clinica",
             centroId: centro.id,
+            tipo: "CLINICA",
             estado: true
         }
     });
 
     const bodegaAseo = await prisma.bodega.upsert({
         where: { id: "bodega-aseo" },
-        update: { nombre: "Bodega Aseo", estado: true },
+        update: { nombre: "Bodega Aseo", tipo: "ASEO", estado: true },
         create: {
             id: "bodega-aseo",
             nombre: "Bodega Aseo",
             centroId: centro.id,
+            tipo: "ASEO",
             estado: true
         }
     });

@@ -13,6 +13,7 @@ const BASE: FiltrosConsultaStock = {
     bodegaIds: ["b1", "b2"],
     busqueda: "",
     bajoMinimo: false,
+    sinStock: false,
     porCaducar: false,
     sort: "producto",
     direction: "asc",
@@ -74,6 +75,29 @@ describe("construirConsultaStock", () => {
         expect(texto).toContain("ORDER BY CASE WHEN g.cantidad <= 0 THEN 0");
         expect(texto).toContain("END DESC");
     });
+
+    it("incluye grupos agotados con varios lotes solo al filtrar sin stock", () => {
+        const consulta = construirConsultaStock({ ...BASE, sinStock: true }, { skip: 0, tamano: 50 });
+        const texto = sqlPlano(consulta);
+
+        expect(texto).not.toContain("HAVING lotesConExistencia > 0 OR lotes = 1");
+        expect(texto).toContain("HAVING SUM(s.Cantidad_Disponible > 0) = 0");
+        expect(texto).toContain("WHERE 1 = 1 AND g.cantidad = 0");
+    });
+
+    it("mantiene fuera los grupos agotados de varios lotes sin el filtro sin stock", () => {
+        const texto = sqlPlano(construirConsultaStock(BASE, { skip: 0, tamano: 50 }));
+
+        expect(texto).toContain("HAVING lotesConExistencia > 0 OR lotes = 1");
+        expect(texto).not.toContain("OR g.cantidad = 0");
+    });
+
+    it("no combina bajo mínimo con sin stock", () => {
+        const texto = sqlPlano(construirConsultaStock({ ...BASE, bajoMinimo: true, sinStock: true }, { skip: 0, tamano: 50 }));
+
+        expect(texto).toContain("g.cantidad = 0");
+        expect(texto).not.toContain("g.cantidad > 0 AND g.cantidad <=");
+    });
 });
 
 describe("construirConteoStock", () => {
@@ -82,6 +106,14 @@ describe("construirConteoStock", () => {
         expect(texto).toContain("SELECT COUNT(*) AS total");
         expect(texto).toContain("p.Linea = ?");
         expect(texto).not.toContain("LIMIT");
+    });
+
+    it("usa la misma condición de cantidad cero que el listado sin stock", () => {
+        const texto = sqlPlano(construirConteoStock({ ...BASE, sinStock: true }));
+
+        expect(texto).not.toContain("HAVING lotesConExistencia > 0 OR lotes = 1");
+        expect(texto).toContain("HAVING SUM(s.Cantidad_Disponible > 0) = 0");
+        expect(texto).toContain("WHERE 1 = 1 AND g.cantidad = 0");
     });
 });
 

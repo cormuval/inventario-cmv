@@ -21,6 +21,7 @@ export interface ListarStockInput {
     busqueda?: string;
     linea?: string;
     bajoMinimo?: boolean;
+    sinStock?: boolean;
     porCaducar?: boolean;
     sort?: StockSortKey;
     direction?: SortDirection;
@@ -60,6 +61,7 @@ export interface ListarStockResult {
     linea: string;
     lineas: string[];
     bajoMinimo: boolean;
+    sinStock: boolean;
     porCaducar: boolean;
     sort: StockSortKey;
     direction: SortDirection;
@@ -91,7 +93,8 @@ export async function listarStockConsolidado(input: ListarStockInput = {}): Prom
     const linea = input.linea?.trim() ?? "";
     const sort = input.sort ?? "producto";
     const direction = input.direction ?? "asc";
-    const bajoMinimo = input.bajoMinimo ?? false;
+    const sinStock = input.sinStock ?? false;
+    const bajoMinimo = sinStock ? false : (input.bajoMinimo ?? false);
     const porCaducar = input.porCaducar ?? false;
     const lineas = (await prisma.producto.findMany({
         distinct: ["linea"],
@@ -108,6 +111,7 @@ export async function listarStockConsolidado(input: ListarStockInput = {}): Prom
         linea,
         lineas,
         bajoMinimo,
+        sinStock,
         porCaducar,
         sort,
         direction
@@ -122,6 +126,7 @@ export async function listarStockConsolidado(input: ListarStockInput = {}): Prom
         busqueda,
         linea: linea || undefined,
         bajoMinimo,
+        sinStock,
         porCaducar,
         sort,
         direction,

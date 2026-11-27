@@ -21,6 +21,7 @@ export interface FiltrosConsultaStock {
     busqueda: string;
     linea?: string;
     bajoMinimo: boolean;
+    sinStock: boolean;
     porCaducar: boolean;
     sort: StockSortKey;
     direction: SortDirection;
@@ -57,11 +58,16 @@ export function patronLike(texto: string): string {
 
 /**
  * Agrupa lotes por producto × bodega con la regla de `filtrarExistenciasVisibles`:
- * suma y caducidad mínima solo de lotes con existencia; si no hay ninguno, el grupo
- * se muestra únicamente cuando tiene un solo lote (fila en 0).
+ * sin `sinStock`, muestra grupos con existencia o una única fila agotada; con
+ * `sinStock`, incluye todos los grupos agotados, incluidos los de varios lotes.
+ * La suma y la caducidad mínima consideran solo los lotes con existencia.
  * `caducidadProxima` es el primer lote con existencia que aún no vence, sin contar la fecha centinela.
  */
-function agrupado(bodegaIds: string[], hoy: string): Prisma.Sql {
+function agrupado(bodegaIds: string[], hoy: string, sinStock: boolean): Prisma.Sql {
+    const condicionVisibilidad = sinStock
+        ? Prisma.sql`SUM(s.Cantidad_Disponible > 0) = 0`
+        : Prisma.sql`lotesConExistencia > 0 OR lotes = 1`;
+
     return Prisma.sql`
         SELECT
             s.ID_Product AS productoId,
@@ -74,7 +80,7 @@ function agrupado(bodegaIds: string[], hoy: string): Prisma.Sql {
         FROM Stock s
         WHERE s.ID_Bodega IN (${Prisma.join(bodegaIds)})
         GROUP BY s.ID_Product, s.ID_Bodega
-        HAVING lotesConExistencia > 0 OR lotes = 1`;
+        HAVING ${condicionVisibilidad}`;
 }
 
 function condiciones(filtros: FiltrosConsultaStock): Prisma.Sql {
@@ -91,7 +97,9 @@ function condiciones(filtros: FiltrosConsultaStock): Prisma.Sql {
     if (filtros.linea) {
         partes.push(Prisma.sql`p.Linea = ${filtros.linea}`);
     }
-    if (filtros.bajoMinimo) {
+    if (filtros.sinStock) {
+        partes.push(Prisma.sql`g.cantidad = 0`);
+    } else if (filtros.bajoMinimo) {
         partes.push(Prisma.sql`g.cantidad > 0 AND g.cantidad <= ${EXPR_MINIMO}`);
     }
     if (filtros.porCaducar) {
@@ -133,7 +141,7 @@ function columnaOrden(sort: StockSortKey, hoy: string): Prisma.Sql {
 
 function desdeConJoins(filtros: FiltrosConsultaStock): Prisma.Sql {
     return Prisma.sql`
-        FROM (${agrupado(filtros.bodegaIds, filtros.hoy)}) g
+        FROM (${agrupado(filtros.bodegaIds, filtros.hoy, filtros.sinStock)}) g
         JOIN Producto p ON p.ID_Product = g.productoId
         JOIN Bodega b ON b.ID_Bodega = g.bodegaId
         JOIN Centro c ON c.ID_Centro = b.ID_Centro
