@@ -130,7 +130,8 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
                 id: "bodega-pa-1",
                 nombre: "Farmacia Playa Ancha",
                 centroId: "centro-playa-ancha",
-                estado: true
+                estado: true,
+                tipo: "CLINICA"
             } as never);
         }
 
@@ -152,6 +153,34 @@ describe("Recepción de Préstamos Intercentros (recepcion-prestamos.action)", (
             expect(mockOrdenEntradaCreate).toHaveBeenCalledWith(expect.objectContaining({
                 data: expect.objectContaining({ fecha: new Date("2026-11-05T00:00:00.000Z") })
             }));
+        });
+
+        it("rechaza una bodega receptora incompatible antes de modificar stock", async () => {
+            vi.mocked(prisma.ordenSalida.findFirst).mockResolvedValue({
+                ...mockOrdenEnTransito,
+                detalles: [
+                    {
+                        ...mockOrdenEnTransito.detalles[0],
+                        producto: { ...mockOrdenEnTransito.detalles[0].producto, linea: "ASEO" }
+                    }
+                ]
+            } as never);
+            vi.mocked(prisma.bodega.findUnique).mockResolvedValue({
+                id: "bodega-pa-1",
+                nombre: "Farmacia Playa Ancha",
+                centroId: "centro-playa-ancha",
+                estado: true,
+                tipo: "CLINICA"
+            } as never);
+
+            const res = await confirmarRecepcionPrestamoAction({
+                codigo: "K94J2Q8",
+                bodegaDestinoId: "bodega-pa-1"
+            });
+
+            expect(res.ok).toBe(false);
+            expect(res.message).toContain("solo pueden ingresarse en bodegas de aseo");
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
         it("rechaza la recepción en una bodega fuera del alcance del usuario sin tocar el stock", async () => {

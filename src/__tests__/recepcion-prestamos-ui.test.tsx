@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RecepcionPrestamoView } from "@/modules/orden-entrada/components/recepcion-prestamo-view";
 import * as actions from "@/modules/orden-entrada/actions/recepcion-prestamos.action";
@@ -17,8 +17,9 @@ vi.mock("sonner", () => ({
 }));
 
 const mockBodegas = [
-    { id: "b-pa-1", nombre: "Farmacia Playa Ancha", centroId: "c-pa" },
-    { id: "b-pa-2", nombre: "Vacunatorio Playa Ancha", centroId: "c-pa" }
+    { id: "b-pa-1", nombre: "Farmacia Playa Ancha", centroId: "c-pa", tipo: "CLINICA" as const },
+    { id: "b-pa-2", nombre: "Vacunatorio Playa Ancha", centroId: "c-pa", tipo: "CLINICA" as const },
+    { id: "b-pa-3", nombre: "Aseo Playa Ancha", centroId: "c-pa", tipo: "ASEO" as const }
 ];
 
 const mockPrestamoDetalle = {
@@ -95,5 +96,22 @@ describe("RecepcionPrestamoView UI", () => {
         await user.click(screen.getByRole("button", { name: /localizar envío/i }));
 
         expect(await screen.findByText(/Tránsito Demorado/i)).toBeInTheDocument();
+    });
+
+    it("muestra solo bodegas compatibles con todos los productos del préstamo", async () => {
+        vi.mocked(actions.buscarPrestamoPorCodigoAction).mockResolvedValue({
+            ok: true,
+            message: "Localizado",
+            prestamo: mockPrestamoDetalle
+        });
+
+        const user = userEvent.setup();
+        render(<RecepcionPrestamoView bodegasDisponibles={mockBodegas} />);
+        await user.type(screen.getByPlaceholderText("Ej: K94J2Q8"), "K94J2Q8");
+        await user.click(screen.getByRole("button", { name: /localizar envío/i }));
+
+        const selector = await screen.findByLabelText(/bodega de destino/i);
+        expect(within(selector).getByRole("option", { name: "Farmacia Playa Ancha" })).toBeInTheDocument();
+        expect(within(selector).queryByRole("option", { name: "Aseo Playa Ancha" })).not.toBeInTheDocument();
     });
 });

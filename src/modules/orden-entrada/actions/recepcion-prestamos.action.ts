@@ -22,6 +22,7 @@ import {
 // utils
 import { normalizarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
 import { fechaHoyChile } from "@/shared/utils/filtros-registros";
+import { obtenerMensajeIncompatibilidad, sonProductosCompatiblesConBodega } from "@/shared/utils/compatibilidad-bodega-producto";
 
 export interface DetallePrestamoResumen {
     id: string;
@@ -195,6 +196,13 @@ export async function confirmarRecepcionPrestamoAction(
             return {
                 ok: false,
                 message: "La bodega seleccionada no existe o no pertenece al centro de salud receptor."
+            };
+        }
+
+        if (!sonProductosCompatiblesConBodega(bodegaDestino.tipo, orden.detalles.map((detalle) => detalle.producto))) {
+            return {
+                ok: false,
+                message: obtenerMensajeIncompatibilidad(bodegaDestino.tipo)
             };
         }
 

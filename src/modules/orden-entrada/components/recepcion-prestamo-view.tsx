@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { TipoBodega } from "@prisma/client";
 import { Search, PackageCheck, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,11 +21,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 
 // utils
 import { normalizarCodigoRecepcion } from "@/modules/orden-salida/utils/codigo-recepcion";
+import { sonProductosCompatiblesConBodega } from "@/shared/utils/compatibilidad-bodega-producto";
 
 interface BodegaOption {
     id: string;
     nombre: string;
     centroId: string;
+    tipo: TipoBodega;
 }
 
 interface RecepcionPrestamoViewProps {
@@ -48,7 +51,11 @@ export function RecepcionPrestamoView({
         if (!prestamo) {
             return bodegasDisponibles;
         }
-        return bodegasDisponibles.filter((b) => b.centroId === prestamo.centroDestinoId);
+        return bodegasDisponibles.filter(
+            (b) =>
+                b.centroId === prestamo.centroDestinoId &&
+                sonProductosCompatiblesConBodega(b.tipo, prestamo.detalles)
+        );
     }, [bodegasDisponibles, prestamo]);
 
     const [bodegaDestinoId, setBodegaDestinoId] = React.useState(
